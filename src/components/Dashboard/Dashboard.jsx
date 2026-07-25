@@ -14,6 +14,7 @@ import StaffTab from './tabs/StaffTab'
 import StockTab from './tabs/StockTab'
 import MatieresTab from './tabs/MatieresTab'
 import ComptabiliteTab from './tabs/ComptabiliteTab'
+import PagesClientTab from './tabs/PagesClientTab'
 
 const TABS = [
   { id: 'clients',    icon: '👥', label: 'Clients & Devis' },
@@ -26,6 +27,7 @@ const TABS = [
   { id: 'menus',      icon: '🍽️', label: 'Menus' },
   { id: 'gateaux',    icon: '🎂', label: 'Gâteaux' },
   { id: 'prestations',icon: '🎵', label: 'Prestations' },
+  { id: 'pages',      icon: '🌍', label: 'Pages Client' },
   { id: 'infos',      icon: '⚙️', label: 'Mes Infos' },
   { id: 'motdepasse', icon: '🔑', label: 'Code PIN' },
 ]
@@ -65,6 +67,7 @@ export default function Dashboard() {
       case 'menus':       return <MenuTab key={refreshKey} />
       case 'gateaux':     return <GateauTab key={refreshKey} />
       case 'prestations': return <PrestationTab key={refreshKey} />
+      case 'pages':       return <PagesClientTab key={refreshKey} />
       case 'infos':       return <MesInfosTab key={refreshKey} />
       case 'motdepasse':  return <MotDePasseTab key={refreshKey} />
       default: return null

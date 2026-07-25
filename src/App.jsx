@@ -6,6 +6,7 @@ import Dashboard from './components/Dashboard/Dashboard'
 import WizardForm from './components/Wizard/WizardForm'
 import EspaceClient from './components/EspaceClient/EspaceClient'
 import EspaceStaff from './components/EspaceStaff/EspaceStaff'
+import CityPage from './components/VillesPages/CityPage'
 import SyncIndicator from './components/SyncIndicator'
 import { initStorage } from './utils/storage'
 
@@ -51,6 +52,7 @@ function App() {
         <Route path="/devis" element={<WizardForm />} />
         <Route path="/espace-client/:devisId" element={<EspaceClient />} />
         <Route path="/espace-staff/:staffId" element={<EspaceStaff />} />
+        <Route path="/villes/:citySlug" element={<CityPage />} />
       </Routes>
       <SyncIndicator />
     </BrowserRouter>

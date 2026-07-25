@@ -1,0 +1,21 @@
+# Apache configuration for the Paradise application (React SPA + PHP API).
+#
+# Requirements: mod_rewrite must be enabled on the server.
+
+Options -Indexes
+DirectoryIndex index.html
+
+<IfModule mod_rewrite.c>
+    RewriteEngine On
+    RewriteBase /
+
+    # Serve PHP files in api/ directly — do not rewrite them to index.html
+    RewriteRule ^api/ - [L]
+
+    # Let static assets (js, css, images…) be served directly
+    RewriteCond %{REQUEST_FILENAME} -f
+    RewriteRule ^ - [L]
+
+    # Fall back to index.html for all other routes (React Router SPA)
+    RewriteRule ^ index.html [L]
+</IfModule>

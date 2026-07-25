@@ -7,6 +7,10 @@ yarn-error.log*
 pnpm-debug.log*
 lerna-debug.log*
 
+# User data written at runtime by the PHP backend — never commit these
+public/storage-data/*.json
+public/storage-data/notify.log
+
 node_modules
 dist
 dist-ssr

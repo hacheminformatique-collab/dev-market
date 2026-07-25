@@ -53,6 +53,7 @@ export default function PagesClientTab() {
   const [pages, setPages]           = useState({})
   const [gallery, setGallery]       = useState([])
   const [backups, setBackups]       = useState([])
+  const [restoringIdx, setRestoringIdx] = useState(null)
   const [saving, setSaving]         = useState(false)
   const [generating, setGenerating] = useState(false)
   const [genProgress, setGenProgress] = useState({ done: 0, total: 0, current: '' })
@@ -224,6 +225,24 @@ export default function PagesClientTab() {
     const updated = gallery.filter((_, i) => i !== idx)
     setGallery(updated)
     await saveCityGallery(updated)
+  }
+
+  async function handleRestoreBackup(idx) {
+    const backup = backups[idx]
+    if (!backup?.snapshot) return
+    const ok = window.confirm('Restaurer cette sauvegarde des pages villes ? Les pages actuelles seront remplacées.')
+    if (!ok) return
+
+    setRestoringIdx(idx)
+    try {
+      const snapshot = backup.snapshot || {}
+      await saveCityPages(snapshot)
+      setPages(snapshot)
+      const bkps = await getCityPagesBackups()
+      setBackups(bkps || [])
+    } finally {
+      setRestoringIdx(null)
+    }
   }
 
   // ── Social helpers ────────────────────────────────────────────────────────
@@ -717,6 +736,14 @@ export default function PagesClientTab() {
                     <span style={{ fontSize: '12px', color: '#aaa', background: '#f5f5f5', padding: '3px 10px', borderRadius: '20px' }}>
                       {i === 0 ? 'Dernière' : `Il y a ${i + 1}`}
                     </span>
+                    <button
+                      className="btn btn-outline btn-sm"
+                      onClick={() => handleRestoreBackup(i)}
+                      disabled={restoringIdx !== null}
+                      style={{ minWidth: '110px', justifyContent: 'center' }}
+                    >
+                      {restoringIdx === i ? '⏳ Restauration…' : '↩ Restaurer'}
+                    </button>
                   </div>
                 )
               })}

@@ -158,6 +158,108 @@ function TikTokEmbed({ url }) {
   )
 }
 
+// ── City news RSS feed ─────────────────────────────────────────────────────
+
+function CityNews({ cityName }) {
+  const [items, setItems] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState(false)
+
+  useEffect(() => {
+    setLoading(true)
+    setError(false)
+    const rssUrl = `https://news.google.com/rss/search?q=${encodeURIComponent(cityName + ' actualités')}&hl=fr&gl=FR&ceid=FR:fr`
+    const apiUrl = `https://api.rss2json.com/v1/api.json?rss_url=${encodeURIComponent(rssUrl)}&count=5`
+
+    fetch(apiUrl)
+      .then((r) => r.json())
+      .then((data) => {
+        if (data.status === 'ok' && Array.isArray(data.items)) {
+          setItems(data.items.slice(0, 5))
+        } else {
+          setError(true)
+        }
+      })
+      .catch(() => setError(true))
+      .finally(() => setLoading(false))
+  }, [cityName])
+
+  if (loading) {
+    return (
+      <Section title={`📰 Quoi de neuf à ${cityName} ?`}>
+        <p style={{ color: '#bbb', fontSize: '14px' }}>Chargement des actualités…</p>
+      </Section>
+    )
+  }
+
+  if (error || items.length === 0) return null
+
+  return (
+    <Section title={`📰 Quoi de neuf à ${cityName} ?`}>
+      <p style={{ color: 'var(--text-light)', fontSize: '14px', marginBottom: '20px' }}>
+        Les dernières actualités de {cityName} et de ses environs.
+      </p>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+        {items.map((item, i) => {
+          const pubDate = item.pubDate ? new Date(item.pubDate).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' }) : ''
+          return (
+            <a
+              key={i}
+              href={item.link}
+              target="_blank"
+              rel="noreferrer noopener"
+              style={{
+                display: 'block', padding: '14px 18px',
+                background: 'white', border: '1px solid var(--border)',
+                borderRadius: '10px', textDecoration: 'none',
+                transition: 'box-shadow 0.15s, border-color 0.15s',
+                boxShadow: 'var(--shadow-sm)',
+              }}
+              onMouseEnter={(e) => { e.currentTarget.style.boxShadow = 'var(--shadow-md)'; e.currentTarget.style.borderColor = 'var(--gold)' }}
+              onMouseLeave={(e) => { e.currentTarget.style.boxShadow = 'var(--shadow-sm)'; e.currentTarget.style.borderColor = 'var(--border)' }}
+            >
+              <div style={{ fontSize: '15px', fontWeight: '600', color: 'var(--dark)', marginBottom: '4px', lineHeight: 1.4 }}>
+                {item.title}
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '12px', color: '#aaa' }}>
+                {item.author && <span>{item.author}</span>}
+                {pubDate && <span>• {pubDate}</span>}
+              </div>
+            </a>
+          )
+        })}
+      </div>
+    </Section>
+  )
+}
+
+// ── WhatsApp floating button ───────────────────────────────────────────────
+
+function WhatsAppButton() {
+  return (
+    <a
+      href="https://wa.me/33782821582"
+      target="_blank"
+      rel="noreferrer noopener"
+      aria-label="Contactez-nous sur WhatsApp"
+      style={{
+        position: 'fixed', bottom: '24px', right: '24px', zIndex: 9999,
+        width: '60px', height: '60px', borderRadius: '50%',
+        background: '#25D366', display: 'flex', alignItems: 'center', justifyContent: 'center',
+        boxShadow: '0 4px 16px rgba(37,211,102,0.45)',
+        transition: 'transform 0.18s, box-shadow 0.18s',
+        textDecoration: 'none',
+      }}
+      onMouseEnter={(e) => { e.currentTarget.style.transform = 'scale(1.1)'; e.currentTarget.style.boxShadow = '0 6px 24px rgba(37,211,102,0.6)' }}
+      onMouseLeave={(e) => { e.currentTarget.style.transform = 'scale(1)'; e.currentTarget.style.boxShadow = '0 4px 16px rgba(37,211,102,0.45)' }}
+    >
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" width="32" height="32" fill="white">
+        <path d="M24 4C12.95 4 4 12.95 4 24c0 3.55.93 6.87 2.56 9.75L4 44l10.5-2.75A19.87 19.87 0 0 0 24 44c11.05 0 20-8.95 20-20S35.05 4 24 4zm0 36.5c-3.16 0-6.13-.87-8.67-2.38l-.62-.37-6.23 1.63 1.66-6.06-.41-.64A16.43 16.43 0 0 1 7.5 24C7.5 14.84 14.84 7.5 24 7.5S40.5 14.84 40.5 24 33.16 40.5 24 40.5zm9.08-12.3c-.49-.25-2.92-1.44-3.37-1.6-.45-.17-.78-.25-1.1.25-.33.49-1.27 1.6-1.56 1.93-.29.33-.57.37-1.06.12-.49-.25-2.07-.76-3.94-2.43-1.46-1.3-2.44-2.9-2.73-3.39-.29-.49-.03-.76.22-1 .22-.22.49-.57.74-.86.25-.29.33-.49.49-.82.17-.33.08-.62-.04-.86-.12-.25-1.1-2.65-1.51-3.63-.4-.95-.8-.82-1.1-.84-.29-.02-.62-.02-.95-.02-.33 0-.86.12-1.31.62-.45.49-1.72 1.68-1.72 4.1 0 2.42 1.76 4.76 2.01 5.09.25.33 3.47 5.3 8.41 7.43 1.17.51 2.09.81 2.8 1.04 1.18.38 2.25.32 3.1.2.94-.14 2.92-1.19 3.33-2.34.41-1.15.41-2.14.29-2.34-.12-.2-.45-.33-.94-.57z"/>
+      </svg>
+    </a>
+  )
+}
+
 // ── Nearby city backlinks ──────────────────────────────────────────────────
 
 function NearbyLinks({ citySlug, pages }) {
@@ -480,6 +582,9 @@ export default function CityPage() {
           </Section>
         )}
 
+        {/* City news RSS feed */}
+        <CityNews cityName={city.name} />
+
         {/* CTA */}
         <div style={{
           background: 'linear-gradient(135deg, var(--dark), var(--navy))',
@@ -505,6 +610,9 @@ export default function CityPage() {
           Page mise à jour le {new Date(page.generatedAt).toLocaleDateString('fr-FR')} • {businessName} • {city.name}, {city.deptName}
         </div>
       </div>
+
+      {/* Floating WhatsApp button */}
+      <WhatsAppButton />
     </div>
   )
 }

@@ -337,7 +337,14 @@ export default function PagesClientTab() {
                         type="checkbox"
                         checked={check !== 'none'}
                         ref={(el) => { if (el) el.indeterminate = check === 'partial' }}
-                        onChange={() => focusDeptCode(dept.code)}
+                        onChange={(e) => {
+                          e.stopPropagation()
+                          if (check === 'none') {
+                            selectAllDept(dept.code)
+                          } else {
+                            deselectAllDept(dept.code)
+                          }
+                        }}
                         onClick={(e) => e.stopPropagation()}
                         style={{ cursor: 'pointer', accentColor: 'var(--gold)' }}
                       />

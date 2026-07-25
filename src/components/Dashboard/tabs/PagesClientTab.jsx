@@ -59,6 +59,7 @@ export default function PagesClientTab() {
   const [genDone, setGenDone]       = useState(false)
   const [selDepts, setSelDepts]     = useState({})   // { deptCode: 'all' | Set<slug> }
   const [focusDept, setFocusDept]   = useState(null)
+  const [citySearch, setCitySearch] = useState('')
 
   // Load everything on mount
   useEffect(() => {
@@ -93,17 +94,17 @@ export default function PagesClientTab() {
 
   // ── City / dept selection helpers ────────────────────────────────────────
 
-  function toggleDept(code) {
-    setSelDepts((prev) => {
-      const next = { ...prev }
-      if (next[code] === 'all') {
-        delete next[code]
-      } else {
-        next[code] = 'all'
-      }
-      return next
-    })
-    if (focusDept !== code) setFocusDept(code)
+  function focusDeptCode(code) {
+    setFocusDept((prev) => (prev === code ? null : code))
+    setCitySearch('')
+  }
+
+  function selectAllDept(code) {
+    setSelDepts((prev) => ({ ...prev, [code]: 'all' }))
+  }
+
+  function deselectAllDept(code) {
+    setSelDepts((prev) => { const n = { ...prev }; delete n[code]; return n })
   }
 
   function toggleCity(deptCode, slug) {
@@ -304,7 +305,7 @@ export default function PagesClientTab() {
                   return (
                     <div
                       key={dept.code}
-                      onClick={() => { setFocusDept(dept.code === focusDept ? null : dept.code) }}
+                      onClick={() => focusDeptCode(dept.code)}
                       style={{
                         display: 'flex', alignItems: 'center', gap: '10px',
                         padding: '9px 16px', cursor: 'pointer',
@@ -317,7 +318,7 @@ export default function PagesClientTab() {
                         type="checkbox"
                         checked={check !== 'none'}
                         ref={(el) => { if (el) el.indeterminate = check === 'partial' }}
-                        onChange={() => toggleDept(dept.code)}
+                        onChange={() => focusDeptCode(dept.code)}
                         onClick={(e) => e.stopPropagation()}
                         style={{ cursor: 'pointer', accentColor: 'var(--gold)' }}
                       />
@@ -334,44 +335,88 @@ export default function PagesClientTab() {
             </div>
 
             {/* Column 2 – Cities of focused department */}
-            <div style={{ border: '1px solid var(--border)', borderRadius: '10px', overflow: 'hidden' }}>
+            <div style={{ border: '1px solid var(--border)', borderRadius: '10px', overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
+              {/* Header */}
               <div style={{ background: 'var(--dark)', color: 'var(--gold)', padding: '10px 16px', fontSize: '13px', fontWeight: '700', letterSpacing: '0.05em' }}>
                 {focusDeptObj ? `VILLES — ${focusDeptObj.name}` : 'VILLES'}
               </div>
-              <div style={{ maxHeight: '420px', overflowY: 'auto' }}>
+
+              {/* Toolbar: search + select-all (only when a dept is focused) */}
+              {focusDeptObj && (
+                <div style={{ padding: '8px 12px', borderBottom: '1px solid var(--border-light)', display: 'flex', gap: '8px', alignItems: 'center', background: '#fafafa' }}>
+                  <input
+                    type="text"
+                    placeholder="🔍 Rechercher une ville…"
+                    value={citySearch}
+                    onChange={(e) => setCitySearch(e.target.value)}
+                    style={{ flex: 1, padding: '6px 10px', border: '1.5px solid var(--border)', borderRadius: '6px', fontSize: '12px', fontFamily: 'var(--font-body)', outline: 'none' }}
+                  />
+                  {(() => {
+                    const deptVal = selDepts[focusDeptObj.code]
+                    const allSelected = deptVal === 'all'
+                    return (
+                      <button
+                        onClick={() => allSelected ? deselectAllDept(focusDeptObj.code) : selectAllDept(focusDeptObj.code)}
+                        style={{
+                          padding: '6px 12px', border: '1.5px solid var(--gold)', borderRadius: '6px',
+                          background: allSelected ? 'var(--gold)' : 'white', color: allSelected ? 'white' : 'var(--gold)',
+                          fontSize: '12px', fontWeight: '600', cursor: 'pointer', whiteSpace: 'nowrap',
+                        }}
+                      >
+                        {allSelected ? '✓ Tout désélectionner' : 'Sélectionner tout'}
+                      </button>
+                    )
+                  })()}
+                </div>
+              )}
+
+              <div style={{ maxHeight: '380px', overflowY: 'auto', flex: 1 }}>
                 {!focusDeptObj ? (
                   <div style={{ padding: '24px', color: '#bbb', fontSize: '13px', textAlign: 'center' }}>
                     ← Cliquez sur un département
                   </div>
-                ) : focusDeptObj.cities.map((city) => {
+                ) : (() => {
                   const deptVal = selDepts[focusDeptObj.code]
-                  const checked = deptVal === 'all' || (deptVal instanceof Set && deptVal.has(city.slug))
-                  return (
-                    <label
-                      key={city.slug}
-                      style={{
-                        display: 'flex', alignItems: 'center', gap: '10px',
-                        padding: '8px 16px', cursor: 'pointer',
-                        background: checked ? '#faf5e4' : 'white',
-                        borderBottom: '1px solid var(--border-light)',
-                      }}
-                    >
-                      <input
-                        type="checkbox"
-                        checked={checked}
-                        onChange={() => toggleCity(focusDeptObj.code, city.slug)}
-                        style={{ cursor: 'pointer', accentColor: 'var(--gold)' }}
-                      />
-                      <span style={{ fontSize: '13px', color: 'var(--text)', flex: 1 }}>{city.name}</span>
-                      {pages[city.slug] && (
-                        <span title={`Générée le ${new Date(pages[city.slug].generatedAt).toLocaleDateString('fr-FR')}`}
-                          style={{ fontSize: '10px', background: '#e8f5e9', color: '#2e7d52', padding: '2px 6px', borderRadius: '4px' }}>
-                          ✓ générée
-                        </span>
-                      )}
-                    </label>
-                  )
-                })}
+                  const needle = citySearch.trim().toLowerCase()
+                  const filtered = needle
+                    ? focusDeptObj.cities.filter((c) => c.name.toLowerCase().includes(needle))
+                    : focusDeptObj.cities
+                  if (filtered.length === 0) {
+                    return (
+                      <div style={{ padding: '24px', color: '#bbb', fontSize: '13px', textAlign: 'center' }}>
+                        Aucune ville trouvée
+                      </div>
+                    )
+                  }
+                  return filtered.map((city) => {
+                    const checked = deptVal === 'all' || (deptVal instanceof Set && deptVal.has(city.slug))
+                    return (
+                      <label
+                        key={city.slug}
+                        style={{
+                          display: 'flex', alignItems: 'center', gap: '10px',
+                          padding: '8px 16px', cursor: 'pointer',
+                          background: checked ? '#faf5e4' : 'white',
+                          borderBottom: '1px solid var(--border-light)',
+                        }}
+                      >
+                        <input
+                          type="checkbox"
+                          checked={checked}
+                          onChange={() => toggleCity(focusDeptObj.code, city.slug)}
+                          style={{ cursor: 'pointer', accentColor: 'var(--gold)' }}
+                        />
+                        <span style={{ fontSize: '13px', color: 'var(--text)', flex: 1 }}>{city.name}</span>
+                        {pages[city.slug] && (
+                          <span title={`Générée le ${new Date(pages[city.slug].generatedAt).toLocaleDateString('fr-FR')}`}
+                            style={{ fontSize: '10px', background: '#e8f5e9', color: '#2e7d52', padding: '2px 6px', borderRadius: '4px' }}>
+                            ✓ générée
+                          </span>
+                        )}
+                      </label>
+                    )
+                  })
+                })()}
               </div>
             </div>
           </div>

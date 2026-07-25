@@ -251,16 +251,44 @@ export default function CityPage() {
   const instagramPosts = config?.instagramPosts || []
   const tiktokPosts = config?.tiktokPosts || []
 
-  // Convert markdown-like content (** bold ** and bullet •) to paragraphs
+  // Convert markdown headings and bold to proper elements
   function renderContent(text) {
     if (!text) return null
     return text.split('\n').map((line, i) => {
       if (!line.trim()) return <br key={i} />
+      if (line.startsWith('### ')) {
+        return (
+          <h3 key={i} style={{
+            fontFamily: 'var(--font-heading)', fontSize: '1.25rem', fontWeight: '600',
+            color: 'var(--dark)', margin: '28px 0 12px', lineHeight: 1.3,
+          }}>
+            {line.slice(4)}
+          </h3>
+        )
+      }
+      if (line.startsWith('## ')) {
+        return (
+          <h2 key={i} style={{
+            fontFamily: 'var(--font-heading)', fontSize: '1.5rem', fontWeight: '700',
+            color: 'var(--dark)', margin: '40px 0 16px', paddingBottom: '10px',
+            borderBottom: '2px solid var(--gold)', display: 'block',
+          }}>
+            {line.slice(3)}
+          </h2>
+        )
+      }
       // Bold replacement
       const parts = line.split(/\*\*(.*?)\*\*/g)
       const rendered = parts.map((part, j) =>
         j % 2 === 1 ? <strong key={j}>{part}</strong> : part
       )
+      if (line.startsWith('• ') || line.startsWith('- ')) {
+        return (
+          <p key={i} style={{ marginBottom: '8px', lineHeight: 1.75, paddingLeft: '20px' }}>
+            {rendered}
+          </p>
+        )
+      }
       return <p key={i} style={{ marginBottom: '10px', lineHeight: 1.75 }}>{rendered}</p>
     })
   }
@@ -311,10 +339,13 @@ export default function CityPage() {
           fontFamily: 'var(--font-heading)', fontSize: 'clamp(2rem, 5vw, 3.5rem)',
           fontWeight: '700', color: 'white', marginBottom: '12px', letterSpacing: '0.03em',
         }}>
-          {businessName} à {city.name}
+          Salle de mariage et réception — {businessName} à {city.name}
         </h1>
-        <p style={{ fontSize: '1.1rem', color: 'rgba(255,255,255,0.7)', maxWidth: '600px', margin: '0 auto 24px' }}>
-          Votre salle de réception de prestige pour tous vos événements
+        <p style={{ fontSize: '1.1rem', color: 'rgba(255,255,255,0.7)', maxWidth: '680px', margin: '0 auto 8px' }}>
+          Le Paradise 77 — votre salle de mariage de prestige pour tous vos mariages et réceptions
+        </p>
+        <p style={{ fontSize: '0.95rem', color: 'rgba(255,255,255,0.55)', maxWidth: '600px', margin: '0 auto 24px' }}>
+          Salle de mariage et réception accessible depuis {city.name} ({city.deptName})
         </p>
         <div style={{ display: 'flex', gap: '12px', justifyContent: 'center', flexWrap: 'wrap' }}>
           <Link to="/devis" className="btn btn-primary" style={{ fontSize: '14px', padding: '12px 28px' }}>
@@ -333,6 +364,56 @@ export default function CityPage() {
         <Section title={`${businessName} à ${city.name}`}>
           <div style={{ fontSize: '15px', color: 'var(--text)', lineHeight: 1.8 }}>
             {renderContent(page.content)}
+          </div>
+        </Section>
+
+        {/* Extra SEO keyword sections */}
+        <Section>
+          <div style={{ fontSize: '15px', color: 'var(--text)', lineHeight: 1.8 }}>
+            <h2 style={{
+              fontFamily: 'var(--font-heading)', fontSize: '1.5rem', fontWeight: '700',
+              color: 'var(--dark)', marginBottom: '16px', paddingBottom: '10px',
+              borderBottom: '2px solid var(--gold)',
+            }}>
+              Salle de mariage et réception — {businessName} près de {city.name}
+            </h2>
+            <p>
+              Vous planifiez un <strong>mariage</strong> ou une <strong>réception</strong> à {city.name} ou dans les environs ?{' '}
+              <strong>Le Paradise 77</strong> est votre <strong>salle de mariage</strong> de prestige en Seine-et-Marne.
+              Notre <strong>salle de mariage</strong> accueille vos événements les plus précieux dans un cadre élégant et raffiné.
+              Le Paradise 77 est la <strong>salle de réception</strong> idéale pour un <strong>mariage</strong> inoubliable depuis {city.name}.
+            </p>
+            <p>
+              Depuis {city.name}, rejoindre la <strong>salle de mariage</strong> du <strong>Paradise 77</strong> ne prend que quelques minutes.
+              Notre <strong>salle de réception</strong> est facilement accessible depuis {city.name} et toute la {city.deptName}.
+              Le <strong>Paradise 77</strong> est la <strong>salle de mariage</strong> et <strong>réception</strong> préférée des couples de {city.name}.
+              Chaque <strong>mariage</strong> célébré dans notre <strong>salle de réception</strong> est unique et mémorable.
+            </p>
+            <h3 style={{
+              fontFamily: 'var(--font-heading)', fontSize: '1.25rem', fontWeight: '600',
+              color: 'var(--dark)', margin: '28px 0 12px',
+            }}>
+              Pourquoi choisir le Paradise 77 pour votre mariage à {city.name} ?
+            </h3>
+            <p>
+              Le <strong>Paradise 77</strong> propose des formules de <strong>mariage</strong> et de <strong>réception</strong> adaptées à tous les budgets.
+              Notre <strong>salle de mariage</strong> peut accueillir des cérémonies intimes comme de grandes <strong>réceptions</strong>.
+              Le <strong>Paradise 77</strong> est la <strong>salle de réception</strong> qui s&apos;adapte à tous vos besoins de <strong>mariage</strong>.
+              Notre <strong>salle de mariage</strong> est régulièrement plébiscitée par les couples venant de {city.name} et des environs.
+            </p>
+            <h3 style={{
+              fontFamily: 'var(--font-heading)', fontSize: '1.25rem', fontWeight: '600',
+              color: 'var(--dark)', margin: '28px 0 12px',
+            }}>
+              Réserver le Paradise 77 pour votre mariage et réception depuis {city.name}
+            </h3>
+            <p>
+              Réserver la <strong>salle de mariage</strong> du <strong>Paradise 77</strong> depuis {city.name} est simple et rapide.
+              Notre <strong>salle de réception</strong> est disponible pour les <strong>mariages</strong> et <strong>réceptions</strong> toute l&apos;année.
+              Le <strong>Paradise 77</strong> vous accompagne dans l&apos;organisation de votre <strong>mariage</strong> de A à Z.
+              Notre <strong>salle de mariage</strong> garantit un événement inoubliable pour votre <strong>mariage</strong> et votre <strong>réception</strong>.
+              Contactez le <strong>Paradise 77</strong> dès aujourd&apos;hui pour un devis de <strong>mariage</strong> personnalisé depuis {city.name}.
+            </p>
           </div>
         </Section>
 
@@ -405,14 +486,17 @@ export default function CityPage() {
           borderRadius: '16px', padding: '40px', textAlign: 'center', color: 'white',
           marginTop: '40px',
         }}>
-          <h2 style={{ fontFamily: 'var(--font-heading)', fontSize: '2rem', color: 'var(--gold)', marginBottom: '12px' }}>
-            Votre événement à {city.name}
+          <h2 style={{ fontFamily: 'var(--font-heading)', fontSize: '2rem', color: 'var(--gold)', marginBottom: '8px' }}>
+            Votre salle de mariage et réception à {city.name}
           </h2>
-          <p style={{ color: 'rgba(255,255,255,0.7)', marginBottom: '24px', fontSize: '15px' }}>
-            Contactez-nous dès aujourd&apos;hui pour obtenir votre devis personnalisé.
+          <p style={{ color: 'rgba(255,255,255,0.8)', marginBottom: '8px', fontSize: '15px' }}>
+            Le Paradise 77 — salle de mariage et réception de prestige en Seine-et-Marne
+          </p>
+          <p style={{ color: 'rgba(255,255,255,0.6)', marginBottom: '24px', fontSize: '14px' }}>
+            Réservez votre mariage et votre réception au Paradise 77 depuis {city.name}. Devis gratuit et personnalisé.
           </p>
           <Link to="/devis" className="btn btn-primary" style={{ fontSize: '15px', padding: '14px 36px' }}>
-            📋 Demander un devis gratuit
+            📋 Réserver votre salle de mariage — Devis gratuit
           </Link>
         </div>
 

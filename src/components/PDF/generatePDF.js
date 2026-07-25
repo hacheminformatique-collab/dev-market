@@ -1,0 +1,305 @@
+import jsPDF from 'jspdf'
+import autoTable from 'jspdf-autotable'
+import { getSettings } from '../../utils/storage'
+
+const CGV = `CONDITIONS GÉNÉRALES DE LOCATION ET DE PRESTATIONS - LE PARADISE RÉCEPTION
+
+ARTICLE 1 : OBJET ET IDENTITÉ DU PRESTATAIRE
+Les presentes conditions regissent les relations contractuelles entre la societe AFM (Enseigne PARADISE), SARL au capital de 7 500,00 EUR, immatriculee au RCS de Meaux sous le SIRET 904 543 816, dont le siege social est situe au 5 avenue FRIDINGEN 77100 NANTEUIL LES MEAUX, et le Client. Elles s'appliquent de plein droit a toutes les prestations de location de salle (seche ou avec options), de restauration (Traiteur) et de services evenementiels proposees par AFM.
+
+ARTICLE 2 : DESTINATION DES LIEUX
+Le lieu de reception est exclusivement destine a accueillir l'evenement precise sur le devis. Les locaux sont loues a titre prive et temporaire pour la duree strictement definie au contrat. Toute modification de l'objet de l'evenement sans accord ecrit de AFM peut entrainer l'annulation immediate du contrat.
+
+ARTICLE 3 : ÉQUIPEMENTS
+Le Client declare parfaitement connaitre les lieux loues pour les avoir visites. Toute friture ou cuisson vive reste strictement interdite a l'interieur.
+
+ARTICLE 4 : DURÉE ET HORAIRES
+La fin de l'evenement est fixee a l'heure mentionnee au devis. Tout depassement sera facture 150 EUR TTC par heure entamee.
+
+ARTICLE 5 : MODALITÉS DE PAIEMENT
+Les prix sont exprimes en euros TTC. Taux de TVA : 10% pour la restauration, 20% pour la location et les services. Un acompte de 1 500 EUR minimum est exige a la signature. Le solde total doit etre regle au plus tard 45 jours avant l'evenement.
+
+ARTICLE 6 : ANNULATION PAR LE CLIENT
+En cas d'annulation, les acomptes verses restent definitivement acquis a la societe AFM. La date etant reservee exclusivement pour le Client, le solde reste du a AFM a titre de dedommagement. Conformement a l'Art. L221-28 du Code de la Consommation, aucun droit de retractation ne s'applique.
+
+ARTICLE 7 : NOMBRE DE CONVIVES
+Le nombre exact de convives doit etre confirme par ecrit au plus tard 15 jours ouvrables avant l'evenement. Une baisse de plus de 10% de l'effectif ne pourra donner lieu a une reduction du prix total convenu.
+
+ARTICLE 8 : DÉPÔT DE GARANTIE
+Un depot de garantie de 3 000 EUR par cheque est exige le jour de l'evenement. Il sera restitue dans un delai de 7 jours ouvres apres verification des equipements.
+
+ARTICLE 9 : RESPONSABILITÉ ET ASSURANCES
+Le Client doit fournir une attestation d'assurance Responsabilite Civile "Organisateur d'evenement" au plus tard 30 jours avant l'evenement. AFM decline toute responsabilite en cas de vol ou de dommage subi par les biens personnels.
+
+ARTICLE 10 : SÉCURITÉ ET ORDRE PUBLIC
+L'usage de flammes reelles, chichas, encens, cierges magiques est strictement interdit. Les tirs de mortiers, feux d'artifice et petards sont strictement interdits. Le service d'alcool aux mineurs est strictement interdit.
+
+ARTICLE 11 : CESSION
+Toute cession ou sous-location de la salle est strictement interdite.
+
+ARTICLE 12 : FORCE MAJEURE
+En cas d'evenement imprevisible, la prestation pourra etre reportee via un avoir de 12 mois. Aucun remboursement ne pourra etre exige.
+
+ARTICLE 13 : RÉSOLUTION ET LITIGES
+Le present contrat sera resilie immediatement en cas de violation d'une clause de securite majeure. A defaut d'accord amiable, tout litige sera porte devant le Tribunal de MEAUX (77).
+
+ARTICLE 14 : PROTECTION DES DONNÉES (RGPD)
+Les informations collectees sont necessaires pour la gestion de votre reservation. Vous disposez d'un droit d'acces et de rectification en contactant la SARL AFM.
+
+AFM - PARADISE - 5 AVENUE FRIDINGEN, 77100 NANTEUIL LES MEAUX
+SARL au capital de 7 500,00 EUR - SIREN 904 543 816 - TVA FR06904543816
+RCS MEAUX (inscrit le 01/11/2021) - NAF 68.20B`
+
+function formatMoney(n) {
+  return Number(n || 0).toLocaleString('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' €'
+}
+
+function vatBreakdown(ttc, rate) {
+  const ht = ttc / (1 + rate)
+  const tva = ttc - ht
+  return { ht, tva, ttc }
+}
+
+function calcMenuItemTotal(item, nbAdultes, nbEnfants) {
+  if (!item.tarif) return 0
+  if (item.section === 'Cocktail de bienvenu') return item.tarif * (nbAdultes + nbEnfants)
+  if (item.section === 'Menu enfants') return item.tarif * nbEnfants
+  if (item.section === 'Boissons') return 0
+  return item.tarif * nbAdultes
+}
+
+export function generatePDF(devis) {
+  const settings = getSettings()
+  const doc = new jsPDF({ unit: 'mm', format: 'a4' })
+  const pageW = doc.internal.pageSize.getWidth()
+  const pageH = doc.internal.pageSize.getHeight()
+  let y = 20
+
+  // ---- Header ----
+  doc.setFillColor(26, 26, 46)
+  doc.rect(0, 0, pageW, 40, 'F')
+  doc.setTextColor(201, 168, 76)
+  doc.setFontSize(22)
+  doc.setFont('helvetica', 'bold')
+  doc.text('LE PARADISE', 20, 18)
+  doc.setFontSize(10)
+  doc.setFont('helvetica', 'normal')
+  doc.setTextColor(200, 200, 200)
+  doc.text('Salle de réception — Nanteuil les Meaux', 20, 26)
+  doc.text('5 avenue Fridingen, 77100 Nanteuil les Meaux', 20, 32)
+  doc.text('Tel: 0782821582 | contact@leparadise77.fr', 20, 38)
+
+  // Devis title on right
+  doc.setTextColor(255, 255, 255)
+  doc.setFontSize(16)
+  doc.setFont('helvetica', 'bold')
+  doc.text('DEVIS', pageW - 20, 18, { align: 'right' })
+  doc.setFontSize(10)
+  doc.setFont('helvetica', 'normal')
+  doc.text(devis.devisNumber || '', pageW - 20, 26, { align: 'right' })
+  const dateStr = new Date(devis.createdAt || Date.now()).toLocaleDateString('fr-FR')
+  doc.text(`Date: ${dateStr}`, pageW - 20, 32, { align: 'right' })
+
+  y = 50
+
+  // ---- Client info ----
+  doc.setTextColor(50, 50, 50)
+  doc.setFontSize(11)
+  doc.setFont('helvetica', 'bold')
+  doc.text('CLIENT', 20, y)
+  doc.setFont('helvetica', 'normal')
+  doc.setFontSize(10)
+  y += 6
+  doc.text(`${devis.prenom || ''} ${devis.nom || ''}`, 20, y); y += 5
+  if (devis.adresse) { doc.text(devis.adresse, 20, y); y += 5 }
+  doc.text(`Email: ${devis.email || ''}`, 20, y); y += 5
+  doc.text(`Tél: ${devis.telephone || ''}`, 20, y); y += 10
+
+  // ---- Event info ----
+  doc.setFont('helvetica', 'bold')
+  doc.setFontSize(11)
+  doc.text('ÉVÉNEMENT', 20, y)
+  doc.setFont('helvetica', 'normal')
+  doc.setFontSize(10)
+  y += 6
+  const evDate = devis.dateEvenement ? new Date(devis.dateEvenement).toLocaleDateString('fr-FR') : '—'
+  doc.text(`Type: ${devis.typeEvenement || '—'}`, 20, y)
+  doc.text(`Date: ${evDate}`, 110, y)
+  y += 5
+  const nbAdultes = parseInt(devis.nbAdultes) || devis.nbPersonnes || 0
+  const nbEnfants = parseInt(devis.nbEnfants) || 0
+  const nbPersonnes = nbAdultes + nbEnfants
+  doc.text(`Personnes: ${nbPersonnes} (${nbAdultes} adultes${nbEnfants > 0 ? ` + ${nbEnfants} enfants` : ''})`, 20, y)
+  if (devis.heureDebut) doc.text(`Horaires: ${devis.heureDebut} — ${devis.heureFin || ''}`, 110, y)
+  y += 5
+  doc.text(`Formule: ${devis.formule?.nomFormule || '—'}`, 20, y)
+  y += 12
+
+  // ---- Pricing table ----
+  const prixSalle = devis.prixSalle || 0
+  const menuTotal = (devis.menus || []).reduce((s, m) => s + calcMenuItemTotal(m, nbAdultes, nbEnfants), 0)
+  const gateauTotal = (devis.gateau?.tarif || 0) * nbPersonnes
+  const traiteurTotal = menuTotal + gateauTotal
+  const prestationsTotal = (devis.prestations || []).reduce((s, p) => s + (p.tarif || 0), 0)
+
+  const salle = vatBreakdown(prixSalle, 0.20)
+  const traiteur = vatBreakdown(traiteurTotal, 0.10)
+  const options = vatBreakdown(prestationsTotal, 0.20)
+  const totalHT = salle.ht + traiteur.ht + options.ht
+  const totalTVA = salle.tva + traiteur.tva + options.tva
+  const totalTTC = prixSalle + traiteurTotal + prestationsTotal
+
+  const rows = []
+  if (prixSalle > 0) {
+    rows.push([
+      `Location salle\n${devis.formule?.nomFormule || ''}`,
+      '20%',
+      formatMoney(salle.ht),
+      formatMoney(salle.tva),
+      formatMoney(prixSalle),
+    ])
+  }
+
+  // Menu details
+  if ((devis.menus || []).length > 0) {
+    const menuLines = (devis.menus || []).filter((m) => m.tarif > 0).map((m) => {
+      const total = calcMenuItemTotal(m, nbAdultes, nbEnfants)
+      return `${m.nomMenu} (${m.tarif}€/pers.) = ${formatMoney(total)}`
+    }).join('\n')
+    if (menuLines && menuTotal > 0) {
+      const menuHT = vatBreakdown(menuTotal, 0.10)
+      rows.push([
+        `Traiteur — Menus\n${menuLines}`,
+        '10%',
+        formatMoney(menuHT.ht),
+        formatMoney(menuHT.tva),
+        formatMoney(menuTotal),
+      ])
+    }
+  }
+
+  if (gateauTotal > 0) {
+    const gateauHT = vatBreakdown(gateauTotal, 0.10)
+    rows.push([
+      `Gâteau — ${devis.gateau?.nomGateau || ''}\n(${nbPersonnes} pers. × ${devis.gateau?.tarif}€)`,
+      '10%',
+      formatMoney(gateauHT.ht),
+      formatMoney(gateauHT.tva),
+      formatMoney(gateauTotal),
+    ])
+  }
+
+  for (const p of (devis.prestations || [])) {
+    const pHT = vatBreakdown(p.tarif, 0.20)
+    rows.push([
+      `${p.nomPresta}\n${p.description || ''}`,
+      '20%',
+      formatMoney(pHT.ht),
+      formatMoney(pHT.tva),
+      formatMoney(p.tarif),
+    ])
+  }
+
+  autoTable(doc, {
+    startY: y,
+    head: [['Désignation', 'TVA', 'HT', 'TVA €', 'TTC']],
+    body: rows,
+    foot: [
+      ['', 'Sous-total HT', formatMoney(totalHT), '', ''],
+      ['', 'TVA', formatMoney(totalTVA), '', ''],
+      ['', 'TOTAL TTC', '', '', formatMoney(totalTTC)],
+    ],
+    styles: { fontSize: 9, cellPadding: 4 },
+    headStyles: { fillColor: [26, 26, 46], textColor: [255, 255, 255] },
+    footStyles: { fillColor: [240, 240, 240], fontStyle: 'bold' },
+    columnStyles: {
+      0: { cellWidth: 80 },
+      1: { cellWidth: 15, halign: 'center' },
+      2: { cellWidth: 30, halign: 'right' },
+      3: { cellWidth: 25, halign: 'right' },
+      4: { cellWidth: 30, halign: 'right' },
+    },
+  })
+
+  y = doc.lastAutoTable.finalY + 12
+
+  // ---- Bank info ----
+  const bank = settings.bankInfo || {}
+  if (bank.iban) {
+    if (y > pageH - 60) { doc.addPage(); y = 20 }
+    doc.setFont('helvetica', 'bold')
+    doc.setFontSize(10)
+    doc.setTextColor(50, 50, 50)
+    doc.text('RÈGLEMENT', 20, y)
+    doc.setFont('helvetica', 'normal')
+    y += 5
+    doc.setFontSize(9)
+    if (bank.titulaire) { doc.text(`Titulaire: ${bank.titulaire}`, 20, y); y += 4 }
+    doc.text(`IBAN: ${bank.iban}`, 20, y); y += 4
+    if (bank.bic) { doc.text(`BIC: ${bank.bic}`, 20, y); y += 4 }
+    y += 8
+  }
+
+  // ---- CGV ----
+  doc.addPage()
+  y = 20
+  doc.setFont('helvetica', 'bold')
+  doc.setFontSize(12)
+  doc.setTextColor(26, 26, 46)
+  doc.text('CONDITIONS GÉNÉRALES DE LOCATION ET DE PRESTATIONS', 20, y)
+  y += 8
+
+  doc.setFont('helvetica', 'normal')
+  doc.setFontSize(8)
+  doc.setTextColor(60, 60, 60)
+  const lines = doc.splitTextToSize(CGV, pageW - 40)
+  lines.forEach((line) => {
+    if (y > pageH - 20) { doc.addPage(); y = 20 }
+    doc.text(line, 20, y)
+    y += 4
+  })
+
+  // ---- Signature area on last CGV page ----
+  if (y > pageH - 50) { doc.addPage(); y = 20 }
+  y += 8
+  doc.setFont('helvetica', 'bold')
+  doc.setFontSize(10)
+  doc.setTextColor(26, 26, 46)
+  doc.text('BON POUR ACCORD', 20, y)
+  y += 6
+  doc.setFont('helvetica', 'normal')
+  doc.setFontSize(9)
+  doc.setTextColor(60, 60, 60)
+  doc.text('Lu et approuvé — Signature du client :', 20, y)
+  y += 6
+  if (devis.signature) {
+    try {
+      doc.addImage(devis.signature, 'PNG', 20, y, 80, 30)
+      y += 34
+    } catch (e) { y += 34 }
+  } else {
+    doc.setDrawColor(150, 150, 150)
+    doc.rect(20, y, 80, 30)
+    y += 34
+  }
+  doc.setFontSize(8)
+  doc.setTextColor(100, 100, 100)
+  if (devis.signedAt) {
+    doc.text(`Signé électroniquement le ${new Date(devis.signedAt).toLocaleDateString('fr-FR')}`, 20, y)
+  }
+
+  // ---- Footer on all pages ----
+  const pageCount = doc.internal.getNumberOfPages()
+  for (let i = 1; i <= pageCount; i++) {
+    doc.setPage(i)
+    doc.setFontSize(8)
+    doc.setTextColor(150, 150, 150)
+    doc.text(
+      `SARL AFM — 5 avenue Fridingen, 77100 Nanteuil les Meaux — RCS Meaux: 904543816`,
+      pageW / 2, pageH - 8, { align: 'center' }
+    )
+    doc.text(`Page ${i} / ${pageCount}`, pageW - 15, pageH - 8, { align: 'right' })
+  }
+
+  doc.save(`${devis.devisNumber || 'devis'}.pdf`)
+}

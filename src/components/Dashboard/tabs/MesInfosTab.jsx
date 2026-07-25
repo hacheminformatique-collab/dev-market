@@ -1,9 +1,13 @@
 import { useState } from 'react'
 import { getSettings, saveSettings } from '../../../utils/storage'
+import { getCityPages } from '../../../utils/cityPageStorage'
+import { buildSitemapXml, buildRobotsTxt, downloadTextFile } from '../../../utils/seoFiles'
 
 export default function MesInfosTab() {
   const [data, setData] = useState(getSettings())
   const [saved, setSaved] = useState(false)
+  const [seoBusy, setSeoBusy] = useState(false)
+  const [seoMessage, setSeoMessage] = useState('')
 
   function handleChange(field, value) {
     setData((prev) => ({ ...prev, [field]: value }))
@@ -17,6 +21,23 @@ export default function MesInfosTab() {
     saveSettings(data)
     setSaved(true)
     setTimeout(() => setSaved(false), 2000)
+  }
+
+  async function handleGenerateSeoFiles() {
+    setSeoBusy(true)
+    setSeoMessage('')
+    try {
+      const pages = await getCityPages()
+      const sitemapXml = buildSitemapXml({ baseUrl: data.siteUrl, cityPages: pages })
+      const robotsTxt = buildRobotsTxt(data.siteUrl)
+      downloadTextFile('sitemap.xml', sitemapXml, 'application/xml;charset=utf-8')
+      downloadTextFile('robots.txt', robotsTxt, 'text/plain;charset=utf-8')
+      setSeoMessage(`✅ Fichiers générés (${Object.keys(pages || {}).length} pages villes incluses).`)
+    } catch {
+      setSeoMessage('❌ Échec de génération. Vérifiez l’URL du site et réessayez.')
+    } finally {
+      setSeoBusy(false)
+    }
   }
 
   return (
@@ -34,6 +55,18 @@ export default function MesInfosTab() {
         <div className="form-group">
           <label>WhatsApp (numéro ou lien)</label>
           <input className="form-control" value={data.whatsapp || ''} onChange={(e) => handleChange('whatsapp', e.target.value)} placeholder="0782821582" />
+        </div>
+        <div className="form-group">
+          <label>URL publique du site (SEO)</label>
+          <input
+            className="form-control"
+            value={data.siteUrl || ''}
+            onChange={(e) => handleChange('siteUrl', e.target.value)}
+            placeholder="https://www.votresite.fr"
+          />
+          <small style={{ color: '#777', display: 'block', marginTop: '6px' }}>
+            Utilisée pour générer des URLs absolues valides dans le sitemap.
+          </small>
         </div>
 
         <hr style={{ margin: '20px 0', borderColor: '#eee' }} />
@@ -55,6 +88,19 @@ export default function MesInfosTab() {
         <button onClick={handleSave} className="btn btn-primary">
           {saved ? '✅ Sauvegardé !' : '💾 Sauvegarder'}
         </button>
+        <button
+          onClick={handleGenerateSeoFiles}
+          className="btn btn-outline"
+          style={{ marginLeft: '10px' }}
+          disabled={seoBusy}
+        >
+          {seoBusy ? '⏳ Génération...' : '🗺️ Générer sitemap.xml + robots.txt'}
+        </button>
+        {seoMessage && (
+          <p style={{ marginTop: '10px', color: seoMessage.startsWith('✅') ? '#2e7d32' : '#c62828' }}>
+            {seoMessage}
+          </p>
+        )}
       </div>
     </div>
   )

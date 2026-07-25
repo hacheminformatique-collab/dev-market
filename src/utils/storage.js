@@ -200,6 +200,7 @@ const DEFAULTS = {
   settings: {
     nom: 'LE PARADISE',
     pin: '2205',
+    siteUrl: '',
     bankInfo: {
       iban: '',
       bic: '',

@@ -1,6 +1,7 @@
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { useLocation } from 'react-router-dom'
 import { getCityBySlug } from '../data/idf-cities'
+import { getCityPages } from '../utils/cityPageStorage'
 import { getSettings } from '../utils/storage'
 
 function normalizeSiteUrl(rawUrl) {
@@ -46,24 +47,22 @@ function upsertJsonLd(value) {
   tag.textContent = JSON.stringify(value)
 }
 
-function buildSeoData(pathname, settings) {
+function buildSeoData(pathname, settings, cityPages) {
   const businessName = settings?.nom?.trim() || 'Le Paradise 77'
   const baseUrl = normalizeSiteUrl(settings?.siteUrl)
   const canonical = new URL(pathname, baseUrl).toString()
   const imageUrl = new URL('/favicon.svg', baseUrl).toString()
-  const noindex =
-    pathname === '/admin' ||
-    pathname === '/dashboard' ||
-    pathname.startsWith('/espace-client/') ||
-    pathname.startsWith('/espace-staff/')
+  const citySlug = pathname.startsWith('/villes/') ? pathname.split('/')[2] : ''
+  const hasGeneratedCityPage = Boolean(citySlug && cityPages?.[citySlug]?.content)
+  const isIndexable = pathname === '/' || hasGeneratedCityPage
 
   const base = {
     title: `${businessName} — Salle de mariage et réception`,
     description: `Découvrez ${businessName}, salle de mariage et réception en Seine-et-Marne : devis rapide, prestations sur mesure et accompagnement événementiel.`,
     keywords: 'salle mariage, salle reception, devis mariage, location salle, Seine-et-Marne, Le Paradise',
-    robots: noindex
-      ? 'noindex, nofollow, noarchive'
-      : 'index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1',
+    robots: isIndexable
+      ? 'index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1'
+      : 'noindex, nofollow, noarchive',
     canonical,
     ogType: 'website',
     imageUrl,
@@ -124,9 +123,8 @@ function buildSeoData(pathname, settings) {
   }
 
   if (pathname.startsWith('/villes/')) {
-    const citySlug = pathname.split('/')[2]
     const city = getCityBySlug(citySlug)
-    if (city) {
+    if (city && hasGeneratedCityPage) {
       return {
         ...base,
         title: `Salle de mariage à ${city.name} — ${businessName}`,
@@ -188,10 +186,21 @@ function buildSeoData(pathname, settings) {
 
 export default function SeoManager() {
   const location = useLocation()
+  const [cityPages, setCityPages] = useState({})
+
+  useEffect(() => {
+    let cancelled = false
+    getCityPages().then((pages) => {
+      if (!cancelled) setCityPages(pages || {})
+    })
+    return () => {
+      cancelled = true
+    }
+  }, [])
 
   useEffect(() => {
     const settings = getSettings()
-    const seo = buildSeoData(location.pathname, settings)
+    const seo = buildSeoData(location.pathname, settings, cityPages)
 
     document.documentElement.lang = 'fr'
     document.title = seo.title
@@ -213,7 +222,7 @@ export default function SeoManager() {
     upsertMeta('name', 'twitter:image', seo.imageUrl)
     upsertLink('canonical', seo.canonical)
     upsertJsonLd(seo.jsonLd)
-  }, [location.pathname])
+  }, [cityPages, location.pathname])
 
   return null
 }

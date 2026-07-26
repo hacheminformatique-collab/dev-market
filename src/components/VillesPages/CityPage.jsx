@@ -160,52 +160,74 @@ function TikTokEmbed({ url }) {
 
 // ── City news RSS feed ─────────────────────────────────────────────────────
 
+async function fetchRssItems(cityName) {
+  const rssUrl = `https://news.google.com/rss/search?q=${encodeURIComponent(cityName)}&hl=fr&gl=FR&ceid=FR:fr`
+
+  // Try proxies in order until one works
+  const proxies = [
+    `https://corsproxy.io/?url=${encodeURIComponent(rssUrl)}`,
+    `https://api.allorigins.win/raw?url=${encodeURIComponent(rssUrl)}`,
+  ]
+
+  for (const proxyUrl of proxies) {
+    try {
+      const res = await fetch(proxyUrl, { signal: AbortSignal.timeout(6000) })
+      if (!res.ok) continue
+      const xml = await res.text()
+      const doc = new DOMParser().parseFromString(xml, 'text/xml')
+
+      // Check for parse error
+      if (doc.querySelector('parsererror')) continue
+
+      const rawItems = Array.from(doc.getElementsByTagName('item')).slice(0, 3)
+      if (rawItems.length === 0) continue
+
+      const parsed = rawItems.map((el) => {
+        // <link> in RSS XML sits between its sibling nodes, not as a child —
+        // use nextSibling traversal when textContent is empty
+        let link = el.getElementsByTagName('link')[0]?.textContent?.trim() || ''
+        if (!link) {
+          // Some RSS parsers put <link> as a text node sibling
+          const linkEl = el.getElementsByTagName('link')[0]
+          if (linkEl) link = linkEl.nextSibling?.nodeValue?.trim() || ''
+        }
+
+        const title   = el.getElementsByTagName('title')[0]?.textContent?.trim() || ''
+        const pubDate = el.getElementsByTagName('pubDate')[0]?.textContent?.trim() || ''
+        const source  = el.getElementsByTagName('source')[0]?.textContent?.trim() || ''
+        const desc    = el.getElementsByTagName('description')[0]?.textContent?.trim() || ''
+
+        // Strip HTML tags from description (Google News wraps it in CDATA with markup)
+        const cleanDesc = desc.replace(/<[^>]*>/g, '').slice(0, 180)
+
+        return { title, link, pubDate, source, desc: cleanDesc }
+      }).filter((it) => it.title)
+
+      if (parsed.length > 0) return parsed
+    } catch {
+      // Try next proxy
+    }
+  }
+  return []
+}
+
 function CityNews({ cityName }) {
   const [items, setItems] = useState([])
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
     setLoading(true)
-    const rssUrl = `https://news.google.com/rss/search?q=${encodeURIComponent(cityName)}&hl=fr&gl=FR&ceid=FR:fr`
-    const proxyUrl = `https://api.allorigins.win/raw?url=${encodeURIComponent(rssUrl)}`
-
-    fetch(proxyUrl)
-      .then((r) => {
-        if (!r.ok) throw new Error('fetch failed')
-        return r.text()
-      })
-      .then((xml) => {
-        const doc = new DOMParser().parseFromString(xml, 'text/xml')
-        const rawItems = Array.from(doc.querySelectorAll('item')).slice(0, 5)
-        const parsed = rawItems.map((el) => ({
-          title:   el.querySelector('title')?.textContent || '',
-          link:    el.querySelector('link')?.textContent || '',
-          pubDate: el.querySelector('pubDate')?.textContent || '',
-          source:  el.querySelector('source')?.textContent || '',
-        })).filter((it) => it.title && it.link)
-        setItems(parsed)
-      })
-      .catch(() => { /* show fallback silently */ })
+    fetchRssItems(cityName)
+      .then(setItems)
       .finally(() => setLoading(false))
   }, [cityName])
 
-  const googleNewsLink = `https://news.google.com/search?q=${encodeURIComponent(cityName)}&hl=fr&gl=FR&ceid=FR:fr`
-
   const newsItemStyle = {
-    display: 'block', padding: '14px 18px',
+    display: 'block', padding: '16px 18px',
     background: 'white', border: '1px solid var(--border)',
     borderRadius: '10px', textDecoration: 'none',
     transition: 'box-shadow 0.15s, border-color 0.15s',
     boxShadow: 'var(--shadow-sm)',
-  }
-
-  const moreLinkStyle = {
-    display: 'inline-flex', alignItems: 'center', gap: '6px',
-    marginTop: '16px', padding: '9px 20px',
-    background: 'var(--gold-pale)', border: '1px solid var(--gold)',
-    borderRadius: '20px', fontSize: '13px', fontWeight: '600',
-    color: 'var(--dark)', textDecoration: 'none',
-    transition: 'background 0.15s',
   }
 
   return (
@@ -215,7 +237,18 @@ function CityNews({ cityName }) {
       </p>
 
       {loading && (
-        <p style={{ color: '#bbb', fontSize: '14px' }}>Chargement des actualités…</p>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+          {[1, 2, 3].map((n) => (
+            <div key={n} style={{
+              height: '72px', borderRadius: '10px',
+              background: 'linear-gradient(90deg, #f0ece4 25%, #faf8f4 50%, #f0ece4 75%)',
+              backgroundSize: '200% 100%',
+              animation: 'shimmer 1.4s infinite',
+              border: '1px solid var(--border)',
+            }} />
+          ))}
+          <style>{`@keyframes shimmer { 0%{background-position:200% 0} 100%{background-position:-200% 0} }`}</style>
+        </div>
       )}
 
       {!loading && items.length > 0 && (
@@ -227,18 +260,23 @@ function CityNews({ cityName }) {
             return (
               <a
                 key={i}
-                href={item.link}
+                href={item.link || '#'}
                 target="_blank"
                 rel="noreferrer noopener"
                 style={newsItemStyle}
                 onMouseEnter={(e) => { e.currentTarget.style.boxShadow = 'var(--shadow-md)'; e.currentTarget.style.borderColor = 'var(--gold)' }}
                 onMouseLeave={(e) => { e.currentTarget.style.boxShadow = 'var(--shadow-sm)'; e.currentTarget.style.borderColor = 'var(--border)' }}
               >
-                <div style={{ fontSize: '15px', fontWeight: '600', color: 'var(--dark)', marginBottom: '4px', lineHeight: 1.4 }}>
+                <div style={{ fontSize: '15px', fontWeight: '600', color: 'var(--dark)', marginBottom: '6px', lineHeight: 1.4 }}>
                   {item.title}
                 </div>
+                {item.desc && (
+                  <div style={{ fontSize: '13px', color: 'var(--text-light)', marginBottom: '6px', lineHeight: 1.5 }}>
+                    {item.desc}{item.desc.length === 180 ? '…' : ''}
+                  </div>
+                )}
                 <div style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '12px', color: '#aaa' }}>
-                  {item.source && <span>{item.source}</span>}
+                  {item.source && <span style={{ fontWeight: '600' }}>{item.source}</span>}
                   {pubDate && <span>• {pubDate}</span>}
                 </div>
               </a>
@@ -247,17 +285,11 @@ function CityNews({ cityName }) {
         </div>
       )}
 
-      {/* Always show a "see more" link — ensures section has content even on fetch failure */}
-      <a
-        href={googleNewsLink}
-        target="_blank"
-        rel="noreferrer noopener"
-        style={moreLinkStyle}
-        onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--gold)'; e.currentTarget.style.color = 'white' }}
-        onMouseLeave={(e) => { e.currentTarget.style.background = 'var(--gold-pale)'; e.currentTarget.style.color = 'var(--dark)' }}
-      >
-        🔗 Voir toutes les actualités de {cityName}
-      </a>
+      {!loading && items.length === 0 && (
+        <p style={{ color: '#bbb', fontSize: '14px', fontStyle: 'italic' }}>
+          Aucune actualité disponible pour le moment.
+        </p>
+      )}
     </Section>
   )
 }

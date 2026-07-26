@@ -663,7 +663,7 @@ function SectionGalerie({ gallery, instagramUsername, instagramPosts, tiktokUser
 
 // ── 7. Section Lieux emblématiques ─────────────────────────────────────────────
 
-function SectionLieux({ city }) {
+function SectionLieux({ city, businessName }) {
   const v = cityVariant(city.name)
 
   const lieuxVariants = [

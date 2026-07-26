@@ -220,8 +220,7 @@ export async function generateCityContent(cityName, deptName, keywords, business
   const eventLabel = primaryKw.replace(/^location (de )?salle (de |pour )?/i, '').trim() || 'mariage'
 
   if (githubToken) {
-    try {
-      const prompt = `Tu es un expert en rédaction SEO pour des salles de réception en France.
+    const prompt = `Tu es un expert en rédaction SEO pour des salles de réception en France.
 Génère un contenu SEO très riche, UNIQUE et ORIGINAL pour la page web de la ville de "${cityName}" (${deptName}).
 L'établissement s'appelle "${businessName}" — une salle de réception de prestige en Seine-et-Marne (77).
 
@@ -260,25 +259,32 @@ Structure recommandée (librement réinterprétée pour chaque ville) :
 ## Réserver votre salle pour ${eventLabel} à ${cityName}
 ## Le Paradise 77 : votre partenaire ${eventLabel} en ${deptName}`
 
-      const res = await fetch('https://models.inference.ai.azure.com/chat/completions', {
-        method: 'POST',
-        headers: {
-          'Authorization': 'Bearer ' + githubToken,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          model: 'gpt-4o',
-          messages: [{ role: 'user', content: prompt }],
-          max_tokens: 4096,
-          temperature: 1.0,
-        }),
-      })
-      if (res.ok) {
-        const json = await res.json()
-        const text = json.choices?.[0]?.message?.content?.trim()
-        if (text) return _cleanAIText(text)
-      }
-    } catch { /* API unavailable – fall through to template */ }
+    const res = await fetch('https://models.inference.ai.azure.com/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Authorization': 'Bearer ' + githubToken,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        model: 'gpt-4o-mini',
+        messages: [{ role: 'user', content: prompt }],
+        max_tokens: 4096,
+        temperature: 1.0,
+      }),
+    })
+    if (res.ok) {
+      const json = await res.json()
+      const text = json.choices?.[0]?.message?.content?.trim()
+      if (text) return _cleanAIText(text)
+      throw new Error('Réponse IA vide reçue de GitHub Models.')
+    }
+    // Non-ok response: extract error details and throw so the caller can display it
+    let errMsg = `GitHub Models API — erreur ${res.status}`
+    try {
+      const errJson = await res.json()
+      if (errJson?.error?.message) errMsg += ` : ${errJson.error.message}`
+    } catch { /* ignore parse errors */ }
+    throw new Error(errMsg)
   }
 
   // ── Local template fallback ──────────────────────────────────────────────

@@ -58,6 +58,7 @@ export default function PagesClientTab({ pageType }) {
   const [generating, setGenerating] = useState(false)
   const [genProgress, setGenProgress] = useState({ done: 0, total: 0, current: '' })
   const [genDone, setGenDone]       = useState(false)
+  const [genError, setGenError]     = useState('')
   const [selDepts, setSelDepts]     = useState({})   // { deptCode: 'all' | Set<slug> }
   const [focusDept, setFocusDept]   = useState(null)
   const [citySearch, setCitySearch] = useState('')
@@ -73,6 +74,7 @@ export default function PagesClientTab({ pageType }) {
     setFocusDept(null)
     setCitySearch('')
     setGenDone(false)
+    setGenError('')
   }, [pageType.id])
 
   // Load everything on mount / when page type changes
@@ -180,8 +182,16 @@ export default function PagesClientTab({ pageType }) {
 
   async function handleGenerate() {
     if (selectedSlugs.length === 0) return
+
+    // Block generation and show red error if no GitHub token is configured
+    if (!config.githubToken?.trim()) {
+      setGenError('❌ Token GitHub non configuré. Rendez-vous dans l\'onglet ⚙️ Configuration pour l\'ajouter afin d\'activer la génération par IA.')
+      return
+    }
+
     setGenerating(true)
     setGenDone(false)
+    setGenError('')
     setGenProgress({ done: 0, total: selectedSlugs.length, current: '' })
 
     // 1. Backup existing pages
@@ -197,16 +207,22 @@ export default function PagesClientTab({ pageType }) {
       const city = ALL_CITIES.find((c) => c.slug === slug)
       if (!city) continue
       setGenProgress({ done: i, total: selectedSlugs.length, current: city.name })
-      const content = await generateCityContent(
-        city.name,
-        city.deptName,
-        config.keywords,
-        config.businessName,
-        config.businessType,
-        config.githubToken,
-        pageType.mainKeyword,
-      )
-      updated[slug] = { content, generatedAt: new Date().toISOString() }
+      try {
+        const content = await generateCityContent(
+          city.name,
+          city.deptName,
+          config.keywords,
+          config.businessName,
+          config.businessType,
+          config.githubToken,
+          pageType.mainKeyword,
+        )
+        updated[slug] = { content, generatedAt: new Date().toISOString() }
+      } catch (e) {
+        setGenerating(false)
+        setGenError(`❌ Erreur IA pour "${city.name}" : ${e.message}. Vérifiez votre token GitHub dans ⚙️ Configuration.`)
+        return
+      }
     }
 
     await storage.savePages(updated)
@@ -479,6 +495,23 @@ export default function PagesClientTab({ pageType }) {
                   ✅ {selectedSlugs.length} page{selectedSlugs.length > 1 ? 's' : ''} générée{selectedSlugs.length > 1 ? 's' : ''} avec succès !
                 </span>
               )}
+            </div>
+          )}
+
+          {/* Red error message */}
+          {genError && !generating && (
+            <div style={{
+              marginTop: '16px',
+              background: '#fff0f0',
+              border: '1.5px solid #e53935',
+              borderRadius: '10px',
+              padding: '14px 18px',
+              color: '#c62828',
+              fontSize: '13px',
+              fontWeight: '600',
+              lineHeight: '1.5',
+            }}>
+              {genError}
             </div>
           )}
 

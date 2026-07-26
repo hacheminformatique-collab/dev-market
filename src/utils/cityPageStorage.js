@@ -186,6 +186,24 @@ export function makePageTypeStorage(typeId) {
 // ── AI content generation ──────────────────────────────────────────────────
 
 /**
+ * Cleans raw text returned by GPT before storing or displaying it.
+ * - Decodes literal \uXXXX escape sequences (GPT sometimes outputs them as plain text)
+ * - Strips markdown code-fence wrappers (```markdown … ```) that GPT occasionally adds
+ */
+function _cleanAIText(raw) {
+  if (!raw) return raw
+  let text = raw.replace(/\\u([0-9a-fA-F]{4})/g, (_, hex) =>
+    String.fromCharCode(parseInt(hex, 16))
+  )
+  text = text
+    .split('\n')
+    .filter((line) => !/^```/.test(line.trim()))
+    .join('\n')
+    .trim()
+  return text
+}
+
+/**
  * Generates rich SEO content for a city using GitHub Models API
  * (https://models.inference.ai.azure.com).
  *
@@ -258,7 +276,7 @@ Structure recommandée (librement réinterprétée pour chaque ville) :
       if (res.ok) {
         const json = await res.json()
         const text = json.choices?.[0]?.message?.content?.trim()
-        if (text) return text
+        if (text) return _cleanAIText(text)
       }
     } catch { /* API unavailable – fall through to template */ }
   }

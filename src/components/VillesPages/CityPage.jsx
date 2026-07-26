@@ -20,9 +20,28 @@ function getTravelInfo(city) {
   return { km: Math.round(km), roadKm, driveMin }
 }
 
+// Clean AI-generated text before rendering:
+// 1. Decode literal \uXXXX escape sequences (GPT sometimes outputs them as plain text)
+// 2. Strip markdown code-fence wrappers (```markdown … ```) that GPT occasionally adds
+function cleanAIContent(raw) {
+  if (!raw) return raw
+  // Decode literal \uXXXX sequences → real Unicode characters
+  let text = raw.replace(/\\u([0-9a-fA-F]{4})/g, (_, hex) =>
+    String.fromCharCode(parseInt(hex, 16))
+  )
+  // Remove lines that are only a code-fence marker (``` or ```markdown etc.)
+  text = text
+    .split('\n')
+    .filter((line) => !/^```/.test(line.trim()))
+    .join('\n')
+    .trim()
+  return text
+}
+
 function renderContent(text) {
   if (!text) return null
-  return text.split('\n').map((line, i) => {
+  const cleaned = cleanAIContent(text)
+  return cleaned.split('\n').map((line, i) => {
     if (!line.trim()) return <br key={i} />
     if (line.startsWith('### ')) {
       return (

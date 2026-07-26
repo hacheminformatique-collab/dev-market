@@ -15,6 +15,17 @@ function cityVariant(name, n = 3) {
   return name.split('').reduce((acc, c) => acc + c.charCodeAt(0), 0) % n
 }
 
+function stableHash(input) {
+  return input.split('').reduce((acc, c, i) => (acc + c.charCodeAt(0) * (i + 1)) % 1000003, 0)
+}
+
+function getDevisInsertIndex(seed, sectionsCount) {
+  if (sectionsCount <= 2) return 1
+  const min = 1
+  const max = sectionsCount - 1
+  return min + (stableHash(seed) % (max - min + 1))
+}
+
 function getTravelInfo(city) {
   const km = haversineKm({ lat: city.lat, lng: city.lng }, { lat: PARADISE_LAT, lng: PARADISE_LNG })
   const roadKm = Math.round(km * 1.35)
@@ -1027,6 +1038,28 @@ function SectionBlogArticles({ articles }) {
   )
 }
 
+function SectionDevis({ city, businessName }) {
+  return (
+    <section id="devis" style={{ marginBottom: '56px' }}>
+      <div style={{ background: 'linear-gradient(135deg, var(--dark), var(--navy))', borderRadius: '16px', padding: 'clamp(28px,5vw,48px)', textAlign: 'center', color: 'white' }}>
+        <div style={{ fontSize: '40px', marginBottom: '12px' }}>📋</div>
+        <h2 style={{ fontFamily: 'var(--font-heading)', fontSize: 'clamp(1.5rem,4vw,2rem)', color: 'var(--gold)', marginBottom: '10px' }}>
+          Obtenir une estimation de tarif
+        </h2>
+        <p style={{ color: 'rgba(255,255,255,0.8)', marginBottom: '8px', fontSize: '15px' }}>
+          {businessName} — salle de mariage et réception de prestige en Seine-et-Marne
+        </p>
+        <p style={{ color: 'rgba(255,255,255,0.6)', marginBottom: '28px', fontSize: '14px', maxWidth: '520px', margin: '0 auto 28px' }}>
+          Devis gratuit, personnalisé et sans engagement. Notre équipe vous rappelle sous 24h depuis votre demande à {city.name}.
+        </p>
+        <Link to="/devis" className="btn btn-primary" style={{ fontSize: '15px', padding: '14px 36px' }}>
+          📋 Obtenir mon estimation gratuite
+        </Link>
+      </div>
+    </section>
+  )
+}
+
 // ── Main page ──────────────────────────────────────────────────────────────────
 
 export default function CityPage({ pageType }) {
@@ -1103,6 +1136,31 @@ export default function CityPage({ pageType }) {
   const tiktokUsername    = config?.tiktokUsername || ''
   const instagramPosts    = config?.instagramPosts || []
   const tiktokPosts       = config?.tiktokPosts || []
+  const seed              = `${citySlug}-${pageType?.id || 'mariage'}`
+
+  const orderedSections = [
+    <SectionIntro key="intro" city={city} businessName={businessName} page={page} />,
+    <SectionWhyChoose key="why-choose" city={city} businessName={businessName} />,
+    <SectionPrestations key="prestations" city={city} businessName={businessName} />,
+    <SectionReservation key="reservation" city={city} businessName={businessName} />,
+    <SectionCapacite key="capacite" city={city} businessName={businessName} />,
+    <SectionGalerie
+      key="galerie"
+      gallery={gallery}
+      instagramUsername={instagramUsername}
+      instagramPosts={instagramPosts}
+      tiktokUsername={tiktokUsername}
+      tiktokPosts={tiktokPosts}
+    />,
+    <SectionLieux key="lieux" city={city} businessName={businessName} />,
+    <SectionConseils key="conseils" city={city} />,
+    <SectionFAQ key="faq" city={city} businessName={businessName} />,
+    <SectionBlogArticles key="blog-articles" articles={blogArticles} />,
+  ]
+
+  const devisInsertIndex = getDevisInsertIndex(seed, orderedSections.length)
+  const sectionsWithDevis = [...orderedSections]
+  sectionsWithDevis.splice(devisInsertIndex, 0, <SectionDevis key="devis" city={city} businessName={businessName} />)
 
   return (
     <div style={{ minHeight: '100vh', background: 'var(--cream)' }}>
@@ -1146,60 +1204,7 @@ export default function CityPage({ pageType }) {
       {/* ── Content ── */}
       <div style={{ maxWidth: '960px', margin: '0 auto', padding: 'clamp(32px,5vw,64px) clamp(16px,5vw,40px)' }}>
 
-        {/* 1. Introduction */}
-        <SectionIntro city={city} businessName={businessName} page={page} />
-
-        {/* 2. Pourquoi choisir Le Paradise 77 */}
-        <SectionWhyChoose city={city} businessName={businessName} />
-
-        {/* 3. Prestations */}
-        <SectionPrestations city={city} businessName={businessName} />
-
-        {/* 4. Comment réserver */}
-        <SectionReservation city={city} businessName={businessName} />
-
-        {/* 5. Capacité */}
-        <SectionCapacite city={city} businessName={businessName} />
-
-        {/* 6. Galerie */}
-        <SectionGalerie
-          gallery={gallery}
-          instagramUsername={instagramUsername}
-          instagramPosts={instagramPosts}
-          tiktokUsername={tiktokUsername}
-          tiktokPosts={tiktokPosts}
-        />
-
-        {/* 7. Lieux emblématiques */}
-        <SectionLieux city={city} businessName={businessName} />
-
-        {/* 8. Conseils mariage */}
-        <SectionConseils city={city} />
-
-        {/* 9. FAQ */}
-        <SectionFAQ city={city} businessName={businessName} />
-
-        {/* 10. Articles de blog recommandés */}
-        <SectionBlogArticles articles={blogArticles} />
-
-        {/* 10. Formulaire de devis — CTA */}
-        <section id="devis" style={{ marginBottom: '56px' }}>
-          <div style={{ background: 'linear-gradient(135deg, var(--dark), var(--navy))', borderRadius: '16px', padding: 'clamp(28px,5vw,48px)', textAlign: 'center', color: 'white' }}>
-            <div style={{ fontSize: '40px', marginBottom: '12px' }}>📋</div>
-            <h2 style={{ fontFamily: 'var(--font-heading)', fontSize: 'clamp(1.5rem,4vw,2rem)', color: 'var(--gold)', marginBottom: '10px' }}>
-              Réservez votre salle de mariage à {city.name}
-            </h2>
-            <p style={{ color: 'rgba(255,255,255,0.8)', marginBottom: '8px', fontSize: '15px' }}>
-              {businessName} — salle de mariage et réception de prestige en Seine-et-Marne
-            </p>
-            <p style={{ color: 'rgba(255,255,255,0.6)', marginBottom: '28px', fontSize: '14px', maxWidth: '520px', margin: '0 auto 28px' }}>
-              Devis gratuit, personnalisé et sans engagement. Notre équipe vous rappelle sous 24h depuis votre demande à {city.name}.
-            </p>
-            <Link to="/devis" className="btn btn-primary" style={{ fontSize: '15px', padding: '14px 36px' }}>
-              📋 Demander mon devis gratuit
-            </Link>
-          </div>
-        </section>
+        {sectionsWithDevis}
 
         {/* 11. Carte / Map */}
         <Section id="carte" title={`📍 ${businessName} — Accès depuis ${city.name}`}>

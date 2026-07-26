@@ -163,72 +163,101 @@ function TikTokEmbed({ url }) {
 function CityNews({ cityName }) {
   const [items, setItems] = useState([])
   const [loading, setLoading] = useState(true)
-  const [error, setError] = useState(false)
 
   useEffect(() => {
     setLoading(true)
-    setError(false)
-    const rssUrl = `https://news.google.com/rss/search?q=${encodeURIComponent(cityName + ' actualités')}&hl=fr&gl=FR&ceid=FR:fr`
-    const apiUrl = `https://api.rss2json.com/v1/api.json?rss_url=${encodeURIComponent(rssUrl)}&count=5`
+    const rssUrl = `https://news.google.com/rss/search?q=${encodeURIComponent(cityName)}&hl=fr&gl=FR&ceid=FR:fr`
+    const proxyUrl = `https://api.allorigins.win/raw?url=${encodeURIComponent(rssUrl)}`
 
-    fetch(apiUrl)
-      .then((r) => r.json())
-      .then((data) => {
-        if (data.status === 'ok' && Array.isArray(data.items)) {
-          setItems(data.items.slice(0, 5))
-        } else {
-          setError(true)
-        }
+    fetch(proxyUrl)
+      .then((r) => {
+        if (!r.ok) throw new Error('fetch failed')
+        return r.text()
       })
-      .catch(() => setError(true))
+      .then((xml) => {
+        const doc = new DOMParser().parseFromString(xml, 'text/xml')
+        const rawItems = Array.from(doc.querySelectorAll('item')).slice(0, 5)
+        const parsed = rawItems.map((el) => ({
+          title:   el.querySelector('title')?.textContent || '',
+          link:    el.querySelector('link')?.textContent || '',
+          pubDate: el.querySelector('pubDate')?.textContent || '',
+          source:  el.querySelector('source')?.textContent || '',
+        })).filter((it) => it.title && it.link)
+        setItems(parsed)
+      })
+      .catch(() => { /* show fallback silently */ })
       .finally(() => setLoading(false))
   }, [cityName])
 
-  if (loading) {
-    return (
-      <Section title={`📰 Quoi de neuf à ${cityName} ?`}>
-        <p style={{ color: '#bbb', fontSize: '14px' }}>Chargement des actualités…</p>
-      </Section>
-    )
+  const googleNewsLink = `https://news.google.com/search?q=${encodeURIComponent(cityName)}&hl=fr&gl=FR&ceid=FR:fr`
+
+  const newsItemStyle = {
+    display: 'block', padding: '14px 18px',
+    background: 'white', border: '1px solid var(--border)',
+    borderRadius: '10px', textDecoration: 'none',
+    transition: 'box-shadow 0.15s, border-color 0.15s',
+    boxShadow: 'var(--shadow-sm)',
   }
 
-  if (error || items.length === 0) return null
+  const moreLinkStyle = {
+    display: 'inline-flex', alignItems: 'center', gap: '6px',
+    marginTop: '16px', padding: '9px 20px',
+    background: 'var(--gold-pale)', border: '1px solid var(--gold)',
+    borderRadius: '20px', fontSize: '13px', fontWeight: '600',
+    color: 'var(--dark)', textDecoration: 'none',
+    transition: 'background 0.15s',
+  }
 
   return (
     <Section title={`📰 Quoi de neuf à ${cityName} ?`}>
       <p style={{ color: 'var(--text-light)', fontSize: '14px', marginBottom: '20px' }}>
         Les dernières actualités de {cityName} et de ses environs.
       </p>
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-        {items.map((item, i) => {
-          const pubDate = item.pubDate ? new Date(item.pubDate).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' }) : ''
-          return (
-            <a
-              key={i}
-              href={item.link}
-              target="_blank"
-              rel="noreferrer noopener"
-              style={{
-                display: 'block', padding: '14px 18px',
-                background: 'white', border: '1px solid var(--border)',
-                borderRadius: '10px', textDecoration: 'none',
-                transition: 'box-shadow 0.15s, border-color 0.15s',
-                boxShadow: 'var(--shadow-sm)',
-              }}
-              onMouseEnter={(e) => { e.currentTarget.style.boxShadow = 'var(--shadow-md)'; e.currentTarget.style.borderColor = 'var(--gold)' }}
-              onMouseLeave={(e) => { e.currentTarget.style.boxShadow = 'var(--shadow-sm)'; e.currentTarget.style.borderColor = 'var(--border)' }}
-            >
-              <div style={{ fontSize: '15px', fontWeight: '600', color: 'var(--dark)', marginBottom: '4px', lineHeight: 1.4 }}>
-                {item.title}
-              </div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '12px', color: '#aaa' }}>
-                {item.author && <span>{item.author}</span>}
-                {pubDate && <span>• {pubDate}</span>}
-              </div>
-            </a>
-          )
-        })}
-      </div>
+
+      {loading && (
+        <p style={{ color: '#bbb', fontSize: '14px' }}>Chargement des actualités…</p>
+      )}
+
+      {!loading && items.length > 0 && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+          {items.map((item, i) => {
+            const pubDate = item.pubDate
+              ? new Date(item.pubDate).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' })
+              : ''
+            return (
+              <a
+                key={i}
+                href={item.link}
+                target="_blank"
+                rel="noreferrer noopener"
+                style={newsItemStyle}
+                onMouseEnter={(e) => { e.currentTarget.style.boxShadow = 'var(--shadow-md)'; e.currentTarget.style.borderColor = 'var(--gold)' }}
+                onMouseLeave={(e) => { e.currentTarget.style.boxShadow = 'var(--shadow-sm)'; e.currentTarget.style.borderColor = 'var(--border)' }}
+              >
+                <div style={{ fontSize: '15px', fontWeight: '600', color: 'var(--dark)', marginBottom: '4px', lineHeight: 1.4 }}>
+                  {item.title}
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '12px', color: '#aaa' }}>
+                  {item.source && <span>{item.source}</span>}
+                  {pubDate && <span>• {pubDate}</span>}
+                </div>
+              </a>
+            )
+          })}
+        </div>
+      )}
+
+      {/* Always show a "see more" link — ensures section has content even on fetch failure */}
+      <a
+        href={googleNewsLink}
+        target="_blank"
+        rel="noreferrer noopener"
+        style={moreLinkStyle}
+        onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--gold)'; e.currentTarget.style.color = 'white' }}
+        onMouseLeave={(e) => { e.currentTarget.style.background = 'var(--gold-pale)'; e.currentTarget.style.color = 'var(--dark)' }}
+      >
+        🔗 Voir toutes les actualités de {cityName}
+      </a>
     </Section>
   )
 }

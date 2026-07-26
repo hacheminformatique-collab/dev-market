@@ -118,7 +118,7 @@ function GalleryGrid({ photos }) {
             onMouseEnter={(e) => { e.currentTarget.style.borderColor = 'var(--gold)'; e.currentTarget.style.transform = 'scale(1.02)' }}
             onMouseLeave={(e) => { e.currentTarget.style.borderColor = 'transparent'; e.currentTarget.style.transform = 'scale(1)' }}
           >
-            <img src={src} alt={`Galerie photo ${i + 1}`} style={{ width: '100%', height: '160px', objectFit: 'cover', display: 'block' }} />
+            <img src={src} alt={`Galerie photo ${i + 1}`} loading="lazy" decoding="async" style={{ width: '100%', height: '160px', objectFit: 'cover', display: 'block' }} />
           </button>
         ))}
       </div>
@@ -145,6 +145,7 @@ function InstagramEmbed({ url }) {
       title="Instagram post"
       style={{ border: 'none', borderRadius: '12px', width: '328px', minHeight: '440px', maxWidth: '100%' }}
       scrolling="no"
+      loading="lazy"
       allowTransparency
       allow="encrypted-media"
     />
@@ -163,6 +164,7 @@ function TikTokEmbed({ url }) {
       src={`https://www.tiktok.com/embed/${videoId}`}
       title="TikTok video"
       style={{ border: 'none', borderRadius: '12px', width: '325px', height: '575px', maxWidth: '100%' }}
+      loading="lazy"
       allowFullScreen
       allow="encrypted-media"
     />

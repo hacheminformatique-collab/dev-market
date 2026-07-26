@@ -5,6 +5,64 @@
 Options -Indexes
 DirectoryIndex index.html
 
+# ── Compression (mod_deflate) ────────────────────────────────────────────────
+<IfModule mod_deflate.c>
+    AddOutputFilterByType DEFLATE text/html text/plain text/css text/javascript
+    AddOutputFilterByType DEFLATE application/javascript application/json
+    AddOutputFilterByType DEFLATE application/xml text/xml
+    AddOutputFilterByType DEFLATE image/svg+xml
+    AddOutputFilterByType DEFLATE font/woff font/woff2 application/font-woff application/font-woff2
+    Header append Vary Accept-Encoding
+</IfModule>
+
+# ── Brotli (mod_brotli — if available) ──────────────────────────────────────
+<IfModule mod_brotli.c>
+    AddOutputFilterByType BROTLI_COMPRESS text/html text/plain text/css text/javascript
+    AddOutputFilterByType BROTLI_COMPRESS application/javascript application/json
+    AddOutputFilterByType BROTLI_COMPRESS image/svg+xml
+    AddOutputFilterByType BROTLI_COMPRESS font/woff font/woff2
+</IfModule>
+
+# ── Cache-Control headers (LCP on repeat visits) ─────────────────────────────
+<IfModule mod_headers.c>
+    # Hashed JS/CSS assets: immutable — 1 year
+    <FilesMatch "\.(js|css)$">
+        Header set Cache-Control "public, max-age=31536000, immutable"
+    </FilesMatch>
+    # Fonts: 1 year (rarely change)
+    <FilesMatch "\.(woff2?|ttf|otf|eot)$">
+        Header set Cache-Control "public, max-age=31536000, immutable"
+    </FilesMatch>
+    # Images: 30 days
+    <FilesMatch "\.(png|jpg|jpeg|gif|webp|avif|ico|svg)$">
+        Header set Cache-Control "public, max-age=2592000"
+    </FilesMatch>
+    # HTML (index.html): no-cache so SPA always fetches latest shell
+    <FilesMatch "\.html$">
+        Header set Cache-Control "no-cache, no-store, must-revalidate"
+    </FilesMatch>
+
+    # Security headers
+    Header always set X-Content-Type-Options "nosniff"
+    Header always set X-Frame-Options "SAMEORIGIN"
+    Header always set Referrer-Policy "strict-origin-when-cross-origin"
+</IfModule>
+
+# ── mod_expires fallback ─────────────────────────────────────────────────────
+<IfModule mod_expires.c>
+    ExpiresActive On
+    ExpiresByType text/html                  "access plus 0 seconds"
+    ExpiresByType text/css                   "access plus 1 year"
+    ExpiresByType application/javascript     "access plus 1 year"
+    ExpiresByType image/png                  "access plus 30 days"
+    ExpiresByType image/jpeg                 "access plus 30 days"
+    ExpiresByType image/webp                 "access plus 30 days"
+    ExpiresByType image/avif                 "access plus 30 days"
+    ExpiresByType image/svg+xml              "access plus 30 days"
+    ExpiresByType font/woff2                 "access plus 1 year"
+    ExpiresByType font/woff                  "access plus 1 year"
+</IfModule>
+
 <IfModule mod_rewrite.c>
     RewriteEngine On
     RewriteBase /

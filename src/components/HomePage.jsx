@@ -210,12 +210,81 @@ export default function HomePage() {
           </button>
         </div>
 
+        {/* Presentation section */}
+        <div style={{ marginTop: 'clamp(40px, 6vw, 80px)', textAlign: 'center' }}>
+          <p style={{
+            fontSize: '11px', letterSpacing: '0.3em', textTransform: 'uppercase',
+            color: 'rgba(184,151,74,0.6)', marginBottom: '16px', fontWeight: '700',
+          }}>
+            Notre espace
+          </p>
+          <h2 style={{
+            fontFamily: 'var(--font-heading)', fontWeight: '400',
+            fontSize: 'clamp(1.4rem, 3.5vw, 2rem)', color: 'white',
+            letterSpacing: '0.08em', marginBottom: '16px',
+          }}>
+            Un cadre élégant pour vos événements
+          </h2>
+          <p style={{
+            fontSize: '15px', lineHeight: '1.8', color: 'rgba(255,255,255,0.6)',
+            fontFamily: 'var(--font-body)', maxWidth: '540px', margin: '0 auto 40px',
+          }}>
+            Nichée en Seine-et-Marne, la salle de réception {nomSalle} accueille tous vos moments précieux — mariages, anniversaires, baptêmes, fiançailles et séminaires — dans un cadre raffiné alliant luxe, confort et service sur mesure.
+          </p>
+
+          {/* Feature cards */}
+          <div style={{
+            display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))',
+            gap: '16px', textAlign: 'left',
+          }}>
+            {[
+              { icon: '💍', title: 'Mariages & Fiançailles', desc: 'Décoration somptueuse et coordination complète pour le plus beau jour de votre vie.' },
+              { icon: '🎂', title: 'Anniversaires', desc: 'Célébrez chaque étape de la vie dans un espace chaleureux et personnalisé.' },
+              { icon: '🕊️', title: 'Baptêmes', desc: 'Accueillez vos proches dans une atmosphère sereine et lumineuse.' },
+              { icon: '🤝', title: 'Séminaires', desc: 'Salles modulables et équipements professionnels pour vos événements d\'entreprise.' },
+            ].map((item) => (
+              <div key={item.title} style={{
+                background: 'rgba(255,255,255,0.04)',
+                border: '1px solid rgba(184,151,74,0.15)',
+                borderRadius: '12px', padding: '20px',
+              }}>
+                <div style={{ fontSize: '28px', marginBottom: '10px' }}>{item.icon}</div>
+                <p style={{
+                  fontSize: '12px', fontWeight: '700', letterSpacing: '0.08em',
+                  textTransform: 'uppercase', color: 'rgba(184,151,74,0.85)', marginBottom: '8px',
+                }}>{item.title}</p>
+                <p style={{ fontSize: '13px', color: 'rgba(255,255,255,0.5)', lineHeight: '1.6' }}>{item.desc}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+
         {/* Footer info */}
-        <div style={{ marginTop: 'clamp(30px, 5vw, 60px)', padding: '20px 0', borderTop: '1px solid rgba(184,151,74,0.2)' }}>
-          <p style={{ fontSize: '11px', color: 'rgba(255,255,255,0.3)', letterSpacing: '0.1em', lineHeight: '2' }}>
+        <div style={{ marginTop: 'clamp(40px, 6vw, 80px)', padding: '24px 0', borderTop: '1px solid rgba(184,151,74,0.2)' }}>
+          <p style={{ fontSize: '11px', color: 'rgba(255,255,255,0.3)', letterSpacing: '0.1em', lineHeight: '2', marginBottom: '16px' }}>
             SARL AFM — 5 avenue Fridingen, 77100 Nanteuil les Meaux<br />
             📞 0782821582 — ✉️ contact@leparadise77.fr
           </p>
+          <div style={{ display: 'flex', justifyContent: 'center', gap: '20px', flexWrap: 'wrap' }}>
+            {[
+              { label: 'Mentions légales', path: '/mentions-legales' },
+              { label: 'CGU', path: '/conditions-generales' },
+              { label: 'Confidentialité & RGPD', path: '/politique-confidentialite' },
+            ].map((link) => (
+              <button
+                key={link.path}
+                onClick={() => navigate(link.path)}
+                style={{
+                  background: 'none', border: 'none', color: 'rgba(255,255,255,0.3)',
+                  cursor: 'pointer', fontSize: '11px', letterSpacing: '0.08em',
+                  textDecoration: 'underline', textUnderlineOffset: '3px', padding: 0,
+                  fontFamily: 'var(--font-body)',
+                }}
+              >
+                {link.label}
+              </button>
+            ))}
+          </div>
         </div>
       </div>
 

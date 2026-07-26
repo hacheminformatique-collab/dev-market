@@ -14,6 +14,9 @@ const EspaceStaff = lazy(() => import('./components/EspaceStaff/EspaceStaff'))
 const CityPage = lazy(() => import('./components/VillesPages/CityPage'))
 const BlogListPage = lazy(() => import('./components/Blog/BlogListPage'))
 const BlogArticlePage = lazy(() => import('./components/Blog/BlogArticlePage'))
+const MentionsLegales = lazy(() => import('./components/Legal/MentionsLegales'))
+const CGU = lazy(() => import('./components/Legal/CGU'))
+const PolitiqueConfidentialite = lazy(() => import('./components/Legal/PolitiqueConfidentialite'))
 
 // Redirect /villes/:citySlug → /locationsalledemariage/:citySlug (backward compat)
 function LegacyVillesRedirect() {
@@ -93,6 +96,10 @@ function App() {
           {/* Blog */}
           <Route path="/blog" element={<BlogListPage />} />
           <Route path="/blog/:slug" element={<BlogArticlePage />} />
+          {/* Legal */}
+          <Route path="/mentions-legales" element={<MentionsLegales />} />
+          <Route path="/conditions-generales" element={<CGU />} />
+          <Route path="/politique-confidentialite" element={<PolitiqueConfidentialite />} />
         </Routes>
       </Suspense>
       <SyncIndicator />

@@ -213,6 +213,17 @@ function parseRssXml(xml) {
 async function fetchRssItems(cityName) {
   const rssUrl = `https://news.google.com/rss/search?q=${encodeURIComponent(cityName)}&hl=fr&gl=FR&ceid=FR:fr`
 
+  // ── Strategy 0: same-origin PHP proxy (no CORS, most reliable) ───────────
+  try {
+    const res = await fetchWithTimeout(`/api/news.php?city=${encodeURIComponent(cityName)}`, 8000)
+    if (res.ok) {
+      const data = await res.json()
+      if (Array.isArray(data) && data.length > 0) return data
+    }
+  } catch {
+    // fall through to client-side strategies
+  }
+
   // ── Strategy 1: rss2json.com – purpose-built RSS→JSON API with CORS support
   try {
     const jsonUrl = `https://api.rss2json.com/v1/api.json?rss_url=${encodeURIComponent(rssUrl)}&count=5`

@@ -203,6 +203,9 @@ function _cleanAIText(raw) {
   return text
 }
 
+// Delay between automatic retries when the API quota (429) is reached.
+const RATE_LIMIT_WAIT_MS = 65_000
+
 /**
  * Generates rich SEO content for a city using GitHub Models API
  * (https://models.inference.ai.azure.com).
@@ -212,8 +215,11 @@ function _cleanAIText(raw) {
  *
  * Falls back to a varied local template when the API is unavailable or the
  * token is not configured.
+ *
+ * @param {Function} [onStatus] - Optional callback(message) invoked to report
+ *   status updates (e.g. quota wait). Useful to surface progress in the UI.
  */
-export async function generateCityContent(cityName, deptName, keywords, businessName, businessType, githubToken, mainKeyword) {
+export async function generateCityContent(cityName, deptName, keywords, businessName, businessType, githubToken, mainKeyword, onStatus) {
   // Resolve the primary keyword for this page type (default: location salle de mariage)
   const primaryKw = mainKeyword || 'location salle de mariage'
   // Derive a short event label from the keyword for use in prompts/templates
@@ -259,7 +265,7 @@ Structure recommandée (librement réinterprétée pour chaque ville) :
 ## Réserver votre salle pour ${eventLabel} à ${cityName}
 ## Le Paradise 77 : votre partenaire ${eventLabel} en ${deptName}`
 
-    const res = await fetch('https://models.inference.ai.azure.com/chat/completions', {
+    const fetchCompletion = () => fetch('https://models.inference.ai.azure.com/chat/completions', {
       method: 'POST',
       headers: {
         'Authorization': 'Bearer ' + githubToken,
@@ -272,19 +278,38 @@ Structure recommandée (librement réinterprétée pour chaque ville) :
         temperature: 1.0,
       }),
     })
-    if (res.ok) {
-      const json = await res.json()
+
+    const parseOkResponse = async (r) => {
+      const json = await r.json()
       const text = json.choices?.[0]?.message?.content?.trim()
       if (text) return _cleanAIText(text)
       throw new Error('Réponse IA vide reçue de GitHub Models.')
     }
-    // Non-ok response: extract error details and throw so the caller can display it
-    let errMsg = `GitHub Models API — erreur ${res.status}`
-    try {
-      const errJson = await res.json()
-      if (errJson?.error?.message) errMsg += ` : ${errJson.error.message}`
-    } catch { /* ignore parse errors */ }
-    throw new Error(errMsg)
+
+    const buildErrMsg = async (r) => {
+      let msg = `GitHub Models API — erreur ${r.status}`
+      try {
+        const errJson = await r.json()
+        if (errJson?.error?.message) msg += ` : ${errJson.error.message}`
+      } catch { /* ignore parse errors */ }
+      return msg
+    }
+
+    let res = await fetchCompletion()
+    if (res.ok) return await parseOkResponse(res)
+
+    // On 429 (quota exceeded): notify the UI, wait 65 s, then retry once.
+    if (res.status === 429) {
+      if (onStatus) onStatus('⏳ Quota API atteint — reprise automatique dans 65s…')
+      await new Promise((resolve) => setTimeout(resolve, RATE_LIMIT_WAIT_MS))
+      if (onStatus) onStatus(cityName)
+      res = await fetchCompletion()
+      if (res.ok) return await parseOkResponse(res)
+      throw new Error(await buildErrMsg(res) + ' (après nouvelle tentative suite au quota 429)')
+    }
+
+    // Other non-ok responses: extract error details and throw
+    throw new Error(await buildErrMsg(res))
   }
 
   // ── Local template fallback ──────────────────────────────────────────────

@@ -5,6 +5,11 @@ import {
 } from '../../../utils/cityPageStorage'
 import { DEPARTMENTS, ALL_CITIES } from '../../../data/idf-cities'
 
+// Delay between consecutive AI page generation requests (milliseconds).
+// At ~5 500 tokens/page, 7 s gives ≈ 47 000 tokens/min — safely under the
+// 60 000 tokens/min quota of the GitHub Models API.
+const INTER_PAGE_DELAY_MS = 7_000
+
 // ── Small helpers ──────────────────────────────────────────────────────────
 
 function Label({ children, sub }) {
@@ -216,12 +221,17 @@ export default function PagesClientTab({ pageType }) {
           config.businessType,
           config.githubToken,
           pageType.mainKeyword,
+          (statusMsg) => setGenProgress((prev) => ({ ...prev, current: statusMsg })),
         )
         updated[slug] = { content, generatedAt: new Date().toISOString() }
       } catch (e) {
         setGenerating(false)
         setGenError(`❌ Erreur IA pour "${city.name}" : ${e.message}. Vérifiez votre token GitHub dans ⚙️ Configuration.`)
         return
+      }
+      // Pause between requests to stay within the API rate limit (60 000 tokens/min).
+      if (i < selectedSlugs.length - 1) {
+        await new Promise((resolve) => setTimeout(resolve, INTER_PAGE_DELAY_MS))
       }
     }
 

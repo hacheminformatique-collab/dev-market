@@ -11,7 +11,7 @@ import CartFloat from './CartFloat'
 
 const STEP_LABELS = ['Coordonnées', 'Événement', 'Formule', 'Menu', 'Gâteau', 'Options', 'Récapitulatif']
 
-export default function WizardForm() {
+export default function WizardForm({ inline = false }) {
   const navigate = useNavigate()
   const [step, setStep] = useState(1)
   const [formData, setFormData] = useState({})
@@ -53,6 +53,48 @@ export default function WizardForm() {
     : step
 
   const showCart = step >= 3
+
+  if (inline) {
+    return (
+      <div style={{ background: '#f8f5f0', borderRadius: '12px', overflow: 'hidden' }}>
+        {/* Progress bar */}
+        <div style={{ background: 'white', padding: '16px 24px', borderBottom: '1px solid #eee' }}>
+          <div style={{ display: 'flex', gap: '4px', marginBottom: '8px' }}>
+            {Array.from({ length: totalVisibleSteps }).map((_, i) => (
+              <div
+                key={i}
+                style={{
+                  flex: 1,
+                  height: '4px',
+                  borderRadius: '2px',
+                  background: i < displayStep ? '#c9a84c' : '#e0e0e0',
+                  transition: 'background 0.3s',
+                }}
+              />
+            ))}
+          </div>
+          <div style={{ fontSize: '13px', color: '#888' }}>
+            Étape {displayStep} / {totalVisibleSteps} — {STEP_LABELS[step - 1]}
+          </div>
+        </div>
+
+        {/* Content */}
+        <div style={{ maxWidth: '720px', margin: '0 auto', padding: '24px' }}>
+          <div className="card">
+            {step === 1 && <Step1Client data={formData} onChange={updateField} onNext={() => setStep(2)} />}
+            {step === 2 && <Step2Event data={formData} onChange={updateField} onNext={() => setStep(3)} onBack={() => setStep(1)} />}
+            {step === 3 && <Step3Formule data={formData} onChange={updateField} onNext={nextStep} onBack={() => setStep(2)} />}
+            {step === 4 && <Step4Menu data={formData} onChange={updateField} onNext={() => setStep(5)} onBack={() => setStep(3)} />}
+            {step === 5 && <Step5Gateau data={formData} onChange={updateField} onNext={() => setStep(6)} onBack={() => setStep(4)} />}
+            {step === 6 && <Step6Options data={formData} onChange={updateField} onNext={() => setStep(7)} onBack={prevStep} />}
+            {step === 7 && <Step7Summary data={formData} onBack={() => setStep(6)} onSubmit={() => {}} />}
+          </div>
+        </div>
+
+        {showCart && <CartFloat data={formData} />}
+      </div>
+    )
+  }
 
   return (
     <div style={{ minHeight: '100vh', background: '#f8f5f0', paddingBottom: '100px' }}>

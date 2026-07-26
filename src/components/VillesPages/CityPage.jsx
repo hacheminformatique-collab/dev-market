@@ -4,6 +4,7 @@ import { makePageTypeStorage, getCityPagesConfig } from '../../utils/cityPageSto
 import { getCityBySlug, getNearbyCities, haversineKm } from '../../data/idf-cities'
 import { PAGE_TYPES } from '../../data/pageTypes'
 import { getBlogArticles } from '../../utils/blogStorage'
+import WizardForm from '../Wizard/WizardForm'
 
 // ── Paradise 77 location (5 avenue Fridingen, 77100 Nanteuil-lès-Meaux) ──────
 const PARADISE_LAT = 48.9617
@@ -1041,20 +1042,20 @@ function SectionBlogArticles({ articles }) {
 function SectionDevis({ city, businessName }) {
   return (
     <section id="devis" style={{ marginBottom: '56px' }}>
-      <div style={{ background: 'linear-gradient(135deg, var(--dark), var(--navy))', borderRadius: '16px', padding: 'clamp(28px,5vw,48px)', textAlign: 'center', color: 'white' }}>
-        <div style={{ fontSize: '40px', marginBottom: '12px' }}>📋</div>
-        <h2 style={{ fontFamily: 'var(--font-heading)', fontSize: 'clamp(1.5rem,4vw,2rem)', color: 'var(--gold)', marginBottom: '10px' }}>
-          Obtenir une estimation de tarif
-        </h2>
-        <p style={{ color: 'rgba(255,255,255,0.8)', marginBottom: '8px', fontSize: '15px' }}>
-          {businessName} — salle de mariage et réception de prestige en Seine-et-Marne
-        </p>
-        <p style={{ color: 'rgba(255,255,255,0.6)', marginBottom: '28px', fontSize: '14px', maxWidth: '520px', margin: '0 auto 28px' }}>
-          Devis gratuit, personnalisé et sans engagement. Notre équipe vous rappelle sous 24h depuis votre demande à {city.name}.
-        </p>
-        <Link to="/devis" className="btn btn-primary" style={{ fontSize: '15px', padding: '14px 36px' }}>
-          📋 Obtenir mon estimation gratuite
-        </Link>
+      <div style={{ background: 'linear-gradient(135deg, var(--dark), var(--navy))', borderRadius: '16px', padding: 'clamp(28px,5vw,48px)', color: 'white' }}>
+        <div style={{ textAlign: 'center', marginBottom: '28px' }}>
+          <div style={{ fontSize: '40px', marginBottom: '12px' }}>📋</div>
+          <h2 style={{ fontFamily: 'var(--font-heading)', fontSize: 'clamp(1.5rem,4vw,2rem)', color: 'var(--gold)', marginBottom: '10px' }}>
+            Obtenir une estimation de tarif
+          </h2>
+          <p style={{ color: 'rgba(255,255,255,0.8)', marginBottom: '8px', fontSize: '15px' }}>
+            {businessName} — salle de mariage et réception de prestige en Seine-et-Marne
+          </p>
+          <p style={{ color: 'rgba(255,255,255,0.6)', fontSize: '14px', maxWidth: '520px', margin: '0 auto' }}>
+            Devis gratuit, personnalisé et sans engagement. Notre équipe vous rappelle sous 24h depuis votre demande à {city.name}.
+          </p>
+        </div>
+        <WizardForm inline={true} />
       </div>
     </section>
   )

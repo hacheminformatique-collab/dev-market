@@ -160,6 +160,24 @@ function TikTokEmbed({ url }) {
 
 // ── City news RSS feed ─────────────────────────────────────────────────────
 
+async function fetchWithTimeout(url, timeoutMs = 6000) {
+  if (typeof AbortSignal !== 'undefined' && typeof AbortSignal.timeout === 'function') {
+    return fetch(url, { signal: AbortSignal.timeout(timeoutMs) })
+  }
+
+  if (typeof AbortController !== 'undefined') {
+    const controller = new AbortController()
+    const timeoutId = setTimeout(() => controller.abort(), timeoutMs)
+    try {
+      return await fetch(url, { signal: controller.signal })
+    } finally {
+      clearTimeout(timeoutId)
+    }
+  }
+
+  return fetch(url)
+}
+
 async function fetchRssItems(cityName) {
   const rssUrl = `https://news.google.com/rss/search?q=${encodeURIComponent(cityName)}&hl=fr&gl=FR&ceid=FR:fr`
 
@@ -171,7 +189,7 @@ async function fetchRssItems(cityName) {
 
   for (const proxyUrl of proxies) {
     try {
-      const res = await fetch(proxyUrl, { signal: AbortSignal.timeout(6000) })
+      const res = await fetchWithTimeout(proxyUrl, 6000)
       if (!res.ok) continue
       const xml = await res.text()
       const doc = new DOMParser().parseFromString(xml, 'text/xml')

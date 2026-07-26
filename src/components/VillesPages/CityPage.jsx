@@ -181,7 +181,29 @@ async function fetchWithTimeout(url, timeoutMs = 6000) {
 async function fetchRssItems(cityName) {
   const rssUrl = `https://news.google.com/rss/search?q=${encodeURIComponent(cityName)}&hl=fr&gl=FR&ceid=FR:fr`
 
-  // Try proxies in order until one works
+  // ── Strategy 1: rss2json.com – purpose-built RSS→JSON API with CORS support
+  try {
+    const jsonUrl = `https://api.rss2json.com/v1/api.json?rss_url=${encodeURIComponent(rssUrl)}&count=5`
+    const res = await fetchWithTimeout(jsonUrl, 8000)
+    if (res.ok) {
+      const data = await res.json()
+      if (data.status === 'ok' && Array.isArray(data.items) && data.items.length > 0) {
+        return data.items.slice(0, 5).map((it) => ({
+          title:   it.title?.trim() || '',
+          link:    it.link  || '',
+          pubDate: it.pubDate || '',
+          source:  it.author || data.feed?.title || '',
+          desc:    (it.description || it.content || '')
+            .replace(/<[^>]*>/g, '')
+            .slice(0, 180),
+        })).filter((it) => it.title)
+      }
+    }
+  } catch {
+    // fall through to next strategy
+  }
+
+  // ── Strategy 2: generic CORS proxies returning raw XML ────────────────────
   const proxies = [
     `https://corsproxy.io/?url=${encodeURIComponent(rssUrl)}`,
     `https://api.allorigins.win/raw?url=${encodeURIComponent(rssUrl)}`,
@@ -194,10 +216,9 @@ async function fetchRssItems(cityName) {
       const xml = await res.text()
       const doc = new DOMParser().parseFromString(xml, 'text/xml')
 
-      // Check for parse error
       if (doc.querySelector('parsererror')) continue
 
-      const rawItems = Array.from(doc.getElementsByTagName('item')).slice(0, 3)
+      const rawItems = Array.from(doc.getElementsByTagName('item')).slice(0, 5)
       if (rawItems.length === 0) continue
 
       const parsed = rawItems.map((el) => {
@@ -205,7 +226,6 @@ async function fetchRssItems(cityName) {
         // use nextSibling traversal when textContent is empty
         let link = el.getElementsByTagName('link')[0]?.textContent?.trim() || ''
         if (!link) {
-          // Some RSS parsers put <link> as a text node sibling
           const linkEl = el.getElementsByTagName('link')[0]
           if (linkEl) link = linkEl.nextSibling?.nodeValue?.trim() || ''
         }
@@ -214,8 +234,6 @@ async function fetchRssItems(cityName) {
         const pubDate = el.getElementsByTagName('pubDate')[0]?.textContent?.trim() || ''
         const source  = el.getElementsByTagName('source')[0]?.textContent?.trim() || ''
         const desc    = el.getElementsByTagName('description')[0]?.textContent?.trim() || ''
-
-        // Strip HTML tags from description (Google News wraps it in CDATA with markup)
         const cleanDesc = desc.replace(/<[^>]*>/g, '').slice(0, 180)
 
         return { title, link, pubDate, source, desc: cleanDesc }
@@ -286,7 +304,7 @@ function CityNews({ city }) {
 
       {loading && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-          {[1, 2, 3].map((n) => (
+          {[1, 2, 3, 4, 5].map((n) => (
             <div key={n} style={{
               height: '72px', borderRadius: '10px',
               background: 'linear-gradient(90deg, #f0ece4 25%, #faf8f4 50%, #f0ece4 75%)',

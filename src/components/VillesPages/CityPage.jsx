@@ -229,7 +229,37 @@ async function fetchRssItems(cityName) {
   return []
 }
 
-function CityNews({ cityName }) {
+function getLocalFallbackItems(city) {
+  const { name, deptName, deptCode } = city
+  const q = encodeURIComponent(name)
+  const qDept = encodeURIComponent(deptName)
+  return [
+    {
+      title: `Actualités de ${name} sur Google Actualités`,
+      link: `https://news.google.com/search?q=${q}&hl=fr&gl=FR&ceid=FR:fr`,
+      desc: `Retrouvez les dernières actualités et informations sur ${name} et ses environs directement sur Google Actualités.`,
+      source: 'Google Actualités',
+      pubDate: '',
+    },
+    {
+      title: `${name} — Informations pratiques`,
+      link: `https://fr.wikipedia.org/wiki/${q}`,
+      desc: `Découvrez ${name}, commune du département ${deptName} (${deptCode}).`,
+      source: 'Wikipédia',
+      pubDate: '',
+    },
+    {
+      title: `Actualités du département ${deptName}`,
+      link: `https://news.google.com/search?q=${qDept}&hl=fr&gl=FR&ceid=FR:fr`,
+      desc: `Suivez toutes les actualités et événements du département ${deptName} (${deptCode}).`,
+      source: 'Google Actualités',
+      pubDate: '',
+    },
+  ]
+}
+
+function CityNews({ city }) {
+  const cityName = city.name
   const [items, setItems] = useState([])
   const [loading, setLoading] = useState(true)
 
@@ -304,9 +334,34 @@ function CityNews({ cityName }) {
       )}
 
       {!loading && items.length === 0 && (
-        <p style={{ color: '#bbb', fontSize: '14px', fontStyle: 'italic' }}>
-          Aucune actualité disponible pour le moment.
-        </p>
+        <>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+            {getLocalFallbackItems(city).map((item, i) => (
+              <a
+                key={i}
+                href={item.link}
+                target="_blank"
+                rel="noreferrer noopener"
+                style={newsItemStyle}
+                onMouseEnter={(e) => { e.currentTarget.style.boxShadow = 'var(--shadow-md)'; e.currentTarget.style.borderColor = 'var(--gold)' }}
+                onMouseLeave={(e) => { e.currentTarget.style.boxShadow = 'var(--shadow-sm)'; e.currentTarget.style.borderColor = 'var(--border)' }}
+              >
+                <div style={{ fontSize: '15px', fontWeight: '600', color: 'var(--dark)', marginBottom: '6px', lineHeight: 1.4 }}>
+                  {item.title}
+                </div>
+                <div style={{ fontSize: '13px', color: 'var(--text-light)', marginBottom: '6px', lineHeight: 1.5 }}>
+                  {item.desc}
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '12px', color: '#aaa' }}>
+                  <span style={{ fontWeight: '600' }}>{item.source}</span>
+                </div>
+              </a>
+            ))}
+          </div>
+          <p style={{ color: '#ccc', fontSize: '12px', fontStyle: 'italic', marginTop: '12px' }}>
+            Liens informatifs — flux actualités indisponible pour le moment.
+          </p>
+        </>
       )}
     </Section>
   )
@@ -662,7 +717,7 @@ export default function CityPage() {
         )}
 
         {/* City news RSS feed */}
-        <CityNews cityName={city.name} />
+        <CityNews city={city} />
 
         {/* CTA */}
         <div style={{

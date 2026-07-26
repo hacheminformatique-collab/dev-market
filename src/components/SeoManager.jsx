@@ -4,6 +4,7 @@ import { getCityBySlug } from '../data/idf-cities'
 import { makePageTypeStorage } from '../utils/cityPageStorage'
 import { getSettings } from '../utils/storage'
 import { PAGE_TYPES } from '../data/pageTypes'
+import { getBlogArticles, getBlogConfig } from '../utils/blogStorage'
 
 function normalizeSiteUrl(rawUrl) {
   const fallback = window.location.origin
@@ -48,7 +49,7 @@ function upsertJsonLd(value) {
   tag.textContent = JSON.stringify(value)
 }
 
-function buildSeoData(pathname, settings, cityPages, detectedPageType) {
+function buildSeoData(pathname, settings, cityPages, detectedPageType, blogArticle, blogConfig) {
   const businessName = settings?.nom?.trim() || 'Le Paradise 77'
   const baseUrl = normalizeSiteUrl(settings?.siteUrl)
   const canonical = new URL(pathname, baseUrl).toString()
@@ -196,12 +197,68 @@ function buildSeoData(pathname, settings, cityPages, detectedPageType) {
     }
   }
 
+  if (pathname === '/blog') {
+    return {
+      ...base,
+      title: `Blog mariage — conseils et inspirations — ${businessName}`,
+      description: `Découvrez nos articles de conseils pour futurs mariés : organisation, décoration, budget, traiteur et bien plus encore. Blog de ${businessName}.`,
+      keywords: `${base.keywords}, blog mariage, conseils mariage, organisation mariage, idées mariage`,
+      robots: 'index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1',
+      ogType: 'website',
+      jsonLd: {
+        '@context': 'https://schema.org',
+        '@graph': [
+          ...base.jsonLd['@graph'],
+          {
+            '@type': 'Blog',
+            name: `Blog mariage — ${businessName}`,
+            url: new URL('/blog', baseUrl).toString(),
+            description: `Articles de conseils pour futurs mariés par ${businessName}`,
+            inLanguage: 'fr-FR',
+          },
+          {
+            '@type': 'BreadcrumbList',
+            itemListElement: [
+              { '@type': 'ListItem', position: 1, name: 'Accueil', item: new URL('/', baseUrl).toString() },
+              { '@type': 'ListItem', position: 2, name: 'Blog', item: new URL('/blog', baseUrl).toString() },
+            ],
+          },
+        ],
+      },
+    }
+  }
+
+  if (pathname.startsWith('/blog/')) {
+    const slug = pathname.replace('/blog/', '').replace(/\/$/, '')
+    const article = blogArticle
+    if (article && article.status === 'published') {
+      const _authorName = blogConfig?.authorName || businessName
+      return {
+        ...base,
+        title: article.seoTitle || `${article.title} — ${businessName}`,
+        description: article.seoDescription || article.excerpt || base.description,
+        keywords: `${base.keywords}, ${(article.keywords || []).join(', ')}`,
+        robots: 'index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1',
+        ogType: 'article',
+      }
+    }
+    if (slug) {
+      return {
+        ...base,
+        title: `Article — ${businessName}`,
+        robots: 'noindex, nofollow, noarchive',
+      }
+    }
+  }
+
   return base
 }
 
 export default function SeoManager() {
   const location = useLocation()
   const [cityPages, setCityPages] = useState({})
+  const [blogArticle, setBlogArticle] = useState(null)
+  const [blogConfig, setBlogConfig] = useState(null)
 
   // Detect the current page type from the URL path
   const detectedPageType = PAGE_TYPES.find((pt) =>
@@ -221,8 +278,28 @@ export default function SeoManager() {
   }, [location.pathname, detectedPageType?.id]) // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
+    let cancelled = false
+    if (location.pathname.startsWith('/blog/')) {
+      const slug = location.pathname.replace('/blog/', '').replace(/\/$/, '')
+      Promise.all([getBlogArticles(), getBlogConfig()]).then(([articles, cfg]) => {
+        if (!cancelled) {
+          setBlogArticle(articles[slug] || null)
+          setBlogConfig(cfg)
+        }
+      })
+    } else if (location.pathname === '/blog') {
+      getBlogConfig().then((cfg) => { if (!cancelled) setBlogConfig(cfg) })
+      setBlogArticle(null)
+    } else {
+      setBlogArticle(null)
+      setBlogConfig(null)
+    }
+    return () => { cancelled = true }
+  }, [location.pathname])
+
+  useEffect(() => {
     const settings = getSettings()
-    const seo = buildSeoData(location.pathname, settings, cityPages, detectedPageType)
+    const seo = buildSeoData(location.pathname, settings, cityPages, detectedPageType, blogArticle, blogConfig)
 
     document.documentElement.lang = 'fr'
     document.title = seo.title
@@ -243,8 +320,8 @@ export default function SeoManager() {
     upsertMeta('name', 'twitter:description', seo.description)
     upsertMeta('name', 'twitter:image', seo.imageUrl)
     upsertLink('canonical', seo.canonical)
-    upsertJsonLd(seo.jsonLd)
-  }, [cityPages, location.pathname, detectedPageType]) // eslint-disable-line react-hooks/exhaustive-deps
+    if (seo.jsonLd) upsertJsonLd(seo.jsonLd)
+  }, [cityPages, location.pathname, detectedPageType, blogArticle, blogConfig]) // eslint-disable-line react-hooks/exhaustive-deps
 
   return null
 }

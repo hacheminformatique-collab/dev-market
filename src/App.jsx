@@ -12,6 +12,8 @@ const WizardForm = lazy(() => import('./components/Wizard/WizardForm'))
 const EspaceClient = lazy(() => import('./components/EspaceClient/EspaceClient'))
 const EspaceStaff = lazy(() => import('./components/EspaceStaff/EspaceStaff'))
 const CityPage = lazy(() => import('./components/VillesPages/CityPage'))
+const BlogListPage = lazy(() => import('./components/Blog/BlogListPage'))
+const BlogArticlePage = lazy(() => import('./components/Blog/BlogArticlePage'))
 
 // Redirect /villes/:citySlug → /locationsalledemariage/:citySlug (backward compat)
 function LegacyVillesRedirect() {
@@ -88,6 +90,9 @@ function App() {
           <Route path="/locationsallebapteme/:citySlug" element={<CityPage pageType={PAGE_TYPES_BY_ID['bapteme']} />} />
           <Route path="/locationsallefiancaille/:citySlug" element={<CityPage pageType={PAGE_TYPES_BY_ID['fiancaille']} />} />
           <Route path="/locationsalleseminaire/:citySlug" element={<CityPage pageType={PAGE_TYPES_BY_ID['seminaire']} />} />
+          {/* Blog */}
+          <Route path="/blog" element={<BlogListPage />} />
+          <Route path="/blog/:slug" element={<BlogArticlePage />} />
         </Routes>
       </Suspense>
       <SyncIndicator />

@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import {
-  getBlogConfig, saveBlogConfig, DEFAULT_BLOG_CONFIG,
+  getBlogConfig, saveBlogConfig,
   getBlogArticles, saveBlogArticles, backupBlogArticles, getBlogBackups,
   getBlogAutoLog, appendBlogAutoLog,
   generateBlogArticle, extractExcerpt, buildInternalLinks, buildRelatedSlugs,
@@ -43,7 +43,7 @@ export default function BlogTab() {
   const [subTab, setSubTab]             = useState('articles')
   const [config, setConfig]             = useState(null)
   const [articles, setArticles]         = useState({})
-  const [backups, setBackups]           = useState([])
+  const [_backups, setBackups]          = useState([])
   const [autoLog, setAutoLog]           = useState([])
   const [saving, setSaving]             = useState(false)
   // Batch generation state

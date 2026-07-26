@@ -22,14 +22,16 @@ function xmlEscape(value) {
  * @param {string}  opts.baseUrl
  * @param {object}  [opts.cityPages]        – legacy mariage pages { [slug]: { content, generatedAt } }
  * @param {object}  [opts.allTypePages]     – { [typeId]: { [slug]: { content, generatedAt } } }
+ * @param {object}  [opts.blogArticles]     – { [slug]: Article } from blogStorage
  */
-export function buildSitemapXml({ baseUrl, cityPages = {}, allTypePages = {} }) {
+export function buildSitemapXml({ baseUrl, cityPages = {}, allTypePages = {}, blogArticles = {} }) {
   const normalizedBase = normalizeBaseUrl(baseUrl)
   const today = new Date().toISOString().slice(0, 10)
 
   const rows = [
     { path: '/', changefreq: 'weekly', priority: '1.0', lastmod: today },
     { path: '/devis', changefreq: 'weekly', priority: '0.8', lastmod: today },
+    { path: '/blog', changefreq: 'daily', priority: '0.8', lastmod: today },
   ]
 
   // Helper to add pages for a given basePath
@@ -51,6 +53,21 @@ export function buildSitemapXml({ baseUrl, cityPages = {}, allTypePages = {} }) 
   PAGE_TYPES.forEach((pt) => {
     const pages = allTypePages[pt.id] || (pt.id === 'mariage' ? cityPages : {})
     addPageRows(pt.basePath, pages)
+  })
+
+  // Add published blog articles
+  Object.entries(blogArticles).forEach(([slug, article]) => {
+    if (!slug || article?.status !== 'published') return
+    const publishedAt = article?.publishedAt ? new Date(article.publishedAt) : null
+    const updatedAt = article?.updatedAt ? new Date(article.updatedAt) : null
+    const lastDate = updatedAt || publishedAt
+    const validDate = lastDate && !Number.isNaN(lastDate.getTime())
+    rows.push({
+      path: `/blog/${slug}`,
+      changefreq: 'monthly',
+      priority: '0.6',
+      lastmod: validDate ? lastDate.toISOString().slice(0, 10) : today,
+    })
   })
 
   const uniq = new Map()

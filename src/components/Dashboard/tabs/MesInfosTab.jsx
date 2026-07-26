@@ -3,6 +3,7 @@ import { getSettings, saveSettings } from '../../../utils/storage'
 import { makePageTypeStorage } from '../../../utils/cityPageStorage'
 import { buildSitemapXml, buildRobotsTxt, downloadTextFile } from '../../../utils/seoFiles'
 import { PAGE_TYPES } from '../../../data/pageTypes'
+import { getBlogArticles } from '../../../utils/blogStorage'
 
 export default function MesInfosTab() {
   const [data, setData] = useState(getSettings())
@@ -36,7 +37,7 @@ export default function MesInfosTab() {
         allTypePages[pt.id] = pages || {}
         totalPages += Object.keys(pages || {}).length
       }))
-      const sitemapXml = buildSitemapXml({ baseUrl: data.siteUrl, allTypePages })
+      const sitemapXml = buildSitemapXml({ baseUrl: data.siteUrl, allTypePages, blogArticles: await getBlogArticles() })
       const robotsTxt = buildRobotsTxt(data.siteUrl)
       downloadTextFile('sitemap.xml', sitemapXml, 'application/xml;charset=utf-8')
       downloadTextFile('robots.txt', robotsTxt, 'text/plain;charset=utf-8')

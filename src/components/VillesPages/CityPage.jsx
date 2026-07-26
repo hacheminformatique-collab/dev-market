@@ -3,6 +3,7 @@ import { useParams, Link } from 'react-router-dom'
 import { makePageTypeStorage, getCityPagesConfig } from '../../utils/cityPageStorage'
 import { getCityBySlug, getNearbyCities, haversineKm } from '../../data/idf-cities'
 import { PAGE_TYPES } from '../../data/pageTypes'
+import { getBlogArticles } from '../../utils/blogStorage'
 
 // ── Paradise 77 location (5 avenue Fridingen, 77100 Nanteuil-lès-Meaux) ──────
 const PARADISE_LAT = 48.9617
@@ -965,6 +966,67 @@ function NearbyLinks({ citySlug, allTypePages, city, businessName, currentBasePa
   )
 }
 
+// ── Blog articles recommandés ─────────────────────────────────────────────────
+
+function SectionBlogArticles({ articles }) {
+  if (!articles || articles.length === 0) return null
+  return (
+    <Section id="blog-articles" title="📝 Nos conseils pour votre mariage">
+      <p style={{ color: 'var(--text)', fontSize: '15px', lineHeight: 1.85, marginBottom: '24px' }}>
+        Retrouvez nos articles de conseils pour organiser votre mariage, choisir vos prestataires et vivre un jour J inoubliable.
+      </p>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))', gap: '16px', marginBottom: '20px' }}>
+        {articles.map((article) => (
+          <Link
+            key={article.slug}
+            to={`/blog/${article.slug}`}
+            style={{ textDecoration: 'none' }}
+          >
+            <div style={{
+              background: 'white',
+              border: '1px solid var(--border)',
+              borderRadius: '12px',
+              padding: '20px',
+              boxShadow: 'var(--shadow-sm)',
+              height: '100%',
+              transition: 'box-shadow 0.2s, border-color 0.2s',
+            }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.boxShadow = 'var(--shadow-md)'
+                e.currentTarget.style.borderColor = 'var(--gold)'
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.boxShadow = 'var(--shadow-sm)'
+                e.currentTarget.style.borderColor = 'var(--border)'
+              }}
+            >
+              <div style={{ fontSize: '11px', fontWeight: '600', color: 'var(--gold)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '8px' }}>
+                {article.theme}
+              </div>
+              <div style={{ fontFamily: 'var(--font-heading)', fontWeight: '700', fontSize: '15px', color: 'var(--dark)', marginBottom: '10px', lineHeight: 1.35 }}>
+                {article.title}
+              </div>
+              {article.excerpt && (
+                <div style={{ fontSize: '13px', color: 'var(--text-light)', lineHeight: 1.6, marginBottom: '12px' }}>
+                  {article.excerpt.slice(0, 110)}…
+                </div>
+              )}
+              <span style={{ fontSize: '13px', color: 'var(--gold)', fontWeight: '600' }}>
+                Lire l&apos;article →
+              </span>
+            </div>
+          </Link>
+        ))}
+      </div>
+      <div style={{ textAlign: 'center' }}>
+        <Link to="/blog" className="btn btn-outline" style={{ fontSize: '14px' }}>
+          📝 Voir tous nos articles mariage
+        </Link>
+      </div>
+    </Section>
+  )
+}
+
 // ── Main page ──────────────────────────────────────────────────────────────────
 
 export default function CityPage({ pageType }) {
@@ -974,6 +1036,7 @@ export default function CityPage({ pageType }) {
   const [config, setConfig]         = useState(null)
   const [allTypePages, setAllTypePages] = useState({})
   const [loading, setLoading]       = useState(true)
+  const [blogArticles, setBlogArticles] = useState([])
 
   // Use the page-type-scoped storage
   const storage = makePageTypeStorage(pageType?.id || 'mariage')
@@ -987,11 +1050,23 @@ export default function CityPage({ pageType }) {
       storage.getPages(),
       storage.getGallery(),
       getCityPagesConfig(),
+      getBlogArticles(),
       ...allTypeStorages.map((s) => s.getPages()),
-    ]).then(([pages, gal, cfg, ...typePagesArr]) => {
+    ]).then(([pages, gal, cfg, blogArticlesMap, ...typePagesArr]) => {
       setPage(pages?.[citySlug] || null)
       setGallery(gal || [])
       setConfig(cfg)
+      // Pick up to 3 published blog articles relevant to the current page type
+      const mainKeyword = pageType?.mainKeyword?.toLowerCase() || 'mariage'
+      const relevant = Object.values(blogArticlesMap || {})
+        .filter((a) => a.status === 'published')
+        .sort((a, b) => {
+          const aMatch = (a.theme || '').toLowerCase().includes(mainKeyword) ? 1 : 0
+          const bMatch = (b.theme || '').toLowerCase().includes(mainKeyword) ? 1 : 0
+          return bMatch - aMatch
+        })
+        .slice(0, 3)
+      setBlogArticles(relevant)
       // Build a map: { [typeId]: pagesMap }
       const typeMap = {}
       PAGE_TYPES.forEach((pt, i) => {
@@ -1103,6 +1178,9 @@ export default function CityPage({ pageType }) {
 
         {/* 9. FAQ */}
         <SectionFAQ city={city} businessName={businessName} />
+
+        {/* 10. Articles de blog recommandés */}
+        <SectionBlogArticles articles={blogArticles} />
 
         {/* 10. Formulaire de devis — CTA */}
         <section id="devis" style={{ marginBottom: '56px' }}>

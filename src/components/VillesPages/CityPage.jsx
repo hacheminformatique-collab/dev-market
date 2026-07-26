@@ -210,7 +210,7 @@ async function fetchWithTimeout(url, timeoutMs = 6000) {
 }
 
 function cleanGoogleNewsTitle(raw) {
-  return raw.replace(/\s*[-\u2013]\s+[^-\u2013]{2,60}$/, '').trim()
+  return raw.replace(/\s*[-–]\s+[^-–]{2,60}$/, '').trim()
 }
 
 function parseRssXml(xml) {
@@ -386,11 +386,11 @@ function SectionWhyChoose({ city, businessName }) {
   ]
 
   const cards = [
-    { icon: '\u23F1', title: 'Temps de trajet', value: `\u2248\u00A0${travel.driveMin}\u00A0min en voiture`, desc: `${travel.roadKm}\u00A0km depuis ${city.name}` },
-    { icon: '\uD83C\uDD7F', title: 'Parking gratuit', value: '\u223C\u00A060 places', desc: 'Surveill\u00E9 par agent de s\u00E9curit\u00E9' },
-    { icon: '\uD83D\uDEE3', title: 'Acc\u00E8s autoroute', value: 'A4 \u00B7 A104 \u00B7 N3', desc: 'A140 \u00B7 A1 \u00B7 A3 \u00E0 proximit\u00E9' },
-    { icon: '\uD83D\uDE89', title: 'Gare \u00E0 proximit\u00E9', value: 'Gare de Meaux', desc: '15 min en voiture' },
-    { icon: '\uD83D\uDC65', title: 'Capacit\u00E9', value: "Jusqu'\u00E0 300 invit\u00E9s", desc: 'Grande salle de r\u00E9ception' },
+    { icon: '⏱', title: 'Temps de trajet', value: `≈ ${travel.driveMin} min en voiture`, desc: `${travel.roadKm} km depuis ${city.name}` },
+    { icon: '🅿', title: 'Parking gratuit', value: '∼ 60 places', desc: 'Surveillé par agent de sécurité' },
+    { icon: '🛣', title: 'Accès autoroute', value: 'A4 · A104 · N3', desc: 'A140 · A1 · A3 à proximité' },
+    { icon: '🚉', title: 'Gare à proximité', value: 'Gare de Meaux', desc: '15 min en voiture' },
+    { icon: '👥', title: 'Capacité', value: "Jusqu'à 300 invités", desc: 'Grande salle de réception' },
   ]
 
   const whyParagraphs = [
@@ -459,42 +459,42 @@ function SectionPrestations({ city, businessName }) {
 
   const eventTypes = [
     {
-      emoji: '\uD83D\uDC8D',
+      emoji: '💍',
       title: 'Salle de mariage',
       desc: `${businessName} est avant tout une salle de mariage d'exception. Depuis ${city.name}, de nombreux couples choisissent notre établissement pour célébrer leur union dans un cadre élégant et luxueux. Notre salle de mariage accueille jusqu'à 300 convives et offre tous les services nécessaires pour un Jour J inoubliable : sonorisation professionnelle, éclairage scénique, espace pour le cocktail et bien plus encore. Nous proposons aussi bien la cérémonie civile laïque que la cérémonie religieuse, selon vos souhaits.`,
     },
     {
-      emoji: '\uD83C\uDF7E',
+      emoji: '🍾',
       title: 'Salle de réception',
       desc: `Au-delà des mariages, ${businessName} est la salle de réception idéale pour tous vos événements festifs. Dîners de famille, soirées privées, banquets ou galas — notre équipe s'adapte à votre vision et votre budget pour vous offrir une réception mémorable. Depuis ${city.name}, profitez d'un espace de réception spacieux, climatisé et entièrement équipé pour accueillir vos proches dans les meilleures conditions.`,
     },
     {
-      emoji: '\uD83C\uDF82',
+      emoji: '🎂',
       title: 'Salle anniversaire',
       desc: `Célébrez votre anniversaire en grand à ${businessName} ! Que vous souhaitiez fêter vos 18 ans, vos 30 ans, vos 50 ans ou un autre cap important, notre salle anniversaire se transforme selon votre thème. Depuis ${city.name}, offrez-vous une fête d'anniversaire digne des plus grandes soirées, avec DJ, animations, photobooth et un traiteur aux petits soins.`,
     },
     {
-      emoji: '\uD83D\uDC76',
+      emoji: '👶',
       title: 'Salle baptême',
       desc: `${businessName} accueille avec joie et tendresse les baptêmes et cérémonies de bienvenue. Notre équipe comprend l'importance de ce moment unique et met tout en œuvre pour que la journée soit aussi belle que symbolique. Depuis ${city.name}, venez fêter l'arrivée de votre petit(e) dans un cadre chaleureux pouvant accueillir toute votre famille et vos amis.`,
     },
     {
-      emoji: '\uD83D\uDC8F',
+      emoji: '💏',
       title: 'Salle fiançailles',
       desc: `Les fiançailles méritent une célébration à la hauteur de votre amour. ${businessName} met à votre disposition un espace raffiné pour organiser votre soirée de fiançailles dans une ambiance intimiste et romantique. Depuis ${city.name}, surprenez votre entourage avec une soirée de fiançailles organisée avec passion et professionnalisme.`,
     },
     {
-      emoji: '\uD83D\uDCBC',
+      emoji: '💼',
       title: 'Salle séminaire',
       desc: `${businessName} dispose d'un espace parfaitement équipé pour vos séminaires professionnels. Écran vidéoprojecteur, sonorisation, écran multimédia et restauration sur place font de notre salle séminaire un choix privilégié pour les entreprises de ${city.name} et de toute la région. Organisez vos réunions, formations et team-buildings dans un cadre motivant et professionnel.`,
     },
     {
-      emoji: '\uD83C\uDFE2',
+      emoji: '🏢',
       title: 'Salle entreprise',
       desc: `Pour vos événements d'entreprise — inaugurations, remises de prix, soirées de fin d'année — ${businessName} vous propose un espace modulable à l'image de votre société. Notre équipe prend en charge la logistique complète pour que vos collaborateurs venant de ${city.name} et d'ailleurs passent une soirée mémorable.`,
     },
     {
-      emoji: '\uD83E\uDD42',
+      emoji: '🥂',
       title: 'Salle cocktail',
       desc: `La formule cocktail de ${businessName} est idéale pour les événements debout, les apéritifs dinatoires et les réceptions en mode convivial. Depuis ${city.name}, proposez à vos invités un cocktail de prestige servi par notre équipe de professionnels, dans un cadre moderne et élégant. Jusqu'à 300 personnes peuvent être accueillies en configuration cocktail.`,
     },
@@ -551,23 +551,23 @@ function SectionReservation({ city, businessName }) {
 
   const steps = [
     {
-      n: '01', emoji: '\uD83D\uDCCB', title: 'Demande de devis',
+      n: '01', emoji: '📋', title: 'Demande de devis',
       desc: `Commencez par nous contacter via notre formulaire en ligne ou par téléphone/WhatsApp. Précisez la date souhaitée, le type d'événement (mariage, anniversaire, etc.), le nombre d'invités estimé et vos besoins spécifiques. Notre équipe vous répond sous 24h avec un devis personnalisé et sans engagement. Depuis ${city.name}, votre projet mérite toute notre attention dès le premier contact.`,
     },
     {
-      n: '02', emoji: '\uD83D\uDC40', title: 'Visite de la salle',
+      n: '02', emoji: '👀', title: 'Visite de la salle',
       desc: `Rien ne vaut une visite en personne pour se projeter ! Nous vous invitons à découvrir ${businessName} sur rendez-vous. Depuis ${city.name}, un trajet de ${getTravelInfo(city).driveMin} minutes vous permet de visualiser la salle, les équipements, la cuisine et le parking. Notre équipe vous accueille et répond à toutes vos questions lors de cette visite conviviale et sans pression.`,
     },
     {
-      n: '03', emoji: '\uD83D\uDD8A', title: 'Signature du contrat',
+      n: '03', emoji: '🖊', title: 'Signature du contrat',
       desc: `Une fois votre choix arrêté, nous établissons un contrat de location clair et détaillé qui récapitule toutes les prestations choisies, les dates, les horaires et les conditions. La signature officialise votre réservation et protège les deux parties. Chez ${businessName}, la transparence est au cœur de notre relation avec chaque client de ${city.name}.`,
     },
     {
-      n: '04', emoji: '\uD83D\uDCB3', title: "Versement de l'acompte",
+      n: '04', emoji: '💳', title: "Versement de l'acompte",
       desc: `Lors de la signature, un acompte est versé pour confirmer et sécuriser votre date. Cet acompte est déduit du montant total de votre prestation. Différents moyens de paiement sont acceptés. Le solde est réglé à la date convenue dans le contrat, généralement avant votre événement.`,
     },
     {
-      n: '05', emoji: '\uD83C\uDF89', title: 'Le Jour J',
+      n: '05', emoji: '🎉', title: 'Le Jour J',
       desc: `C'est le grand jour ! L'équipe de ${businessName} est là dès le début pour coordonner la mise en place, accueillir vos invités et s'assurer que tout se déroule parfaitement. Vous et vos proches venant de ${city.name} et d'ailleurs n'avez plus qu'à profiter de chaque instant. Nous gérons la logistique pour que vous puissiez vivre pleinement votre événement.`,
     },
   ]
@@ -601,14 +601,14 @@ function SectionCapacite({ city, businessName }) {
     `Avec une capacité maximale de 300 personnes, ${businessName} est la salle de réception de référence pour les grands événements depuis ${city.name}. Que vous soyez 80 ou 300 invités, notre espace modulable s'adapte à la taille de votre réunion pour un résultat toujours impeccable.`,
   ]
   const specs = [
-    { icon: '\uD83D\uDC65', label: 'Capacité maximale', value: '300 personnes' },
-    { icon: '\uD83C\uDD7F', label: 'Parking', value: '~60 places gratuites' },
-    { icon: '\uD83C\uDF73', label: 'Cuisine', value: 'Professionnelle équipée' },
-    { icon: '\u267F', label: 'Accessibilité', value: 'PMR — accès total' },
-    { icon: '\u2744', label: 'Climatisation', value: 'Toutes saisons' },
-    { icon: '\uD83D\uDD0A', label: 'Sonorisation', value: 'JBL Professionnelle' },
-    { icon: '\uD83D\uDCBB', label: 'Multimédia', value: 'Vidéoprojecteur + écran' },
-    { icon: '\uD83D\uDD12', label: 'Sécurité', value: 'Agent de sécurité' },
+    { icon: '👥', label: 'Capacité maximale', value: '300 personnes' },
+    { icon: '🅿', label: 'Parking', value: '~60 places gratuites' },
+    { icon: '🍳', label: 'Cuisine', value: 'Professionnelle équipée' },
+    { icon: '♿', label: 'Accessibilité', value: 'PMR — accès total' },
+    { icon: '❄', label: 'Climatisation', value: 'Toutes saisons' },
+    { icon: '🔊', label: 'Sonorisation', value: 'JBL Professionnelle' },
+    { icon: '💻', label: 'Multimédia', value: 'Vidéoprojecteur + écran' },
+    { icon: '🔒', label: 'Sécurité', value: 'Agent de sécurité' },
   ]
   return (
     <Section id="capacite" title={`Capacité et équipements — ${businessName}`}>
@@ -641,7 +641,7 @@ function SectionGalerie({ gallery, instagramUsername, instagramPosts, tiktokUser
       {(instagramUsername || instagramPosts.length > 0) && (
         <div style={{ marginBottom: '36px' }}>
           <h3 style={{ fontFamily: 'var(--font-heading)', fontSize: '1.1rem', fontWeight: '700', color: 'var(--dark)', marginBottom: '10px' }}>
-            \uD83D\uDCF8 Instagram
+            📸 Instagram
           </h3>
           {instagramUsername && (
             <p style={{ marginBottom: '16px', fontSize: '14px', color: 'var(--text-light)' }}>
@@ -662,7 +662,7 @@ function SectionGalerie({ gallery, instagramUsername, instagramPosts, tiktokUser
       {(tiktokUsername || tiktokPosts.length > 0) && (
         <div>
           <h3 style={{ fontFamily: 'var(--font-heading)', fontSize: '1.1rem', fontWeight: '700', color: 'var(--dark)', marginBottom: '10px' }}>
-            \uD83C\uDFB5 TikTok
+            🎵 TikTok
           </h3>
           {tiktokUsername && (
             <p style={{ marginBottom: '16px', fontSize: '14px', color: 'var(--text-light)' }}>
@@ -690,22 +690,22 @@ function SectionLieux({ city, businessName }) {
 
   const lieuxVariants = [
     [
-      { emoji: '\uD83C\uDFDB', title: `Mairie de ${city.name}`, desc: `La mairie de ${city.name} est le premier lieu symbolique de votre mariage. C'est ici que se déroule la cérémonie civile officielle, moment solennel et émouvant qui unit légalement les deux époux. Le bâtiment historique de la mairie de ${city.name} offre souvent un cadre architectural charmant pour vos premières photos de couple.` },
-      { emoji: '\u26EA', title: `Église / lieu de culte à ${city.name}`, desc: `Après la cérémonie civile, de nombreux couples de ${city.name} choisissent de prolonger leur engagement par une cérémonie religieuse. Les lieux de culte de ${city.name} et de ses environs — église paroissiale, temple, synagogue ou mosquée — offrent un cadre spirituel et solennel pour la bénédiction de votre union.` },
-      { emoji: '\uD83C\uDF33', title: `Parc municipal de ${city.name}`, desc: `Le parc ou les espaces verts de ${city.name} sont idéaux pour les photos de mariage en plein air. Les arbres centenaires, les allées fleuries et la verdure offrent des décors naturels magnifiques pour immortaliser votre Jour J. Votre photographe de mariage appréciera la beauté et la lumière de ces espaces.` },
-      { emoji: '\uD83C\uDFD9', title: `Centre-ville et monuments de ${city.name}`, desc: `Le centre-ville de ${city.name}, avec ses ruelles pittoresques et ses monuments locaux, constitue un décor authentique pour vos photos de mariage. Chaque ville a ses lieux emblématiques et ses perspectives uniques — autant d'opportunités pour des clichés originaux et pleins de caractère.` },
+      { emoji: '🏛', title: `Mairie de ${city.name}`, desc: `La mairie de ${city.name} est le premier lieu symbolique de votre mariage. C'est ici que se déroule la cérémonie civile officielle, moment solennel et émouvant qui unit légalement les deux époux. Le bâtiment historique de la mairie de ${city.name} offre souvent un cadre architectural charmant pour vos premières photos de couple.` },
+      { emoji: '⛪', title: `Église / lieu de culte à ${city.name}`, desc: `Après la cérémonie civile, de nombreux couples de ${city.name} choisissent de prolonger leur engagement par une cérémonie religieuse. Les lieux de culte de ${city.name} et de ses environs — église paroissiale, temple, synagogue ou mosquée — offrent un cadre spirituel et solennel pour la bénédiction de votre union.` },
+      { emoji: '🌳', title: `Parc municipal de ${city.name}`, desc: `Le parc ou les espaces verts de ${city.name} sont idéaux pour les photos de mariage en plein air. Les arbres centenaires, les allées fleuries et la verdure offrent des décors naturels magnifiques pour immortaliser votre Jour J. Votre photographe de mariage appréciera la beauté et la lumière de ces espaces.` },
+      { emoji: '🏙', title: `Centre-ville et monuments de ${city.name}`, desc: `Le centre-ville de ${city.name}, avec ses ruelles pittoresques et ses monuments locaux, constitue un décor authentique pour vos photos de mariage. Chaque ville a ses lieux emblématiques et ses perspectives uniques — autant d'opportunités pour des clichés originaux et pleins de caractère.` },
     ],
     [
-      { emoji: '\uD83C\uDFDB', title: `Hôtel de ville de ${city.name}`, desc: `L'hôtel de ville de ${city.name} est le cadre officiel de votre mariage civil. Ce bâtiment municipal, souvent chargé d'histoire, accueille chaque année des dizaines de cérémonies civiles. C'est le premier acte de votre engagement, celui qui vous unit aux yeux de la loi, dans la salle des mariages de la commune.` },
-      { emoji: '\uD83C\uDF3F', title: `Jardin public de ${city.name}`, desc: `Les jardins publics de ${city.name} offrent un cadre verdoyant et apaisé pour vos photos de mariage. Rosiers en fleurs, fontaines et allées ombragées créent des décors bucoliques parfaits pour les portraits de couple et les photos de groupe après la cérémonie. Une escapade nature à deux pas de la salle de réception.` },
-      { emoji: '\u26EA', title: `Chapelle et lieux de cérémonie à ${city.name}`, desc: `Pour les couples souhaitant une cérémonie religieuse ou une bénédiction, ${city.name} et ses environs comptent plusieurs chapelles et lieux de culte de caractère. Ces petits sanctuaires, souvent patrimoniaux, offrent une intimité et une émotion particulières pour célébrer votre union devant Dieu et vos proches.` },
-      { emoji: '\uD83C\uDFD9', title: `Place centrale et patrimoine de ${city.name}`, desc: `La place centrale de ${city.name} et ses abords historiques sont un décor de premier choix pour vos photos de mariage. Les façades anciennes, les cafés en terrasse et l'architecture locale créent une atmosphère typiquement française qui donnera du cachet à vos souvenirs photographiques.` },
+      { emoji: '🏛', title: `Hôtel de ville de ${city.name}`, desc: `L'hôtel de ville de ${city.name} est le cadre officiel de votre mariage civil. Ce bâtiment municipal, souvent chargé d'histoire, accueille chaque année des dizaines de cérémonies civiles. C'est le premier acte de votre engagement, celui qui vous unit aux yeux de la loi, dans la salle des mariages de la commune.` },
+      { emoji: '🌿', title: `Jardin public de ${city.name}`, desc: `Les jardins publics de ${city.name} offrent un cadre verdoyant et apaisé pour vos photos de mariage. Rosiers en fleurs, fontaines et allées ombragées créent des décors bucoliques parfaits pour les portraits de couple et les photos de groupe après la cérémonie. Une escapade nature à deux pas de la salle de réception.` },
+      { emoji: '⛪', title: `Chapelle et lieux de cérémonie à ${city.name}`, desc: `Pour les couples souhaitant une cérémonie religieuse ou une bénédiction, ${city.name} et ses environs comptent plusieurs chapelles et lieux de culte de caractère. Ces petits sanctuaires, souvent patrimoniaux, offrent une intimité et une émotion particulières pour célébrer votre union devant Dieu et vos proches.` },
+      { emoji: '🏙', title: `Place centrale et patrimoine de ${city.name}`, desc: `La place centrale de ${city.name} et ses abords historiques sont un décor de premier choix pour vos photos de mariage. Les façades anciennes, les cafés en terrasse et l'architecture locale créent une atmosphère typiquement française qui donnera du cachet à vos souvenirs photographiques.` },
     ],
     [
-      { emoji: '\uD83C\uDFDB', title: `Mairie de ${city.name} — cérémonie civile`, desc: `La mairie de ${city.name} est incontournable pour tout mariage : c'est là que se tient la cérémonie civile, moment légal et symbolique de votre union. Les agents municipaux de ${city.name} vous accompagnent avec bienveillance pour que ce moment soit gravé dans vos mémoires.` },
-      { emoji: '\uD83C\uDF32', title: `Forêt / bois à proximité de ${city.name}`, desc: `Les bois et forêts à proximité de ${city.name} offrent des décors naturels somptueux pour vos photos de mariage. La lumière filtrée par les frondaisons, les chemins forestiers et la sérénité de la nature créent des portraits de couple d'une rare beauté. Un cadre idéal pour les amoureux de la nature.` },
-      { emoji: '\uD83D\uDD4C', title: `Domaine et parc près de ${city.name}`, desc: `Aux alentours de ${city.name}, quelques domaines et parcs historiques ouvrent leurs portes aux couples pour des séances photo de mariage. Ces espaces privatifs ou publics offrent des perspectives grandioses et une élégance naturelle qui sublimeront vos photos de couple.` },
-      { emoji: '\u26EA', title: `Lieu de cérémonie religieuse à ${city.name}`, desc: `Pour les couples souhaitant unir leur mariage civil à une cérémonie religieuse, ${city.name} et ses alentours proposent des lieux de culte accessibles à toutes les confessions. Ces espaces de recueillement offrent une dimension spirituelle profonde à votre engagement amoureux.` },
+      { emoji: '🏛', title: `Mairie de ${city.name} — cérémonie civile`, desc: `La mairie de ${city.name} est incontournable pour tout mariage : c'est là que se tient la cérémonie civile, moment légal et symbolique de votre union. Les agents municipaux de ${city.name} vous accompagnent avec bienveillance pour que ce moment soit gravé dans vos mémoires.` },
+      { emoji: '🌲', title: `Forêt / bois à proximité de ${city.name}`, desc: `Les bois et forêts à proximité de ${city.name} offrent des décors naturels somptueux pour vos photos de mariage. La lumière filtrée par les frondaisons, les chemins forestiers et la sérénité de la nature créent des portraits de couple d'une rare beauté. Un cadre idéal pour les amoureux de la nature.` },
+      { emoji: '🕌', title: `Domaine et parc près de ${city.name}`, desc: `Aux alentours de ${city.name}, quelques domaines et parcs historiques ouvrent leurs portes aux couples pour des séances photo de mariage. Ces espaces privatifs ou publics offrent des perspectives grandioses et une élégance naturelle qui sublimeront vos photos de couple.` },
+      { emoji: '⛪', title: `Lieu de cérémonie religieuse à ${city.name}`, desc: `Pour les couples souhaitant unir leur mariage civil à une cérémonie religieuse, ${city.name} et ses alentours proposent des lieux de culte accessibles à toutes les confessions. Ces espaces de recueillement offrent une dimension spirituelle profonde à votre engagement amoureux.` },
     ],
   ]
 
@@ -745,34 +745,34 @@ function SectionConseils({ city }) {
 
   const conseilsVariants = [
     [
-      { emoji: '\uD83D\uDCC5', title: "Réservez votre salle au moins 12 à 18 mois à l'avance", desc: `Les salles de mariage de qualité, comme Le Paradise 77, se réservent très tôt. Si vous habitez ${city.name} et rêvez d'un mariage dans les 12 prochains mois, commencez par vérifier la disponibilité de votre salle en priorité. Les meilleures dates (mai à octobre, weekends) partent souvent en premier. N'attendez pas pour sécuriser votre créneau.` },
-      { emoji: '\uD83D\uDCB0', title: 'Définissez votre budget total avant toute réservation', desc: `Établir un budget global réaliste est la première étape pour éviter les mauvaises surprises. Répartissez-le entre les principaux postes : salle de réception (~25-30%), traiteur (~30-35%), photo/vidéo (~10-15%), robe et costumes (~10%), fleurs et décoration (~8-10%), musique/DJ (~8%). Cette répartition vous permettra de faire des choix éclairés depuis ${city.name}.` },
-      { emoji: '\uD83D\uDCDD', title: "Établissez votre liste d'invités avec précision", desc: `Le nombre d'invités impacte directement le coût total de votre mariage. Soyez méthodiques : commencez par les indispensables (famille proche, meilleurs amis), puis étendez selon votre budget. Une liste d'environ 100-200 personnes est idéale pour la grande salle du Paradise 77, permettant un dîner assis confortable avec espace de danse.` },
-      { emoji: '\uD83C\uDFDB', title: 'Choisissez votre salle de réception en priorité', desc: `La salle de réception est le pivot de votre organisation. Depuis ${city.name}, visitez Le Paradise 77 pour vous assurer que l'espace répond à vos attentes en termes de capacité, d'ambiance et d'équipements. Une fois la salle confirmée, les autres prestataires (traiteur, DJ, décorateur) peuvent être choisis en fonction du lieu.` },
-      { emoji: '\uD83C\uDF7D', title: 'Sélectionnez votre traiteur selon vos goûts', desc: `Le repas est l'un des moments les plus attendus de votre mariage. Au Paradise 77, vous pouvez choisir parmi nos traiteurs partenaires (cuisine française, africaine, orientale, internationale) ou apporter votre propre traiteur. Organisez des dégustations pour vos invités venant de ${city.name} et faites votre choix en toute connaissance.` },
-      { emoji: '\uD83C\uDFB6', title: 'Pensez aux animations dès le début', desc: `Un mariage mémorable, c'est aussi de l'animation ! DJ, photobooth, videobooth 360°, fumée lourde pour le slow, jet de scène pour la pièce montée... Le Paradise 77 propose toutes ces animations en interne. Définissez dès la réservation les animations souhaitées pour que votre soirée depuis ${city.name} soit exceptionnelle.` },
-      { emoji: '\uD83D\uDCF8', title: 'Choisissez vos prestataires photo et vidéo', desc: `Le photographe et le vidéaste capturent l'émotion de votre Jour J pour l'éternité. Rencontrez plusieurs prestataires depuis ${city.name}, consultez leurs portfolios et assurez-vous de votre feeling avec eux. Réservez-les tôt car les bons photographes de mariage sont rapidement complets sur les dates de week-end.` },
-      { emoji: '\uD83D\uDC8C', title: "Envoyez les faire-part 3 à 4 mois à l'avance", desc: `Les faire-part doivent parvenir à vos invités suffisamment tôt pour qu'ils puissent s'organiser, surtout s'ils viennent de loin. Envoyez les save the date 6 à 8 mois avant, puis les invitations officielles 3 à 4 mois avant la cérémonie. N'oubliez pas d'inclure toutes les informations pratiques pour rejoindre Le Paradise 77 depuis ${city.name}.` },
+      { emoji: '📅', title: "Réservez votre salle au moins 12 à 18 mois à l'avance", desc: `Les salles de mariage de qualité, comme Le Paradise 77, se réservent très tôt. Si vous habitez ${city.name} et rêvez d'un mariage dans les 12 prochains mois, commencez par vérifier la disponibilité de votre salle en priorité. Les meilleures dates (mai à octobre, weekends) partent souvent en premier. N'attendez pas pour sécuriser votre créneau.` },
+      { emoji: '💰', title: 'Définissez votre budget total avant toute réservation', desc: `Établir un budget global réaliste est la première étape pour éviter les mauvaises surprises. Répartissez-le entre les principaux postes : salle de réception (~25-30%), traiteur (~30-35%), photo/vidéo (~10-15%), robe et costumes (~10%), fleurs et décoration (~8-10%), musique/DJ (~8%). Cette répartition vous permettra de faire des choix éclairés depuis ${city.name}.` },
+      { emoji: '📝', title: "Établissez votre liste d'invités avec précision", desc: `Le nombre d'invités impacte directement le coût total de votre mariage. Soyez méthodiques : commencez par les indispensables (famille proche, meilleurs amis), puis étendez selon votre budget. Une liste d'environ 100-200 personnes est idéale pour la grande salle du Paradise 77, permettant un dîner assis confortable avec espace de danse.` },
+      { emoji: '🏛', title: 'Choisissez votre salle de réception en priorité', desc: `La salle de réception est le pivot de votre organisation. Depuis ${city.name}, visitez Le Paradise 77 pour vous assurer que l'espace répond à vos attentes en termes de capacité, d'ambiance et d'équipements. Une fois la salle confirmée, les autres prestataires (traiteur, DJ, décorateur) peuvent être choisis en fonction du lieu.` },
+      { emoji: '🍽', title: 'Sélectionnez votre traiteur selon vos goûts', desc: `Le repas est l'un des moments les plus attendus de votre mariage. Au Paradise 77, vous pouvez choisir parmi nos traiteurs partenaires (cuisine française, africaine, orientale, internationale) ou apporter votre propre traiteur. Organisez des dégustations pour vos invités venant de ${city.name} et faites votre choix en toute connaissance.` },
+      { emoji: '🎶', title: 'Pensez aux animations dès le début', desc: `Un mariage mémorable, c'est aussi de l'animation ! DJ, photobooth, videobooth 360°, fumée lourde pour le slow, jet de scène pour la pièce montée... Le Paradise 77 propose toutes ces animations en interne. Définissez dès la réservation les animations souhaitées pour que votre soirée depuis ${city.name} soit exceptionnelle.` },
+      { emoji: '📸', title: 'Choisissez vos prestataires photo et vidéo', desc: `Le photographe et le vidéaste capturent l'émotion de votre Jour J pour l'éternité. Rencontrez plusieurs prestataires depuis ${city.name}, consultez leurs portfolios et assurez-vous de votre feeling avec eux. Réservez-les tôt car les bons photographes de mariage sont rapidement complets sur les dates de week-end.` },
+      { emoji: '💌', title: "Envoyez les faire-part 3 à 4 mois à l'avance", desc: `Les faire-part doivent parvenir à vos invités suffisamment tôt pour qu'ils puissent s'organiser, surtout s'ils viennent de loin. Envoyez les save the date 6 à 8 mois avant, puis les invitations officielles 3 à 4 mois avant la cérémonie. N'oubliez pas d'inclure toutes les informations pratiques pour rejoindre Le Paradise 77 depuis ${city.name}.` },
     ],
     [
-      { emoji: '\uD83C\uDFA8', title: 'Définissez votre thème et style de mariage', desc: `Le thème de votre mariage donne la direction à tous vos choix (couleurs, décoration, tenue, fleurs, invitation). Bohème, romantique, champêtre, moderne, mariage africain ou oriental... Définissez votre style dès le début pour que tout soit cohérent. La salle modulable du Paradise 77 s'adapte à tous les thèmes depuis ${city.name}.` },
-      { emoji: '\uD83C\uDFDB', title: 'Réservez votre salle de réception en priorité absolue', desc: `Avant même de contacter d'autres prestataires, sécurisez votre salle. Le Paradise 77, à seulement quelques minutes de ${city.name}, propose des dates tout au long de l'année. Une fois la salle réservée, vous disposez d'un cadre et d'une date fixes pour organiser le reste sereinement.` },
-      { emoji: '\uD83D\uDCCB', title: 'Planifiez le menu avec votre traiteur', desc: `Le menu est l'un des sujets les plus discutés d'un mariage. Pour vos invités venant de ${city.name} et d'ailleurs, proposez un menu équilibré qui respecte les préférences culturelles et les régimes alimentaires de chacun. Le Paradise 77 travaille avec des traiteurs multispecialités pour satisfaire tous vos convives.` },
-      { emoji: '\uD83C\uDF38', title: 'Pensez à la décoration en accord avec la salle', desc: `La décoration transforme votre salle de réception en un espace unique et personnel. Fleurs, centres de table, luminaires, tissus, arches florales... Visitez Le Paradise 77 depuis ${city.name} pour vous inspirer et imaginer la décoration idéale. Notre espace spacieux permet des installations décoratives ambitieuses et créatives.` },
-      { emoji: '\uD83C\uDFB5', title: "Choisissez votre DJ pour l'ambiance musicale", desc: `La musique est l'âme de votre soirée. Le Paradise 77 dispose d'une sonorisation professionnelle JBL qui valorise le travail de votre DJ. Choisissez un DJ expérimenté en mariages depuis ${city.name}, qui sait animer une salle diverse et maintenir l'énergie tout au long de la nuit jusqu'à 4h du matin.` },
-      { emoji: '\uD83D\uDCCA', title: 'Préparez un plan de table réfléchi', desc: `Le plan de table évite les situations délicates et favorise les échanges entre convives. Prenez en compte les affinités, les âges et les liens familiaux. Avec une salle de 300 personnes comme Le Paradise 77, un plan de table bien pensé transforme votre réception en un moment de convivialité générale pour tous vos invités de ${city.name}.` },
-      { emoji: '\uD83D\uDE8C', title: 'Organisez le transport de vos invités', desc: `Pensez à faciliter l'accès au Paradise 77 pour vos invités qui ne connaissent pas le chemin depuis ${city.name} ou d'autres villes. Communiquez clairement l'adresse, les indications routières et les informations parking dans vos invitations. Pour les invités sans voiture, mentionnez les options de transport depuis Meaux (taxi, covoiturage).` },
-      { emoji: '\uD83D\uDC8D', title: 'Préparez votre planning du Jour J', desc: `Un mariage bien orchestré suit un planning précis et clair. Établissez un rétroplanning détaillé heure par heure pour le Jour J : horaire de la mairie, photos, arrivée à la salle, cocktail, repas, animations... Partagez ce planning avec votre équipe et les prestataires pour que chacun sache exactement quoi faire.` },
+      { emoji: '🎨', title: 'Définissez votre thème et style de mariage', desc: `Le thème de votre mariage donne la direction à tous vos choix (couleurs, décoration, tenue, fleurs, invitation). Bohème, romantique, champêtre, moderne, mariage africain ou oriental... Définissez votre style dès le début pour que tout soit cohérent. La salle modulable du Paradise 77 s'adapte à tous les thèmes depuis ${city.name}.` },
+      { emoji: '🏛', title: 'Réservez votre salle de réception en priorité absolue', desc: `Avant même de contacter d'autres prestataires, sécurisez votre salle. Le Paradise 77, à seulement quelques minutes de ${city.name}, propose des dates tout au long de l'année. Une fois la salle réservée, vous disposez d'un cadre et d'une date fixes pour organiser le reste sereinement.` },
+      { emoji: '📋', title: 'Planifiez le menu avec votre traiteur', desc: `Le menu est l'un des sujets les plus discutés d'un mariage. Pour vos invités venant de ${city.name} et d'ailleurs, proposez un menu équilibré qui respecte les préférences culturelles et les régimes alimentaires de chacun. Le Paradise 77 travaille avec des traiteurs multispecialités pour satisfaire tous vos convives.` },
+      { emoji: '🌸', title: 'Pensez à la décoration en accord avec la salle', desc: `La décoration transforme votre salle de réception en un espace unique et personnel. Fleurs, centres de table, luminaires, tissus, arches florales... Visitez Le Paradise 77 depuis ${city.name} pour vous inspirer et imaginer la décoration idéale. Notre espace spacieux permet des installations décoratives ambitieuses et créatives.` },
+      { emoji: '🎵', title: "Choisissez votre DJ pour l'ambiance musicale", desc: `La musique est l'âme de votre soirée. Le Paradise 77 dispose d'une sonorisation professionnelle JBL qui valorise le travail de votre DJ. Choisissez un DJ expérimenté en mariages depuis ${city.name}, qui sait animer une salle diverse et maintenir l'énergie tout au long de la nuit jusqu'à 4h du matin.` },
+      { emoji: '📊', title: 'Préparez un plan de table réfléchi', desc: `Le plan de table évite les situations délicates et favorise les échanges entre convives. Prenez en compte les affinités, les âges et les liens familiaux. Avec une salle de 300 personnes comme Le Paradise 77, un plan de table bien pensé transforme votre réception en un moment de convivialité générale pour tous vos invités de ${city.name}.` },
+      { emoji: '🚌', title: 'Organisez le transport de vos invités', desc: `Pensez à faciliter l'accès au Paradise 77 pour vos invités qui ne connaissent pas le chemin depuis ${city.name} ou d'autres villes. Communiquez clairement l'adresse, les indications routières et les informations parking dans vos invitations. Pour les invités sans voiture, mentionnez les options de transport depuis Meaux (taxi, covoiturage).` },
+      { emoji: '💍', title: 'Préparez votre planning du Jour J', desc: `Un mariage bien orchestré suit un planning précis et clair. Établissez un rétroplanning détaillé heure par heure pour le Jour J : horaire de la mairie, photos, arrivée à la salle, cocktail, repas, animations... Partagez ce planning avec votre équipe et les prestataires pour que chacun sache exactement quoi faire.` },
     ],
     [
-      { emoji: '\uD83C\uDFDB', title: 'Commencez par réserver Le Paradise 77', desc: `La règle d'or : réservez votre salle de mariage en premier. Le Paradise 77, à quelques minutes de ${city.name}, est souvent complet 12 à 18 mois à l'avance pour les grandes dates. Lancez votre demande de devis dès maintenant et sécurisez votre date avant toute autre démarche.` },
-      { emoji: '\uD83D\uDCB0', title: 'Budgétisez chaque poste de dépense', desc: `Un mariage réussi depuis ${city.name} se planifie avec un budget réaliste. Listez tous les postes de dépenses (salle, traiteur, DJ, décoration, tenues, photographe, fleurs, transport, hébergement invités...) et attribuez une enveloppe à chacun. Le Paradise 77 propose des formules à différents budgets pour s'adapter à votre situation.` },
-      { emoji: '\uD83D\uDCDD', title: "Finalisez votre liste d'invités rapidement", desc: `Le nombre d'invités détermine le coût total de votre mariage et l'organisation de la salle. Dressez une liste définitive dès que possible pour optimiser votre budget. Le Paradise 77 accueille jusqu'à 300 personnes, offrant une grande flexibilité pour les familles nombreuses de ${city.name} et de la région.` },
-      { emoji: '\u26EA', title: 'Planifiez la cérémonie civile et/ou religieuse', desc: `N'oubliez pas de prendre rendez-vous avec la mairie de ${city.name} pour la publication des bans et la cérémonie civile. Si vous souhaitez une cérémonie religieuse, contactez votre lieu de culte au plus tôt. Ces étapes administratives et spirituelles sont incontournables et demandent du temps de préparation.` },
-      { emoji: '\uD83D\uDCF8', title: 'Choisissez vos prestataires photo et vidéo avec soin', desc: `Les photos et la vidéo de votre mariage resteront vos souvenirs pour toujours. Investissez dans de bons professionnels depuis ${city.name} qui connaissent les lieux et savent capter l'émotion du Jour J. Consultez plusieurs portfolios et n'hésitez pas à rencontrer vos candidats en personne avant de décider.` },
-      { emoji: '\uD83C\uDF89', title: 'Pensez aux animations pour toute la nuit', desc: `Pour que vos invités de ${city.name} dansent jusqu'à 4h du matin, misez sur des animations variées et de qualité. Le Paradise 77 propose DJ, photobooth, videobooth 360°, fumée lourde pour le slow et jet de scène. Ces animations incluses dans nos formules garantissent une soirée rythmée et mémorable pour tous.` },
-      { emoji: '\uD83D\uDC8C', title: 'Envoyez des faire-part personnalisés', desc: `Vos faire-part sont la première impression que vos invités auront de votre mariage. Soignez-les ! Incluez toutes les informations pratiques pour rejoindre Le Paradise 77 depuis ${city.name} et les villes environnantes : adresse, GPS, parking, hébergements à proximité. Un beau faire-part annonce un beau mariage.` },
-      { emoji: '\uD83D\uDCCB', title: 'Préparez un rétroplanning détaillé', desc: `De J-18 mois à J+1, établissez un rétroplanning complet avec toutes les échéances importantes : réservations, rendez-vous prestataires, essayages, répétitions... Ce document de référence vous permettra d'avancer sereinement dans la préparation de votre mariage depuis ${city.name} sans rien oublier.` },
+      { emoji: '🏛', title: 'Commencez par réserver Le Paradise 77', desc: `La règle d'or : réservez votre salle de mariage en premier. Le Paradise 77, à quelques minutes de ${city.name}, est souvent complet 12 à 18 mois à l'avance pour les grandes dates. Lancez votre demande de devis dès maintenant et sécurisez votre date avant toute autre démarche.` },
+      { emoji: '💰', title: 'Budgétisez chaque poste de dépense', desc: `Un mariage réussi depuis ${city.name} se planifie avec un budget réaliste. Listez tous les postes de dépenses (salle, traiteur, DJ, décoration, tenues, photographe, fleurs, transport, hébergement invités...) et attribuez une enveloppe à chacun. Le Paradise 77 propose des formules à différents budgets pour s'adapter à votre situation.` },
+      { emoji: '📝', title: "Finalisez votre liste d'invités rapidement", desc: `Le nombre d'invités détermine le coût total de votre mariage et l'organisation de la salle. Dressez une liste définitive dès que possible pour optimiser votre budget. Le Paradise 77 accueille jusqu'à 300 personnes, offrant une grande flexibilité pour les familles nombreuses de ${city.name} et de la région.` },
+      { emoji: '⛪', title: 'Planifiez la cérémonie civile et/ou religieuse', desc: `N'oubliez pas de prendre rendez-vous avec la mairie de ${city.name} pour la publication des bans et la cérémonie civile. Si vous souhaitez une cérémonie religieuse, contactez votre lieu de culte au plus tôt. Ces étapes administratives et spirituelles sont incontournables et demandent du temps de préparation.` },
+      { emoji: '📸', title: 'Choisissez vos prestataires photo et vidéo avec soin', desc: `Les photos et la vidéo de votre mariage resteront vos souvenirs pour toujours. Investissez dans de bons professionnels depuis ${city.name} qui connaissent les lieux et savent capter l'émotion du Jour J. Consultez plusieurs portfolios et n'hésitez pas à rencontrer vos candidats en personne avant de décider.` },
+      { emoji: '🎉', title: 'Pensez aux animations pour toute la nuit', desc: `Pour que vos invités de ${city.name} dansent jusqu'à 4h du matin, misez sur des animations variées et de qualité. Le Paradise 77 propose DJ, photobooth, videobooth 360°, fumée lourde pour le slow et jet de scène. Ces animations incluses dans nos formules garantissent une soirée rythmée et mémorable pour tous.` },
+      { emoji: '💌', title: 'Envoyez des faire-part personnalisés', desc: `Vos faire-part sont la première impression que vos invités auront de votre mariage. Soignez-les ! Incluez toutes les informations pratiques pour rejoindre Le Paradise 77 depuis ${city.name} et les villes environnantes : adresse, GPS, parking, hébergements à proximité. Un beau faire-part annonce un beau mariage.` },
+      { emoji: '📋', title: 'Préparez un rétroplanning détaillé', desc: `De J-18 mois à J+1, établissez un rétroplanning complet avec toutes les échéances importantes : réservations, rendez-vous prestataires, essayages, répétitions... Ce document de référence vous permettra d'avancer sereinement dans la préparation de votre mariage depuis ${city.name} sans rien oublier.` },
     ],
   ]
 
@@ -883,7 +883,7 @@ function SectionFAQ({ city, businessName }) {
               style={{ width: '100%', textAlign: 'left', padding: '16px 20px', background: 'none', border: 'none', cursor: 'pointer', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '12px' }}
             >
               <span style={{ fontSize: '15px', fontWeight: '600', color: 'var(--dark)', lineHeight: 1.4 }}>{faq.q}</span>
-              <span style={{ flexShrink: 0, color: 'var(--gold)', fontSize: '20px', lineHeight: 1 }}>{open === i ? '\u2212' : '\u002B'}</span>
+              <span style={{ flexShrink: 0, color: 'var(--gold)', fontSize: '20px', lineHeight: 1 }}>{open === i ? '−' : '+'}</span>
             </button>
             {open === i && (
               <div style={{ padding: '0 20px 16px', fontSize: '14px', lineHeight: 1.8, color: 'var(--text)', borderTop: '1px solid var(--border)' }}>
@@ -1015,10 +1015,10 @@ export default function CityPage({ pageType }) {
   if (!city || !page) {
     return (
       <div style={{ minHeight: '60vh', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '16px' }}>
-        <div style={{ fontSize: '48px' }}>\uD83C\uDFD9</div>
+        <div style={{ fontSize: '48px' }}>🏙</div>
         <h2 style={{ color: 'var(--dark)' }}>Page introuvable</h2>
-        <p style={{ color: '#888' }}>Cette page n&#x27;a pas encore \u00E9t\u00E9 g\u00E9n\u00E9r\u00E9e.</p>
-        <Link to="/" className="btn btn-primary">Retour \u00E0 l&#x27;accueil</Link>
+        <p style={{ color: '#888' }}>Cette page n&#x27;a pas encore été générée.</p>
+        <Link to="/" className="btn btn-primary">Retour à l&#x27;accueil</Link>
       </div>
     )
   }
@@ -1047,23 +1047,23 @@ export default function CityPage({ pageType }) {
       {/* ── Hero ── */}
       <div style={{ background: 'linear-gradient(135deg, var(--dark) 0%, var(--navy) 100%)', color: 'white', padding: 'clamp(40px,8vw,80px) clamp(16px,5vw,80px)', textAlign: 'center' }}>
         <div style={{ display: 'inline-block', background: 'var(--gold)', color: 'white', padding: '4px 16px', borderRadius: '20px', fontSize: '12px', fontWeight: '700', letterSpacing: '0.1em', textTransform: 'uppercase', marginBottom: '16px' }}>
-          {city.deptCode} \u2014 {city.deptName}
+          {city.deptCode} — {city.deptName}
         </div>
         <h1 style={{ fontFamily: 'var(--font-heading)', fontSize: 'clamp(2rem, 5vw, 3.5rem)', fontWeight: '700', color: 'white', marginBottom: '12px', letterSpacing: '0.03em' }}>
-          Salle de mariage et r\u00E9ception \u2014 {businessName} \u00E0 {city.name}
+          Salle de mariage et réception — {businessName} à {city.name}
         </h1>
         <p style={{ fontSize: '1.1rem', color: 'rgba(255,255,255,0.7)', maxWidth: '680px', margin: '0 auto 8px' }}>
-          Le Paradise 77 \u2014 votre salle de mariage de prestige pour tous vos mariages et r\u00E9ceptions
+          Le Paradise 77 — votre salle de mariage de prestige pour tous vos mariages et réceptions
         </p>
         <p style={{ fontSize: '0.95rem', color: 'rgba(255,255,255,0.55)', maxWidth: '600px', margin: '0 auto 24px' }}>
-          Salle de mariage et r\u00E9ception accessible depuis {city.name} ({city.deptName})
+          Salle de mariage et réception accessible depuis {city.name} ({city.deptName})
         </p>
         <div style={{ display: 'flex', gap: '12px', justifyContent: 'center', flexWrap: 'wrap' }}>
           <Link to="/devis" className="btn btn-primary" style={{ fontSize: '14px', padding: '12px 28px' }}>
-            \uD83D\uDCCB Demander un devis gratuit
+            📋 Demander un devis gratuit
           </Link>
           <a href="#carte" className="btn btn-outline" style={{ fontSize: '14px', padding: '12px 28px', borderColor: 'rgba(255,255,255,0.4)', color: 'white' }}>
-            \uD83D\uDCCD Nous trouver
+            📍 Nous trouver
           </a>
         </div>
       </div>
@@ -1107,26 +1107,26 @@ export default function CityPage({ pageType }) {
         {/* 10. Formulaire de devis — CTA */}
         <section id="devis" style={{ marginBottom: '56px' }}>
           <div style={{ background: 'linear-gradient(135deg, var(--dark), var(--navy))', borderRadius: '16px', padding: 'clamp(28px,5vw,48px)', textAlign: 'center', color: 'white' }}>
-            <div style={{ fontSize: '40px', marginBottom: '12px' }}>\uD83D\uDCCB</div>
+            <div style={{ fontSize: '40px', marginBottom: '12px' }}>📋</div>
             <h2 style={{ fontFamily: 'var(--font-heading)', fontSize: 'clamp(1.5rem,4vw,2rem)', color: 'var(--gold)', marginBottom: '10px' }}>
-              R\u00E9servez votre salle de mariage \u00E0 {city.name}
+              Réservez votre salle de mariage à {city.name}
             </h2>
             <p style={{ color: 'rgba(255,255,255,0.8)', marginBottom: '8px', fontSize: '15px' }}>
-              {businessName} \u2014 salle de mariage et r\u00E9ception de prestige en Seine-et-Marne
+              {businessName} — salle de mariage et réception de prestige en Seine-et-Marne
             </p>
             <p style={{ color: 'rgba(255,255,255,0.6)', marginBottom: '28px', fontSize: '14px', maxWidth: '520px', margin: '0 auto 28px' }}>
-              Devis gratuit, personnalis\u00E9 et sans engagement. Notre \u00E9quipe vous rappelle sous 24h depuis votre demande \u00E0 {city.name}.
+              Devis gratuit, personnalisé et sans engagement. Notre équipe vous rappelle sous 24h depuis votre demande à {city.name}.
             </p>
             <Link to="/devis" className="btn btn-primary" style={{ fontSize: '15px', padding: '14px 36px' }}>
-              \uD83D\uDCCB Demander mon devis gratuit
+              📋 Demander mon devis gratuit
             </Link>
           </div>
         </section>
 
         {/* 11. Carte / Map */}
-        <Section id="carte" title={`\uD83D\uDCCD ${businessName} — Accès depuis ${city.name}`}>
+        <Section id="carte" title={`📍 ${businessName} — Accès depuis ${city.name}`}>
           <p style={{ fontSize: '14px', color: 'var(--text-light)', marginBottom: '16px' }}>
-            5 avenue Fridingen, 77100 Nanteuil-l\u00E8s-Meaux — \u00E0 environ {getTravelInfo(city).driveMin} minutes depuis {city.name}
+            5 avenue Fridingen, 77100 Nanteuil-lès-Meaux — à environ {getTravelInfo(city).driveMin} minutes depuis {city.name}
           </p>
           <CityMap city={city} apiKey={config?.googleMapsApiKey} />
         </Section>
@@ -1139,7 +1139,7 @@ export default function CityPage({ pageType }) {
 
         {/* Micro-data footer */}
         <div style={{ marginTop: '40px', paddingTop: '20px', borderTop: '1px solid var(--border)', fontSize: '11px', color: '#bbb', textAlign: 'center' }}>
-          Page mise \u00E0 jour le {new Date(page.generatedAt).toLocaleDateString('fr-FR')} \u2022 {businessName} \u2022 {city.name}, {city.deptName}
+          Page mise à jour le {new Date(page.generatedAt).toLocaleDateString('fr-FR')} • {businessName} • {city.name}, {city.deptName}
         </div>
       </div>
 

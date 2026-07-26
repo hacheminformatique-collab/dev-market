@@ -178,6 +178,38 @@ async function fetchWithTimeout(url, timeoutMs = 6000) {
   return fetch(url)
 }
 
+// Strip "– Source Name" or "- Source Name" appended by Google News to titles
+function cleanGoogleNewsTitle(raw) {
+  return raw.replace(/\s*[-–]\s+[^-–]{2,60}$/, '').trim()
+}
+
+function parseRssXml(xml) {
+  const doc = new DOMParser().parseFromString(xml, 'text/xml')
+  if (doc.querySelector('parsererror')) return []
+
+  const rawItems = Array.from(doc.getElementsByTagName('item')).slice(0, 5)
+  if (rawItems.length === 0) return []
+
+  return rawItems.map((el) => {
+    // <link> in RSS XML sits between its sibling nodes, not as a child —
+    // use nextSibling traversal when textContent is empty
+    let link = el.getElementsByTagName('link')[0]?.textContent?.trim() || ''
+    if (!link) {
+      const linkEl = el.getElementsByTagName('link')[0]
+      if (linkEl) link = linkEl.nextSibling?.nodeValue?.trim() || ''
+    }
+
+    const rawTitle = el.getElementsByTagName('title')[0]?.textContent?.trim() || ''
+    const title    = cleanGoogleNewsTitle(rawTitle)
+    const pubDate  = el.getElementsByTagName('pubDate')[0]?.textContent?.trim() || ''
+    const source   = el.getElementsByTagName('source')[0]?.textContent?.trim() || ''
+    const desc     = el.getElementsByTagName('description')[0]?.textContent?.trim() || ''
+    const cleanDesc = desc.replace(/<[^>]*>/g, '').slice(0, 180)
+
+    return { title, link, pubDate, source, desc: cleanDesc }
+  }).filter((it) => it.title)
+}
+
 async function fetchRssItems(cityName) {
   const rssUrl = `https://news.google.com/rss/search?q=${encodeURIComponent(cityName)}&hl=fr&gl=FR&ceid=FR:fr`
 
@@ -188,8 +220,8 @@ async function fetchRssItems(cityName) {
     if (res.ok) {
       const data = await res.json()
       if (data.status === 'ok' && Array.isArray(data.items) && data.items.length > 0) {
-        return data.items.slice(0, 5).map((it) => ({
-          title:   it.title?.trim() || '',
+        const items = data.items.slice(0, 5).map((it) => ({
+          title:   cleanGoogleNewsTitle(it.title?.trim() || ''),
           link:    it.link  || '',
           pubDate: it.pubDate || '',
           source:  it.author || data.feed?.title || '',
@@ -197,16 +229,33 @@ async function fetchRssItems(cityName) {
             .replace(/<[^>]*>/g, '')
             .slice(0, 180),
         })).filter((it) => it.title)
+        if (items.length > 0) return items
       }
     }
   } catch {
     // fall through to next strategy
   }
 
-  // ── Strategy 2: generic CORS proxies returning raw XML ────────────────────
+  // ── Strategy 2: allorigins JSON endpoint (returns { contents: "<xml>" }) ──
+  try {
+    const url = `https://api.allorigins.win/get?url=${encodeURIComponent(rssUrl)}`
+    const res = await fetchWithTimeout(url, 7000)
+    if (res.ok) {
+      const data = await res.json()
+      if (data.contents) {
+        const items = parseRssXml(data.contents)
+        if (items.length > 0) return items
+      }
+    }
+  } catch {
+    // fall through
+  }
+
+  // ── Strategy 3: generic CORS proxies returning raw XML ────────────────────
   const proxies = [
     `https://corsproxy.io/?url=${encodeURIComponent(rssUrl)}`,
     `https://api.allorigins.win/raw?url=${encodeURIComponent(rssUrl)}`,
+    `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(rssUrl)}`,
   ]
 
   for (const proxyUrl of proxies) {
@@ -214,32 +263,8 @@ async function fetchRssItems(cityName) {
       const res = await fetchWithTimeout(proxyUrl, 6000)
       if (!res.ok) continue
       const xml = await res.text()
-      const doc = new DOMParser().parseFromString(xml, 'text/xml')
-
-      if (doc.querySelector('parsererror')) continue
-
-      const rawItems = Array.from(doc.getElementsByTagName('item')).slice(0, 5)
-      if (rawItems.length === 0) continue
-
-      const parsed = rawItems.map((el) => {
-        // <link> in RSS XML sits between its sibling nodes, not as a child —
-        // use nextSibling traversal when textContent is empty
-        let link = el.getElementsByTagName('link')[0]?.textContent?.trim() || ''
-        if (!link) {
-          const linkEl = el.getElementsByTagName('link')[0]
-          if (linkEl) link = linkEl.nextSibling?.nodeValue?.trim() || ''
-        }
-
-        const title   = el.getElementsByTagName('title')[0]?.textContent?.trim() || ''
-        const pubDate = el.getElementsByTagName('pubDate')[0]?.textContent?.trim() || ''
-        const source  = el.getElementsByTagName('source')[0]?.textContent?.trim() || ''
-        const desc    = el.getElementsByTagName('description')[0]?.textContent?.trim() || ''
-        const cleanDesc = desc.replace(/<[^>]*>/g, '').slice(0, 180)
-
-        return { title, link, pubDate, source, desc: cleanDesc }
-      }).filter((it) => it.title)
-
-      if (parsed.length > 0) return parsed
+      const items = parseRssXml(xml)
+      if (items.length > 0) return items
     } catch {
       // Try next proxy
     }

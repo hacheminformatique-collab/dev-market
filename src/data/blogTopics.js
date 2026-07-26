@@ -1,0 +1,317 @@
+/**
+ * blogTopics.js – 250 article topics for the wedding blog,
+ * organised in 16 thematic clusters.
+ *
+ * Each entry:
+ *   theme          – cluster label (used as article category)
+ *   title          – question / article title (French)
+ *   slug           – URL-safe identifier (generated from title)
+ *   keywords       – main SEO keywords
+ *   relatedThemes  – neighbouring clusters for cross-linking
+ */
+
+export const BLOG_CLUSTERS = [
+  'Budget & Financement',
+  'Organisation & Planning',
+  'Salle de réception',
+  'Traiteur & Restauration',
+  'Cérémonie civile',
+  'Cérémonie religieuse & Laïque',
+  'Décoration & Fleurs',
+  'Tenues & Beauté',
+  'Photo & Vidéo',
+  'Animations & Musique',
+  'Invités & Logistique',
+  'Faire-part & Papeterie',
+  'Jour J & Programme',
+  'Lune de miel',
+  'Mariage thématique',
+  'Mariage en Île-de-France',
+]
+
+export const BLOG_TOPICS = [
+  // ── Budget & Financement ────────────────────────────────────────────────────
+  { theme: 'Budget & Financement', title: 'Comment établir le budget de son mariage ?', keywords: ['budget mariage', 'financement mariage', 'coût mariage'], relatedThemes: ['Organisation & Planning', 'Salle de réception'] },
+  { theme: 'Budget & Financement', title: 'Prix moyen d\'un mariage en France en 2025', keywords: ['prix mariage', 'coût moyen mariage', 'budget moyen'], relatedThemes: ['Organisation & Planning'] },
+  { theme: 'Budget & Financement', title: 'Comment réduire les coûts de son mariage sans rogner sur la qualité', keywords: ['économies mariage', 'mariage pas cher', 'réduire budget'], relatedThemes: ['Organisation & Planning', 'Traiteur & Restauration'] },
+  { theme: 'Budget & Financement', title: 'Budget mariage : combien coûte la location d\'une salle de réception ?', keywords: ['prix salle mariage', 'location salle réception', 'tarif salle'], relatedThemes: ['Salle de réception'] },
+  { theme: 'Budget & Financement', title: 'Financer son mariage : prêt, économies ou participation des parents ?', keywords: ['financement mariage', 'prêt mariage', 'aide parents mariage'], relatedThemes: ['Organisation & Planning'] },
+  { theme: 'Budget & Financement', title: 'Comment négocier les prix avec les prestataires de mariage', keywords: ['négociation prestataires', 'réduire coûts mariage', 'tarifs négociables'], relatedThemes: ['Salle de réception', 'Traiteur & Restauration'] },
+  { theme: 'Budget & Financement', title: 'Mariage pas cher : astuces et idées pour se marier à petit budget', keywords: ['mariage petit budget', 'mariage économique', 'mariage low cost'], relatedThemes: ['Décoration & Fleurs', 'Faire-part & Papeterie'] },
+  { theme: 'Budget & Financement', title: 'Checklist des postes de dépenses du mariage', keywords: ['checklist budget mariage', 'postes dépenses mariage', 'liste coûts mariage'], relatedThemes: ['Organisation & Planning'] },
+  { theme: 'Budget & Financement', title: 'Combien coûte un traiteur de mariage pour 100 personnes ?', keywords: ['prix traiteur mariage', 'coût traiteur', 'budget traiteur'], relatedThemes: ['Traiteur & Restauration'] },
+  { theme: 'Budget & Financement', title: 'Prix d\'un photographe de mariage : combien prévoir ?', keywords: ['prix photographe mariage', 'tarif photo mariage', 'budget photographe'], relatedThemes: ['Photo & Vidéo'] },
+  { theme: 'Budget & Financement', title: 'Combien coûte un DJ pour un mariage ?', keywords: ['prix DJ mariage', 'tarif DJ', 'budget musique mariage'], relatedThemes: ['Animations & Musique'] },
+  { theme: 'Budget & Financement', title: 'Budget fleurs et décoration pour un mariage', keywords: ['budget fleurs mariage', 'prix décoration mariage', 'coût fleuriste'], relatedThemes: ['Décoration & Fleurs'] },
+  { theme: 'Budget & Financement', title: 'Prix d\'une robe de mariée : du low-cost au luxe', keywords: ['prix robe mariée', 'tarif robe mariage', 'budget tenue mariée'], relatedThemes: ['Tenues & Beauté'] },
+  { theme: 'Budget & Financement', title: 'Astuces pour faire des économies sur le mariage sans le décevoir', keywords: ['économies mariage', 'astuces budget mariage', 'optimiser budget'], relatedThemes: ['Organisation & Planning'] },
+  { theme: 'Budget & Financement', title: 'Comment gérer un budget mariage à deux sans se disputer', keywords: ['budget mariage couple', 'gestion finances mariage', 'organisation budget'], relatedThemes: ['Organisation & Planning'] },
+  { theme: 'Budget & Financement', title: 'Prioriser son budget mariage : ce qui vaut vraiment le coup', keywords: ['priorités budget mariage', 'investir mariage', 'ce qui compte au mariage'], relatedThemes: ['Organisation & Planning'] },
+  { theme: 'Budget & Financement', title: 'Outils et tableaux pour suivre son budget mariage', keywords: ['outil budget mariage', 'tableau budget', 'suivi dépenses mariage'], relatedThemes: ['Organisation & Planning'] },
+  { theme: 'Budget & Financement', title: 'Quelles dépenses cachées faut-il prévoir pour son mariage ?', keywords: ['dépenses imprévues mariage', 'frais cachés mariage', 'budget supplémentaire'], relatedThemes: ['Organisation & Planning'] },
+  { theme: 'Budget & Financement', title: 'Est-ce rentable de se marier en semaine plutôt que le week-end ?', keywords: ['mariage semaine', 'économie mariage semaine', 'prix salle semaine'], relatedThemes: ['Organisation & Planning', 'Salle de réception'] },
+  { theme: 'Budget & Financement', title: 'Le rapport qualité-prix d\'une salle de mariage : comment évaluer ?', keywords: ['rapport qualité prix salle', 'valeur salle mariage', 'comparer salles mariage'], relatedThemes: ['Salle de réception'] },
+
+  // ── Organisation & Planning ─────────────────────────────────────────────────
+  { theme: 'Organisation & Planning', title: 'Rétroplanning mariage : le guide complet mois par mois', keywords: ['rétroplanning mariage', 'planning mariage', 'chronologie organisation'], relatedThemes: ['Budget & Financement', 'Jour J & Programme'] },
+  { theme: 'Organisation & Planning', title: 'Par où commencer quand on organise son mariage ?', keywords: ['organiser mariage', 'premières étapes mariage', 'début organisation'], relatedThemes: ['Budget & Financement'] },
+  { theme: 'Organisation & Planning', title: 'Combien de temps faut-il pour préparer un mariage ?', keywords: ['délai préparation mariage', 'durée organisation mariage', 'temps mariage'], relatedThemes: ['Salle de réception'] },
+  { theme: 'Organisation & Planning', title: 'La checklist ultime de l\'organisation de mariage', keywords: ['checklist mariage', 'liste organisation mariage', 'todo mariage'], relatedThemes: ['Jour J & Programme'] },
+  { theme: 'Organisation & Planning', title: 'Comment choisir sa date de mariage ?', keywords: ['choisir date mariage', 'meilleure date mariage', 'calendrier mariage'], relatedThemes: ['Salle de réception'] },
+  { theme: 'Organisation & Planning', title: 'Se marier un week-end ou en semaine : avantages et inconvénients', keywords: ['mariage week-end semaine', 'jour mariage', 'choisir jour mariage'], relatedThemes: ['Budget & Financement', 'Salle de réception'] },
+  { theme: 'Organisation & Planning', title: 'Organiser un mariage en 6 mois : est-ce vraiment faisable ?', keywords: ['mariage 6 mois', 'organisation rapide mariage', 'court délai mariage'], relatedThemes: ['Salle de réception', 'Traiteur & Restauration'] },
+  { theme: 'Organisation & Planning', title: 'Organiser son mariage en 1 an : calendrier détaillé pas à pas', keywords: ['mariage un an', 'calendrier mariage 1 an', 'planning annuel mariage'], relatedThemes: ['Budget & Financement'] },
+  { theme: 'Organisation & Planning', title: 'Trouver un wedding planner : est-ce vraiment nécessaire ?', keywords: ['wedding planner', 'coordinateur mariage', 'aide organisation mariage'], relatedThemes: ['Jour J & Programme'] },
+  { theme: 'Organisation & Planning', title: 'Comment gérer le stress de l\'organisation du mariage', keywords: ['stress mariage', 'gestion stress préparation', 'anxiété mariage'], relatedThemes: ['Jour J & Programme'] },
+  { theme: 'Organisation & Planning', title: 'Les 10 erreurs à éviter quand on organise son mariage', keywords: ['erreurs organisation mariage', 'pièges mariage', 'éviter erreurs'], relatedThemes: ['Budget & Financement'] },
+  { theme: 'Organisation & Planning', title: 'Comment créer une liste de prestataires de mariage de confiance', keywords: ['prestataires mariage', 'liste prestataires', 'trouver prestataires'], relatedThemes: ['Traiteur & Restauration', 'Photo & Vidéo'] },
+  { theme: 'Organisation & Planning', title: 'Faut-il un coordinateur de mariage le jour J ?', keywords: ['coordinateur jour J', 'maître de cérémonie', 'coordination mariage'], relatedThemes: ['Jour J & Programme'] },
+  { theme: 'Organisation & Planning', title: 'Organiser un mariage à distance : outils et conseils pratiques', keywords: ['mariage à distance', 'organiser mariage online', 'outils organisation mariage'], relatedThemes: [] },
+  { theme: 'Organisation & Planning', title: 'Applications et outils numériques pour organiser son mariage', keywords: ['application mariage', 'outil numérique mariage', 'app organisation mariage'], relatedThemes: [] },
+  { theme: 'Organisation & Planning', title: 'Comment partager les tâches d\'organisation avec son partenaire ?', keywords: ['partage tâches mariage', 'organisation couple', 'répartition mariage'], relatedThemes: [] },
+  { theme: 'Organisation & Planning', title: 'Les mois les plus populaires pour se marier en France', keywords: ['meilleur mois mariage', 'saison mariage France', 'période mariage'], relatedThemes: ['Salle de réception'] },
+  { theme: 'Organisation & Planning', title: 'Comment éviter les conflits familiaux pendant la préparation du mariage', keywords: ['conflits famille mariage', 'gestion famille mariage', 'tensions préparation'], relatedThemes: [] },
+  { theme: 'Organisation & Planning', title: 'Révision finale avant le grand jour : la checklist J-1', keywords: ['checklist veille mariage', 'J-1 mariage', 'dernière vérification mariage'], relatedThemes: ['Jour J & Programme'] },
+  { theme: 'Organisation & Planning', title: 'Mariage civil ou religieux en France : comment choisir ?', keywords: ['mariage civil religieux', 'choisir type mariage', 'cérémonie France'], relatedThemes: ['Cérémonie civile', 'Cérémonie religieuse & Laïque'] },
+  { theme: 'Organisation & Planning', title: 'Mariage en hiver vs mariage en été : avantages et inconvénients', keywords: ['mariage hiver été', 'saison mariage', 'mariage hivernal estival'], relatedThemes: ['Salle de réception', 'Décoration & Fleurs'] },
+
+  // ── Salle de réception ───────────────────────────────────────────────────────
+  { theme: 'Salle de réception', title: 'Comment choisir sa salle de mariage ?', keywords: ['choisir salle mariage', 'critères salle mariage', 'trouver salle mariage'], relatedThemes: ['Budget & Financement', 'Organisation & Planning'] },
+  { theme: 'Salle de réception', title: 'Salle de mariage : les critères essentiels à vérifier', keywords: ['critères salle mariage', 'checklist salle', 'vérifier salle réception'], relatedThemes: ['Budget & Financement'] },
+  { theme: 'Salle de réception', title: 'Capacité, accès, parking : les questions à poser lors d\'une visite de salle', keywords: ['visite salle mariage', 'questions salle', 'inspection salle réception'], relatedThemes: ['Invités & Logistique'] },
+  { theme: 'Salle de réception', title: 'Louer une salle pour 100, 200 ou 300 personnes : ce qu\'il faut savoir', keywords: ['salle 100 personnes', 'grande salle mariage', 'capacité salle réception'], relatedThemes: ['Invités & Logistique', 'Budget & Financement'] },
+  { theme: 'Salle de réception', title: 'Salle de mariage : faut-il un espace extérieur pour la réception ?', keywords: ['espace extérieur mariage', 'jardins salle réception', 'terrasse mariage'], relatedThemes: ['Décoration & Fleurs'] },
+  { theme: 'Salle de réception', title: 'Quand réserver sa salle de mariage ? Les bons délais à respecter', keywords: ['réserver salle mariage', 'délai réservation', 'quand réserver mariage'], relatedThemes: ['Organisation & Planning'] },
+  { theme: 'Salle de réception', title: 'Salle de réception avec traiteur inclus : avantages et inconvénients', keywords: ['salle traiteur inclus', 'tout inclus mariage', 'prestation complète'], relatedThemes: ['Traiteur & Restauration'] },
+  { theme: 'Salle de réception', title: 'Que doit contenir un contrat de location de salle de mariage ?', keywords: ['contrat salle mariage', 'clauses contrat réception', 'contrat location salle'], relatedThemes: ['Budget & Financement'] },
+  { theme: 'Salle de réception', title: 'Comment décorer une grande salle de réception pour un mariage ?', keywords: ['décoration grande salle', 'décorer salle réception', 'ambiance salle mariage'], relatedThemes: ['Décoration & Fleurs'] },
+  { theme: 'Salle de réception', title: 'Mariage en plein air vs salle de réception : que choisir ?', keywords: ['mariage plein air', 'extérieur vs intérieur mariage', 'choix lieu mariage'], relatedThemes: ['Organisation & Planning'] },
+  { theme: 'Salle de réception', title: 'Les équipements indispensables d\'une salle de mariage moderne', keywords: ['équipements salle mariage', 'sono lumière mariage', 'matériel salle réception'], relatedThemes: ['Animations & Musique'] },
+  { theme: 'Salle de réception', title: 'Comment choisir entre plusieurs salles de mariage ?', keywords: ['comparer salles mariage', 'choisir salle', 'critères de sélection salle'], relatedThemes: ['Budget & Financement'] },
+  { theme: 'Salle de réception', title: 'Accessibilité PMR dans les salles de mariage : ce que la loi impose', keywords: ['accessibilité PMR mariage', 'salle handicapé mariage', 'PMR salle réception'], relatedThemes: ['Invités & Logistique'] },
+  { theme: 'Salle de réception', title: 'Que demander à votre salle de mariage concernant la sonorisation ?', keywords: ['sonorisation salle mariage', 'sono mariage', 'équipement audio mariage'], relatedThemes: ['Animations & Musique'] },
+  { theme: 'Salle de réception', title: 'Mariage en hiver : quelle salle de réception choisir ?', keywords: ['salle mariage hiver', 'réception hivernale', 'salle chauffée mariage'], relatedThemes: ['Organisation & Planning', 'Décoration & Fleurs'] },
+  { theme: 'Salle de réception', title: 'Salle de mariage modulable : l\'avantage de la flexibilité', keywords: ['salle modulable mariage', 'espace modulaire réception', 'grande salle adaptable'], relatedThemes: ['Invités & Logistique'] },
+  { theme: 'Salle de réception', title: 'Parking et accessibilité : des critères clés pour votre salle de mariage', keywords: ['parking salle mariage', 'accès salle réception', 'transport invités'], relatedThemes: ['Invités & Logistique'] },
+
+  // ── Traiteur & Restauration ─────────────────────────────────────────────────
+  { theme: 'Traiteur & Restauration', title: 'Comment choisir son traiteur de mariage ?', keywords: ['choisir traiteur mariage', 'sélectionner traiteur', 'critères traiteur'], relatedThemes: ['Budget & Financement', 'Salle de réception'] },
+  { theme: 'Traiteur & Restauration', title: 'Menu de mariage : comment le composer pour satisfaire tous vos invités ?', keywords: ['menu mariage', 'composer menu réception', 'repas mariage'], relatedThemes: ['Invités & Logistique'] },
+  { theme: 'Traiteur & Restauration', title: 'Mariage halal : comment trouver le bon traiteur ?', keywords: ['mariage halal', 'traiteur halal mariage', 'repas halal réception'], relatedThemes: [] },
+  { theme: 'Traiteur & Restauration', title: 'Traiteur africain pour mariage : ce qu\'il faut savoir', keywords: ['traiteur africain mariage', 'cuisine africaine mariage', 'repas africain réception'], relatedThemes: ['Mariage thématique'] },
+  { theme: 'Traiteur & Restauration', title: 'Menu de mariage oriental : les plats incontournables', keywords: ['menu oriental mariage', 'cuisine orientale réception', 'meze mariage'], relatedThemes: ['Mariage thématique'] },
+  { theme: 'Traiteur & Restauration', title: 'Cocktail de bienvenue au mariage : comment bien l\'organiser ?', keywords: ['cocktail mariage', 'vin honneur mariage', 'apéritif réception'], relatedThemes: ['Jour J & Programme'] },
+  { theme: 'Traiteur & Restauration', title: 'Pièce montée ou wedding cake : que choisir pour votre mariage ?', keywords: ['pièce montée mariage', 'wedding cake', 'gâteau mariage'], relatedThemes: ['Budget & Financement'] },
+  { theme: 'Traiteur & Restauration', title: 'Comment gérer les régimes alimentaires au mariage ?', keywords: ['régimes alimentaires mariage', 'menu végétarien mariage', 'sans gluten mariage'], relatedThemes: ['Invités & Logistique'] },
+  { theme: 'Traiteur & Restauration', title: 'Mariage et allergies alimentaires : comment anticiper ?', keywords: ['allergies mariage', 'intolérance alimentaire mariage', 'menu sans allergènes'], relatedThemes: ['Invités & Logistique'] },
+  { theme: 'Traiteur & Restauration', title: 'Vin et champagne pour un mariage : quelle quantité prévoir ?', keywords: ['quantité champagne mariage', 'alcool mariage', 'boissons réception'], relatedThemes: ['Budget & Financement', 'Invités & Logistique'] },
+  { theme: 'Traiteur & Restauration', title: 'Buffet ou service à table au mariage : que préférer ?', keywords: ['buffet mariage', 'service table mariage', 'formule traiteur mariage'], relatedThemes: ['Salle de réception'] },
+  { theme: 'Traiteur & Restauration', title: 'Cocktail dinatoire pour 50 à 200 personnes : comment l\'organiser ?', keywords: ['cocktail dinatoire mariage', 'organisation cocktail', 'apéro dînatoire'], relatedThemes: ['Salle de réception'] },
+  { theme: 'Traiteur & Restauration', title: 'Comment déguster et choisir le menu de votre mariage ?', keywords: ['dégustation menu mariage', 'tester traiteur', 'essai menu réception'], relatedThemes: ['Organisation & Planning'] },
+  { theme: 'Traiteur & Restauration', title: 'Les tendances culinaires pour les mariages 2024-2025', keywords: ['tendances culinaires mariage', 'gastronomie mariage', 'nouvelles tendances repas'], relatedThemes: ['Mariage thématique'] },
+  { theme: 'Traiteur & Restauration', title: 'Comment calculer les quantités de nourriture pour un mariage ?', keywords: ['quantités nourriture mariage', 'calcul repas mariage', 'portions réception'], relatedThemes: ['Budget & Financement', 'Invités & Logistique'] },
+  { theme: 'Traiteur & Restauration', title: 'Animation culinaire lors d\'un mariage : idées originales', keywords: ['animation culinaire mariage', 'stand cuisine mariage', 'food truck mariage'], relatedThemes: ['Animations & Musique'] },
+  { theme: 'Traiteur & Restauration', title: 'Traiteur externe ou cuisine de la salle : quelles différences ?', keywords: ['traiteur externe mariage', 'cuisine intégrée salle', 'choisir formule traiteur'], relatedThemes: ['Salle de réception'] },
+
+  // ── Cérémonie civile ─────────────────────────────────────────────────────────
+  { theme: 'Cérémonie civile', title: 'Comment préparer sa cérémonie civile en mairie ?', keywords: ['cérémonie civile mariage', 'mairie mariage', 'préparer mariage civil'], relatedThemes: ['Organisation & Planning'] },
+  { theme: 'Cérémonie civile', title: 'Publication des bans : délais et procédures à connaître', keywords: ['publication bans mariage', 'délai bans', 'procédure bans'], relatedThemes: ['Organisation & Planning'] },
+  { theme: 'Cérémonie civile', title: 'Documents nécessaires pour se marier en France', keywords: ['documents mariage France', 'pièces justificatives mariage', 'formalités mariage'], relatedThemes: ['Organisation & Planning'] },
+  { theme: 'Cérémonie civile', title: 'Mariage civil : comment bien choisir ses témoins ?', keywords: ['témoins mariage civil', 'choisir témoins', 'rôle témoin mariage'], relatedThemes: ['Invités & Logistique'] },
+  { theme: 'Cérémonie civile', title: 'Discours et échanges de vœux à la mairie : est-ce possible ?', keywords: ['vœux mariage civil', 'discours mairie', 'personnaliser cérémonie civile'], relatedThemes: ['Cérémonie religieuse & Laïque'] },
+  { theme: 'Cérémonie civile', title: 'Mariage civil dans une autre commune : comment ça marche ?', keywords: ['mariage autre commune', 'mariage hors domicile', 'domicile mariage civil'], relatedThemes: ['Organisation & Planning'] },
+  { theme: 'Cérémonie civile', title: 'PACS vs mariage civil : quelles différences concrètes ?', keywords: ['PACS mariage différence', 'avantages mariage civil', 'PACS ou mariage'], relatedThemes: ['Organisation & Planning'] },
+  { theme: 'Cérémonie civile', title: 'Mariage civil avec l\'un des époux étranger : les démarches', keywords: ['mariage étranger France', 'mariage binational', 'démarches mariage franco-étranger'], relatedThemes: ['Invités & Logistique'] },
+  { theme: 'Cérémonie civile', title: 'Comment rendre la cérémonie civile plus personnelle et émouvante ?', keywords: ['personnaliser mairie', 'cérémonie civile originale', 'rendre mariage mairie spécial'], relatedThemes: ['Cérémonie religieuse & Laïque'] },
+  { theme: 'Cérémonie civile', title: 'Durée et organisation d\'une cérémonie civile à la mairie', keywords: ['durée cérémonie mairie', 'organisation mariage civil', 'timing mairie'], relatedThemes: ['Jour J & Programme'] },
+
+  // ── Cérémonie religieuse & Laïque ────────────────────────────────────────────
+  { theme: 'Cérémonie religieuse & Laïque', title: 'Cérémonie laïque de mariage : comment l\'organiser ?', keywords: ['cérémonie laïque', 'mariage laïc', 'organiser cérémonie laïque'], relatedThemes: ['Organisation & Planning'] },
+  { theme: 'Cérémonie religieuse & Laïque', title: 'Choisir un officiant laïque pour son mariage', keywords: ['officiant laïque', 'maître de cérémonie mariage', 'trouver officiant'], relatedThemes: [] },
+  { theme: 'Cérémonie religieuse & Laïque', title: 'Cérémonie religieuse : comment préparer son mariage à l\'église ?', keywords: ['mariage église', 'cérémonie catholique', 'préparer mariage religieux'], relatedThemes: ['Organisation & Planning'] },
+  { theme: 'Cérémonie religieuse & Laïque', title: 'Mariage à l\'église : tous les documents nécessaires', keywords: ['documents mariage église', 'dossier mariage catholique', 'certificat baptême mariage'], relatedThemes: ['Cérémonie civile'] },
+  { theme: 'Cérémonie religieuse & Laïque', title: 'Mariage musulman : le nikah, comment l\'organiser en France ?', keywords: ['nikah mariage', 'mariage musulman France', 'cérémonie islamique'], relatedThemes: [] },
+  { theme: 'Cérémonie religieuse & Laïque', title: 'Mariage juif en France : traditions et préparation', keywords: ['mariage juif', 'cérémonie juive', 'houppa mariage'], relatedThemes: [] },
+  { theme: 'Cérémonie religieuse & Laïque', title: 'Cérémonie de mariage en extérieur : ce qu\'il faut savoir légalement', keywords: ['cérémonie extérieur mariage', 'mariage dehors', 'légalité cérémonie extérieure'], relatedThemes: ['Salle de réception'] },
+  { theme: 'Cérémonie religieuse & Laïque', title: 'Écrire ses vœux de mariage : conseils et exemples inspirants', keywords: ['vœux mariage', 'discours vœux', 'écrire promesses mariage'], relatedThemes: ['Jour J & Programme'] },
+  { theme: 'Cérémonie religieuse & Laïque', title: 'Lectures de mariage : comment choisir les textes ?', keywords: ['lecture mariage', 'textes cérémonie mariage', 'poèmes mariage'], relatedThemes: [] },
+  { theme: 'Cérémonie religieuse & Laïque', title: 'Musique pour la cérémonie de mariage : classiques et tendances actuelles', keywords: ['musique cérémonie mariage', 'chanson mariage', 'playlist cérémonie'], relatedThemes: ['Animations & Musique'] },
+
+  // ── Décoration & Fleurs ─────────────────────────────────────────────────────
+  { theme: 'Décoration & Fleurs', title: 'Décoration de mariage : comment créer son thème de A à Z ?', keywords: ['décoration mariage', 'thème mariage', 'créer décor mariage'], relatedThemes: ['Mariage thématique', 'Budget & Financement'] },
+  { theme: 'Décoration & Fleurs', title: 'Choisir ses fleurs de mariage : le guide complet', keywords: ['fleurs mariage', 'choisir fleurs', 'bouquet mariée'], relatedThemes: ['Budget & Financement'] },
+  { theme: 'Décoration & Fleurs', title: 'Centres de table pour mariage : idées et inspirations 2025', keywords: ['centres de table mariage', 'décoration table mariage', 'idées centre table'], relatedThemes: ['Mariage thématique'] },
+  { theme: 'Décoration & Fleurs', title: 'Arche florale de mariage : comment la choisir ou la fabriquer ?', keywords: ['arche florale mariage', 'arche cérémonie', 'arche fleurs mariage'], relatedThemes: [] },
+  { theme: 'Décoration & Fleurs', title: 'Décoration de salle de mariage avec un petit budget', keywords: ['décoration mariage petit budget', 'décorer salle économique', 'déco mariage pas cher'], relatedThemes: ['Budget & Financement'] },
+  { theme: 'Décoration & Fleurs', title: 'DIY décoration mariage : les meilleures idées à réaliser soi-même', keywords: ['DIY décoration mariage', 'fait main mariage', 'décoration artisanale'], relatedThemes: ['Budget & Financement'] },
+  { theme: 'Décoration & Fleurs', title: 'Mariage bohème : la décoration et les fleurs parfaites', keywords: ['décoration mariage bohème', 'fleurs bohème', 'mariage boho'], relatedThemes: ['Mariage thématique'] },
+  { theme: 'Décoration & Fleurs', title: 'Mariage champêtre : décorer avec des éléments naturels', keywords: ['décoration champêtre mariage', 'mariage rustique', 'déco nature mariage'], relatedThemes: ['Mariage thématique'] },
+  { theme: 'Décoration & Fleurs', title: 'Chemin de table mariage : les plus belles idées', keywords: ['chemin de table mariage', 'décoration table linéaire', 'runner table mariage'], relatedThemes: [] },
+  { theme: 'Décoration & Fleurs', title: 'Luminaires et éclairage pour salle de mariage : guide complet', keywords: ['éclairage mariage', 'lumières salle mariage', 'ambiance lumière mariage'], relatedThemes: ['Salle de réception'] },
+  { theme: 'Décoration & Fleurs', title: 'Plan de table au mariage : comment l\'organiser sans se prendre la tête ?', keywords: ['plan de table mariage', 'organisation plan table', 'placement invités'], relatedThemes: ['Invités & Logistique'] },
+  { theme: 'Décoration & Fleurs', title: 'Marque-place mariage : idées originales pour personnaliser', keywords: ['marque-place mariage', 'place card mariage', 'personnaliser table'], relatedThemes: ['Faire-part & Papeterie'] },
+  { theme: 'Décoration & Fleurs', title: 'Photobooth mariage : comment créer un coin photo inoubliable ?', keywords: ['photobooth mariage', 'coin photo mariage', 'borne photo mariage'], relatedThemes: ['Photo & Vidéo', 'Animations & Musique'] },
+  { theme: 'Décoration & Fleurs', title: 'Décoration de mariage avec des bougies : idées et sécurité', keywords: ['bougies mariage', 'décoration bougies', 'mariage chandelles'], relatedThemes: [] },
+  { theme: 'Décoration & Fleurs', title: 'Fleurs de mariage selon la saison : les meilleures combinaisons', keywords: ['fleurs saison mariage', 'fleurs printemps été automne hiver mariage', 'fleuriste mariage'], relatedThemes: [] },
+  { theme: 'Décoration & Fleurs', title: 'Bouquet de mariée : formes, fleurs et tendances 2025', keywords: ['bouquet mariée', 'fleurs bouquet mariage', 'tendances bouquet'], relatedThemes: ['Tenues & Beauté'] },
+  { theme: 'Décoration & Fleurs', title: 'Thèmes de mariage les plus tendance pour 2024-2025', keywords: ['tendances mariage 2025', 'thèmes mariage tendance', 'idées mariage moderne'], relatedThemes: ['Mariage thématique'] },
+  { theme: 'Décoration & Fleurs', title: 'Décoration de table de mariage : les 10 tendances de l\'année', keywords: ['décoration table tendance', 'table mariage moderne', 'art de la table mariage'], relatedThemes: ['Mariage thématique'] },
+
+  // ── Tenues & Beauté ─────────────────────────────────────────────────────────
+  { theme: 'Tenues & Beauté', title: 'Comment choisir sa robe de mariée ? Le guide complet', keywords: ['choisir robe mariée', 'robe de mariée', 'guide robe mariage'], relatedThemes: ['Budget & Financement'] },
+  { theme: 'Tenues & Beauté', title: 'Les grandes tendances de la robe de mariée en 2025', keywords: ['tendances robe mariée 2025', 'mode mariage', 'nouvelles robes mariée'], relatedThemes: [] },
+  { theme: 'Tenues & Beauté', title: 'Costume de marié : guide complet pour faire le bon choix', keywords: ['costume marié', 'tenue marié', 'complet mariage homme'], relatedThemes: [] },
+  { theme: 'Tenues & Beauté', title: 'Tenues des demoiselles d\'honneur : comment les coordonner ?', keywords: ['demoiselles honneur tenues', 'robes demoiselles honneur', 'coordonner tenues mariage'], relatedThemes: ['Organisation & Planning'] },
+  { theme: 'Tenues & Beauté', title: 'Maquillage de mariage : naturel, glamour ou radieux ?', keywords: ['maquillage mariage', 'make-up mariée', 'coiffure maquillage mariage'], relatedThemes: [] },
+  { theme: 'Tenues & Beauté', title: 'Coiffure de mariage : les styles qui tiennent toute la journée', keywords: ['coiffure mariage', 'chignon mariage', 'coiffure mariée durable'], relatedThemes: [] },
+  { theme: 'Tenues & Beauté', title: 'Essayage de robe de mariée : comment bien se préparer ?', keywords: ['essayage robe mariée', 'atelier robe mariage', 'préparation essayage'], relatedThemes: ['Organisation & Planning'] },
+  { theme: 'Tenues & Beauté', title: 'Robe de mariée : acheter, louer ou faire fabriquer ?', keywords: ['acheter louer robe mariée', 'robe sur mesure mariage', 'location robe mariage'], relatedThemes: ['Budget & Financement'] },
+  { theme: 'Tenues & Beauté', title: 'Accessoires de mariée indispensables pour le jour J', keywords: ['accessoires mariée', 'bijoux mariage', 'voile couronne mariée'], relatedThemes: [] },
+  { theme: 'Tenues & Beauté', title: 'Chaussures de mariée : confort ou style, comment concilier les deux ?', keywords: ['chaussures mariée', 'escarpins mariage', 'chaussures confortables mariage'], relatedThemes: [] },
+  { theme: 'Tenues & Beauté', title: 'Beauté mariée : le guide des soins avant le grand jour', keywords: ['soins avant mariage', 'beauté mariée', 'routine beauté mariage'], relatedThemes: [] },
+  { theme: 'Tenues & Beauté', title: 'Comment gérer les retouches de sa robe de mariée ?', keywords: ['retouches robe mariée', 'ajustements robe mariage', 'atelier couture mariage'], relatedThemes: ['Organisation & Planning'] },
+  { theme: 'Tenues & Beauté', title: 'Mariage : comment prendre soin de soi pendant la préparation ?', keywords: ['bien-être mariage', 'prendre soin soi mariée', 'préparation physique mariage'], relatedThemes: ['Organisation & Planning'] },
+  { theme: 'Tenues & Beauté', title: 'Tenues de mariage pour les deux mamans : idées et conseils', keywords: ['tenue maman mariage', 'toilette mères mariés', 'robe maman mariage'], relatedThemes: ['Invités & Logistique'] },
+  { theme: 'Tenues & Beauté', title: 'Manucure et pédicure pour une mariée : tendances et conseils', keywords: ['manucure mariée', 'nail art mariage', 'ongles mariage'], relatedThemes: [] },
+
+  // ── Photo & Vidéo ────────────────────────────────────────────────────────────
+  { theme: 'Photo & Vidéo', title: 'Comment choisir son photographe de mariage ?', keywords: ['photographe mariage', 'choisir photographe', 'photo mariage professionnel'], relatedThemes: ['Budget & Financement'] },
+  { theme: 'Photo & Vidéo', title: 'Photographe de mariage : les questions essentielles à lui poser', keywords: ['questions photographe mariage', 'interview photographe', 'choisir photographe mariage'], relatedThemes: [] },
+  { theme: 'Photo & Vidéo', title: 'Vidéaste de mariage : est-ce indispensable en 2025 ?', keywords: ['vidéaste mariage', 'film mariage', 'vidéo mariage'], relatedThemes: ['Budget & Financement'] },
+  { theme: 'Photo & Vidéo', title: 'Les tendances photo de mariage en 2025', keywords: ['tendances photo mariage 2025', 'style photographique mariage', 'nouvelles tendances photo'], relatedThemes: [] },
+  { theme: 'Photo & Vidéo', title: 'Séance photo avant le mariage (engagement session) : pourquoi la faire ?', keywords: ['engagement session', 'séance photo fiançailles', 'photo avant mariage'], relatedThemes: ['Tenues & Beauté'] },
+  { theme: 'Photo & Vidéo', title: 'First look : découverte des mariés avant la cérémonie, pour ou contre ?', keywords: ['first look mariage', 'découverte mariés avant', 'tradition first look'], relatedThemes: ['Jour J & Programme'] },
+  { theme: 'Photo & Vidéo', title: 'Album photo de mariage : comment choisir le meilleur format ?', keywords: ['album photo mariage', 'livre photo mariage', 'imprimer photos mariage'], relatedThemes: [] },
+  { theme: 'Photo & Vidéo', title: 'Les photos de mariage qu\'on regrette de ne pas avoir prises', keywords: ['photos oubliées mariage', 'liste photos mariage', 'ne pas rater photos'], relatedThemes: ['Organisation & Planning'] },
+  { theme: 'Photo & Vidéo', title: 'Drone pour mariage : réglementation et avantages en France', keywords: ['drone mariage', 'prise de vue aérienne mariage', 'drone réglementation France'], relatedThemes: [] },
+  { theme: 'Photo & Vidéo', title: 'Photobooth mariage : louer une borne ou créer un coin soi-même ?', keywords: ['louer photobooth mariage', 'borne photo mariage', 'photobooth DIY'], relatedThemes: ['Animations & Musique', 'Décoration & Fleurs'] },
+  { theme: 'Photo & Vidéo', title: 'Vidéo 360° pour mariage : la tendance qui fait rêver', keywords: ['vidéo 360 mariage', 'videobooth 360 mariage', 'slow motion mariage'], relatedThemes: ['Animations & Musique'] },
+  { theme: 'Photo & Vidéo', title: 'Comment préparer son photographe pour le jour J ?', keywords: ['briefing photographe mariage', 'liste photos jour J', 'communication photographe'], relatedThemes: ['Jour J & Programme'] },
+  { theme: 'Photo & Vidéo', title: 'Photographie de reportage ou photo posée : quelle approche pour votre mariage ?', keywords: ['photo reportage mariage', 'photo posée mariage', 'style photo mariage'], relatedThemes: [] },
+  { theme: 'Photo & Vidéo', title: 'Instagram et mariage : faut-il partager toutes ses photos ?', keywords: ['instagram mariage', 'réseaux sociaux mariage', 'partager photos mariage'], relatedThemes: [] },
+  { theme: 'Photo & Vidéo', title: 'Droits d\'auteur photos de mariage : ce que vous devez savoir', keywords: ['droits auteur photos mariage', 'contrat photographe', 'propriété photos mariage'], relatedThemes: [] },
+
+  // ── Animations & Musique ─────────────────────────────────────────────────────
+  { theme: 'Animations & Musique', title: 'Comment choisir son DJ de mariage ?', keywords: ['choisir DJ mariage', 'DJ réception', 'trouver DJ mariage'], relatedThemes: ['Budget & Financement'] },
+  { theme: 'Animations & Musique', title: 'DJ ou groupe de musique live pour son mariage : comment choisir ?', keywords: ['DJ groupe live mariage', 'musique live mariage', 'groupe mariage'], relatedThemes: ['Budget & Financement'] },
+  { theme: 'Animations & Musique', title: 'Playlist mariage : les incontournables pour faire danser vos invités', keywords: ['playlist mariage', 'musique danse mariage', 'hits mariage'], relatedThemes: ['Invités & Logistique'] },
+  { theme: 'Animations & Musique', title: 'Le slow de mariage : comment bien le choisir pour l\'ouverture de bal ?', keywords: ['slow mariage', 'ouverture bal mariage', 'première danse mariage'], relatedThemes: ['Jour J & Programme'] },
+  { theme: 'Animations & Musique', title: 'Animations pour invités pendant le vin d\'honneur : les meilleures idées', keywords: ['animations vin honneur', 'jeux cocktail mariage', 'activités avant repas'], relatedThemes: ['Jour J & Programme'] },
+  { theme: 'Animations & Musique', title: 'Animations mariage originales pour tenir toute la nuit', keywords: ['animations mariage nuit', 'idées originales mariage', 'animations soirée mariage'], relatedThemes: [] },
+  { theme: 'Animations & Musique', title: 'Jeux de mariage : les idées incontournables qui font rire', keywords: ['jeux mariage', 'activités mariage', 'quiz mariage'], relatedThemes: ['Invités & Logistique'] },
+  { theme: 'Animations & Musique', title: 'Fumée lourde pour le first dance : l\'effet waouh garanti', keywords: ['fumée lourde mariage', 'machine fumée mariage', 'effet scénique mariage'], relatedThemes: [] },
+  { theme: 'Animations & Musique', title: 'Animation pour les enfants lors d\'un mariage : les meilleures idées', keywords: ['animations enfants mariage', 'occuper enfants mariage', 'espace enfants réception'], relatedThemes: ['Invités & Logistique'] },
+  { theme: 'Animations & Musique', title: 'Comment créer une ambiance magique dans sa salle de mariage ?', keywords: ['ambiance mariage', 'atmosphère salle mariage', 'créer ambiance réception'], relatedThemes: ['Salle de réception', 'Décoration & Fleurs'] },
+  { theme: 'Animations & Musique', title: 'Livre d\'or de mariage : alternatives créatives et numériques', keywords: ['livre or mariage', 'alternatives livre or', 'message invités mariage'], relatedThemes: ['Faire-part & Papeterie'] },
+  { theme: 'Animations & Musique', title: 'Comment personnaliser la musique de votre mariage de A à Z ?', keywords: ['musique personnalisée mariage', 'playlist personnalisée', 'customiser musique mariage'], relatedThemes: [] },
+  { theme: 'Animations & Musique', title: 'Feux d\'artifice et effets pyrotechniques au mariage : est-ce possible ?', keywords: ['feux artifice mariage', 'pyrotechnie mariage', 'bengale mariage'], relatedThemes: [] },
+  { theme: 'Animations & Musique', title: 'Jet de pétales, confettis ou bulles de savon : les meilleures options', keywords: ['confettis mariage', 'pétales rose mariage', 'bulles savon cérémonie'], relatedThemes: ['Cérémonie religieuse & Laïque'] },
+  { theme: 'Animations & Musique', title: 'Karaoké, quiz et activités de groupe pour un mariage animé', keywords: ['karaoké mariage', 'quiz mariage', 'activités groupe réception'], relatedThemes: ['Invités & Logistique'] },
+
+  // ── Invités & Logistique ─────────────────────────────────────────────────────
+  { theme: 'Invités & Logistique', title: 'Comment établir sa liste d\'invités pour le mariage ?', keywords: ['liste invités mariage', 'établir liste mariage', 'combien invités mariage'], relatedThemes: ['Budget & Financement', 'Salle de réception'] },
+  { theme: 'Invités & Logistique', title: 'Comment gérer les personnes non invitées à son mariage ?', keywords: ['non invités mariage', 'gérer non-invitations', 'dire non mariage'], relatedThemes: ['Organisation & Planning'] },
+  { theme: 'Invités & Logistique', title: 'Accueillir des invités venant de loin : hébergement et logistique', keywords: ['hébergement invités mariage', 'hôtels invités', 'logistique invités distance'], relatedThemes: ['Salle de réception'] },
+  { theme: 'Invités & Logistique', title: 'Navettes de mariage : comment les organiser facilement ?', keywords: ['navette mariage', 'transport invités mariage', 'organiser navettes'], relatedThemes: ['Salle de réception'] },
+  { theme: 'Invités & Logistique', title: 'Plan de table mariage : comment éviter les tensions familiales ?', keywords: ['plan table mariage', 'placement invités', 'tensions plan table'], relatedThemes: ['Décoration & Fleurs'] },
+  { theme: 'Invités & Logistique', title: 'Gérer les invités avec enfants au mariage : conseils pratiques', keywords: ['invités enfants mariage', 'gestion enfants mariage', 'baby-sitter mariage'], relatedThemes: ['Animations & Musique'] },
+  { theme: 'Invités & Logistique', title: 'RSVP mariage : comment gérer les réponses efficacement ?', keywords: ['RSVP mariage', 'réponses invités', 'gestion RSVP'], relatedThemes: ['Faire-part & Papeterie'] },
+  { theme: 'Invités & Logistique', title: 'Cadeaux de mariage : liste ou contribution voyage de noces ?', keywords: ['liste mariage', 'cadeaux mariage', 'cagnotte voyage noces'], relatedThemes: ['Lune de miel'] },
+  { theme: 'Invités & Logistique', title: 'Pochettes de bienvenue pour les invités : bonne idée ou pas ?', keywords: ['pochette bienvenue mariage', 'welcome bag mariage', 'cadeau invités arrivée'], relatedThemes: [] },
+  { theme: 'Invités & Logistique', title: 'Discours et toasts au mariage : qui parle et dans quel ordre ?', keywords: ['discours mariage', 'toast mariage', 'ordre discours mariage'], relatedThemes: ['Jour J & Programme'] },
+  { theme: 'Invités & Logistique', title: 'Témoin de mariage : comment le choisir et quelles sont ses missions ?', keywords: ['témoin mariage', 'rôle témoin', 'choisir témoin mariage'], relatedThemes: ['Cérémonie civile'] },
+  { theme: 'Invités & Logistique', title: 'Comment remercier ses invités après le mariage ?', keywords: ['remercier invités mariage', 'carte remerciement', 'mot remerciement'], relatedThemes: ['Faire-part & Papeterie'] },
+  { theme: 'Invités & Logistique', title: 'Mariage international : accueillir des invités étrangers', keywords: ['invités étrangers mariage', 'mariage international', 'accueil invités internationaux'], relatedThemes: ['Cérémonie civile'] },
+  { theme: 'Invités & Logistique', title: 'Cadeaux aux invités du mariage : les tendances et idées actuelles', keywords: ['cadeaux invités mariage', 'dragées mariage', 'cadeau souvenir mariage'], relatedThemes: ['Décoration & Fleurs'] },
+  { theme: 'Invités & Logistique', title: 'Mariage et famille recomposée : comment gérer avec tact ?', keywords: ['famille recomposée mariage', 'mariage avec enfants', 'gérer famille mariage'], relatedThemes: ['Organisation & Planning'] },
+
+  // ── Faire-part & Papeterie ──────────────────────────────────────────────────
+  { theme: 'Faire-part & Papeterie', title: 'Comment choisir ses faire-part de mariage en 2025 ?', keywords: ['faire-part mariage', 'choisir faire-part', 'invitations mariage'], relatedThemes: ['Budget & Financement'] },
+  { theme: 'Faire-part & Papeterie', title: 'Faire-part numérique ou papier pour le mariage : que choisir ?', keywords: ['faire-part numérique mariage', 'invitation électronique mariage', 'faire-part digital'], relatedThemes: ['Budget & Financement'] },
+  { theme: 'Faire-part & Papeterie', title: 'Save the date mariage : pourquoi c\'est indispensable et comment le faire ?', keywords: ['save the date mariage', 'pré-invitation mariage', 'annonce date mariage'], relatedThemes: ['Organisation & Planning'] },
+  { theme: 'Faire-part & Papeterie', title: 'Quand envoyer ses faire-part de mariage ?', keywords: ['timing faire-part mariage', 'quand envoyer invitations', 'délai faire-part'], relatedThemes: ['Organisation & Planning'] },
+  { theme: 'Faire-part & Papeterie', title: 'Texte de faire-part de mariage : formules, exemples et conseils', keywords: ['texte faire-part mariage', 'formule invitation mariage', 'rédiger faire-part'], relatedThemes: [] },
+  { theme: 'Faire-part & Papeterie', title: 'Carte de remerciement après le mariage : comment la rédiger ?', keywords: ['carte remerciement mariage', 'merci après mariage', 'mot remerciement invités'], relatedThemes: ['Invités & Logistique'] },
+  { theme: 'Faire-part & Papeterie', title: 'Programme de cérémonie de mariage : comment le créer ?', keywords: ['programme cérémonie mariage', 'livret mariage', 'programme déroulé mariage'], relatedThemes: ['Cérémonie civile', 'Cérémonie religieuse & Laïque'] },
+  { theme: 'Faire-part & Papeterie', title: 'Menu de mariage à imprimer : formats, styles et idées', keywords: ['menu mariage imprimé', 'carte menu mariage', 'menu à poser table mariage'], relatedThemes: ['Traiteur & Restauration'] },
+  { theme: 'Faire-part & Papeterie', title: 'Marque-place et plan de table : comment les harmoniser ?', keywords: ['marque-place mariage', 'plan de table imprimé', 'coordination papeterie mariage'], relatedThemes: ['Décoration & Fleurs'] },
+  { theme: 'Faire-part & Papeterie', title: 'Papeterie mariage DIY : outils, astuces et inspirations', keywords: ['papeterie DIY mariage', 'créer faire-part maison', 'imprimerie mariage DIY'], relatedThemes: ['Budget & Financement', 'Décoration & Fleurs'] },
+
+  // ── Jour J & Programme ──────────────────────────────────────────────────────
+  { theme: 'Jour J & Programme', title: 'Planning du jour J : de la préparation matinale à la fin de la soirée', keywords: ['planning jour J mariage', 'programme mariage', 'déroulé journée mariage'], relatedThemes: ['Organisation & Planning'] },
+  { theme: 'Jour J & Programme', title: 'Comment gérer la pression et le stress le jour de son mariage ?', keywords: ['stress jour J mariage', 'pression mariage', 'gérer émotions mariage'], relatedThemes: ['Organisation & Planning'] },
+  { theme: 'Jour J & Programme', title: 'Matin de mariée : comment bien se préparer sans stress ?', keywords: ['matin mariage', 'préparation matinale mariage', 'getting ready mariage'], relatedThemes: ['Tenues & Beauté', 'Photo & Vidéo'] },
+  { theme: 'Jour J & Programme', title: 'Entre mairie et salle de réception : combien de temps prévoir ?', keywords: ['timing mairie salle', 'temps entre cérémonie réception', 'trajet mariage'], relatedThemes: ['Cérémonie civile', 'Salle de réception'] },
+  { theme: 'Jour J & Programme', title: 'Traditions françaises du mariage : les incontournables à connaître', keywords: ['traditions mariage français', 'coutumes mariage France', 'rites mariage'], relatedThemes: ['Cérémonie civile'] },
+  { theme: 'Jour J & Programme', title: 'Bal de mariage et ouverture de bal : comment l\'organiser ?', keywords: ['bal mariage', 'ouverture bal', 'première danse mariage'], relatedThemes: ['Animations & Musique'] },
+  { theme: 'Jour J & Programme', title: 'Couper la pièce montée au mariage : traditions et protocole', keywords: ['couper pièce montée', 'cérémonie gâteau mariage', 'tradition gâteau mariage'], relatedThemes: ['Traiteur & Restauration'] },
+  { theme: 'Jour J & Programme', title: 'Comment gérer les discours trop longs lors du repas de mariage ?', keywords: ['discours repas mariage', 'gérer discours mariage', 'timing discours'], relatedThemes: ['Invités & Logistique'] },
+  { theme: 'Jour J & Programme', title: 'Cocktail de bienvenue : durée idéale et organisation parfaite', keywords: ['cocktail bienvenue mariage', 'vin honneur durée', 'organisation apéritif mariage'], relatedThemes: ['Traiteur & Restauration'] },
+  { theme: 'Jour J & Programme', title: 'Mariage : jusqu\'à quelle heure peut-on faire la fête légalement ?', keywords: ['horaires mariage France', 'bruit mariage nuit', 'fin soirée mariage légale'], relatedThemes: ['Salle de réception'] },
+  { theme: 'Jour J & Programme', title: 'Lendemain de mariage : brunch ou deuxième soirée, que choisir ?', keywords: ['lendemain mariage', 'brunch mariage', 'day after mariage'], relatedThemes: ['Traiteur & Restauration'] },
+  { theme: 'Jour J & Programme', title: 'Comment éviter les retards le jour de son mariage ?', keywords: ['retards mariage', 'ponctualité mariage', 'gérer retard mariage'], relatedThemes: ['Organisation & Planning'] },
+  { theme: 'Jour J & Programme', title: 'Lancer de bouquet et jarretière : traditions et alternatives modernes', keywords: ['lancer bouquet mariage', 'jarretière mariage', 'traditions bouquet mariée'], relatedThemes: ['Cérémonie religieuse & Laïque'] },
+  { theme: 'Jour J & Programme', title: 'Préparer son mariage seul(e) : conseils pour les couples sans famille proche', keywords: ['mariage sans famille', 'organiser mariage seul', 'mariage autonome'], relatedThemes: ['Organisation & Planning'] },
+  { theme: 'Jour J & Programme', title: 'Qui parle en premier au repas de mariage ? L\'ordre des discours', keywords: ['ordre discours mariage', 'protocole discours', 'qui prend parole mariage'], relatedThemes: ['Invités & Logistique'] },
+
+  // ── Lune de miel ────────────────────────────────────────────────────────────
+  { theme: 'Lune de miel', title: 'Comment choisir sa destination de lune de miel ?', keywords: ['lune de miel', 'voyage de noces', 'choisir destination lune miel'], relatedThemes: ['Budget & Financement'] },
+  { theme: 'Lune de miel', title: 'Lune de miel en Europe : les destinations incontournables', keywords: ['lune de miel Europe', 'voyage noces Europe', 'destination romantique Europe'], relatedThemes: [] },
+  { theme: 'Lune de miel', title: 'Voyage de noces exotique : les meilleures destinations en 2025', keywords: ['voyage noces exotique', 'lune miel tropicale', 'destination exotique mariage'], relatedThemes: [] },
+  { theme: 'Lune de miel', title: 'Budget lune de miel : combien prévoir pour le voyage de noces ?', keywords: ['budget lune miel', 'coût voyage noces', 'financer lune de miel'], relatedThemes: ['Budget & Financement'] },
+  { theme: 'Lune de miel', title: 'Comment organiser sa lune de miel en surprise pour son conjoint ?', keywords: ['surprise lune miel', 'voyage noces surprise', 'organiser voyage surprise'], relatedThemes: [] },
+  { theme: 'Lune de miel', title: 'Mini-lune de miel (minimoon) : la tendance des jeunes mariés', keywords: ['minimoon', 'mini lune de miel', 'court voyage noces'], relatedThemes: [] },
+  { theme: 'Lune de miel', title: 'Lune de miel à la mer ou à la montagne : comment choisir ?', keywords: ['mer montagne lune miel', 'destination lune de miel France', 'voyage noces proche'], relatedThemes: [] },
+  { theme: 'Lune de miel', title: 'Cagnotte mariage pour financer le voyage de noces : bonne idée ?', keywords: ['cagnotte voyage noces', 'liste mariage voyage', 'financer voyage noces'], relatedThemes: ['Invités & Logistique', 'Budget & Financement'] },
+  { theme: 'Lune de miel', title: 'Les documents indispensables à emporter pour votre voyage de noces', keywords: ['documents voyage noces', 'papiers lune miel', 'passeport mariage'], relatedThemes: [] },
+  { theme: 'Lune de miel', title: 'Que faire après le mariage avant de partir en lune de miel ?', keywords: ['après mariage avant voyage', 'démarches post mariage', 'jours après mariage'], relatedThemes: ['Cérémonie civile'] },
+
+  // ── Mariage thématique ──────────────────────────────────────────────────────
+  { theme: 'Mariage thématique', title: 'Mariage oriental : décoration, menu et traditions', keywords: ['mariage oriental', 'thème oriental mariage', 'déco mariage oriental'], relatedThemes: ['Décoration & Fleurs', 'Traiteur & Restauration'] },
+  { theme: 'Mariage thématique', title: 'Mariage africain : organisation, traditions et décoration', keywords: ['mariage africain', 'thème africain mariage', 'cérémonie africaine'], relatedThemes: ['Décoration & Fleurs', 'Traiteur & Restauration'] },
+  { theme: 'Mariage thématique', title: 'Mariage champêtre-chic : idées, inspirations et organisation', keywords: ['mariage champêtre', 'thème champêtre mariage', 'mariage rustique chic'], relatedThemes: ['Décoration & Fleurs'] },
+  { theme: 'Mariage thématique', title: 'Mariage bohème : comment créer une ambiance free spirit ?', keywords: ['mariage bohème', 'thème boho mariage', 'mariage bohémien'], relatedThemes: ['Décoration & Fleurs'] },
+  { theme: 'Mariage thématique', title: 'Mariage romantique : créer l\'ambiance de rêve dans votre salle', keywords: ['mariage romantique', 'ambiance romantique mariage', 'décoration romantique'], relatedThemes: ['Décoration & Fleurs', 'Salle de réception'] },
+  { theme: 'Mariage thématique', title: 'Mariage vintage : décoration et ambiance années folles', keywords: ['mariage vintage', 'thème années 20 mariage', 'rétro mariage'], relatedThemes: ['Décoration & Fleurs'] },
+  { theme: 'Mariage thématique', title: 'Mariage Hollywood Glamour : tout ce qu\'il faut savoir', keywords: ['mariage glamour Hollywood', 'thème luxe mariage', 'soirée glamour mariage'], relatedThemes: ['Tenues & Beauté'] },
+  { theme: 'Mariage thématique', title: 'Mariage en blanc et or : le grand classique intemporel', keywords: ['mariage blanc or', 'décoration blanc doré', 'thème or mariage'], relatedThemes: ['Décoration & Fleurs'] },
+  { theme: 'Mariage thématique', title: 'Mariage en blanc et vert : le mariage végétal et naturel', keywords: ['mariage blanc vert', 'mariage végétal', 'thème nature mariage'], relatedThemes: ['Décoration & Fleurs'] },
+  { theme: 'Mariage thématique', title: 'Mariage hivernal : thèmes, décoration et ambiance féerique', keywords: ['mariage hiver', 'thème hivernal mariage', 'mariage neige'], relatedThemes: ['Décoration & Fleurs', 'Organisation & Planning'] },
+  { theme: 'Mariage thématique', title: 'Mariage de printemps : fleurs, couleurs et inspirations', keywords: ['mariage printemps', 'thème printanier mariage', 'fleurs printanières mariage'], relatedThemes: ['Décoration & Fleurs'] },
+  { theme: 'Mariage thématique', title: 'Mariage sur le thème du voyage : idées originales et décoration', keywords: ['mariage thème voyage', 'déco voyage mariage', 'wanderlust mariage'], relatedThemes: ['Lune de miel'] },
+  { theme: 'Mariage thématique', title: 'Petit mariage intime : organiser une cérémonie à 20 personnes', keywords: ['petit mariage intime', 'mariage restreint', 'micro mariage'], relatedThemes: ['Budget & Financement', 'Salle de réception'] },
+  { theme: 'Mariage thématique', title: 'Mariage monochrome : comment décliner une seule couleur ?', keywords: ['mariage monochrome', 'thème couleur unique mariage', 'décoration monochrome'], relatedThemes: ['Décoration & Fleurs'] },
+  { theme: 'Mariage thématique', title: 'Mariage tropical : déco, menu et ambiance exotique', keywords: ['mariage tropical', 'thème tropical mariage', 'déco exotique mariage'], relatedThemes: ['Décoration & Fleurs', 'Traiteur & Restauration'] },
+
+  // ── Mariage en Île-de-France ─────────────────────────────────────────────────
+  { theme: 'Mariage en Île-de-France', title: 'Pourquoi organiser son mariage en Seine-et-Marne ?', keywords: ['mariage Seine-et-Marne', 'salle mariage 77', 'réception Seine-et-Marne'], relatedThemes: ['Salle de réception'] },
+  { theme: 'Mariage en Île-de-France', title: 'Les avantages d\'une salle de mariage en Île-de-France', keywords: ['salle mariage Île-de-France', 'mariage région parisienne', 'avantages salle IDF'], relatedThemes: ['Salle de réception'] },
+  { theme: 'Mariage en Île-de-France', title: 'Mariage à Meaux et alentours : tout ce qu\'il faut savoir', keywords: ['mariage Meaux', 'salle réception Meaux', 'mariage Seine-et-Marne Meaux'], relatedThemes: ['Salle de réception'] },
+  { theme: 'Mariage en Île-de-France', title: 'Se marier en Seine-et-Marne avec un budget raisonnable', keywords: ['mariage budget Seine-et-Marne', 'mariage économique 77', 'salle mariage pas cher IDF'], relatedThemes: ['Budget & Financement'] },
+  { theme: 'Mariage en Île-de-France', title: 'Accessibilité depuis Paris pour un mariage en Seine-et-Marne', keywords: ['accès Paris Seine-et-Marne', 'transports mariage 77', 'A4 mariage Seine-et-Marne'], relatedThemes: ['Invités & Logistique'] },
+  { theme: 'Mariage en Île-de-France', title: 'Salle de mariage à la campagne près de Paris : le meilleur des deux mondes', keywords: ['salle mariage campagne Paris', 'mariage nature Île-de-France', 'réception proche Paris'], relatedThemes: ['Salle de réception'] },
+  { theme: 'Mariage en Île-de-France', title: 'Les plus beaux lieux photos pour un mariage en Seine-et-Marne', keywords: ['photo mariage Seine-et-Marne', 'lieux photo 77', 'décors mariage IDF'], relatedThemes: ['Photo & Vidéo'] },
+  { theme: 'Mariage en Île-de-France', title: 'Hébergements pour les invités lors d\'un mariage en Seine-et-Marne', keywords: ['hôtels mariage Seine-et-Marne', 'hébergement invités 77', 'où dormir mariage Meaux'], relatedThemes: ['Invités & Logistique'] },
+  { theme: 'Mariage en Île-de-France', title: 'Les mois idéaux pour organiser un mariage en Île-de-France', keywords: ['saison mariage Île-de-France', 'meilleur mois mariage IDF', 'météo mariage Seine-et-Marne'], relatedThemes: ['Organisation & Planning'] },
+  { theme: 'Mariage en Île-de-France', title: 'Mariage en Seine-et-Marne : les formalités administratives locales', keywords: ['formalités mariage 77', 'mairie mariage Seine-et-Marne', 'démarches administratives mariage IDF'], relatedThemes: ['Cérémonie civile'] },
+  { theme: 'Mariage en Île-de-France', title: 'Les prestataires de mariage incontournables en Seine-et-Marne', keywords: ['prestataires mariage 77', 'fournisseurs mariage Seine-et-Marne', 'annuaire mariage IDF'], relatedThemes: ['Organisation & Planning'] },
+  { theme: 'Mariage en Île-de-France', title: 'Tendances mariage en Île-de-France : ce qui fait le buzz cette année', keywords: ['tendances mariage IDF', 'mode mariage région parisienne', 'nouvelles tendances 77'], relatedThemes: ['Mariage thématique', 'Décoration & Fleurs'] },
+  { theme: 'Mariage en Île-de-France', title: 'Mariage franco-étranger en Seine-et-Marne : toutes les démarches', keywords: ['mariage franco-étranger 77', 'binational Seine-et-Marne', 'mariage mixte IDF'], relatedThemes: ['Cérémonie civile'] },
+  { theme: 'Mariage en Île-de-France', title: 'Les lieux de cérémonie emblématiques près de Meaux', keywords: ['lieux cérémonie Meaux', 'salles cérémonie 77', 'churches mariage Meaux'], relatedThemes: ['Cérémonie civile', 'Cérémonie religieuse & Laïque'] },
+  { theme: 'Mariage en Île-de-France', title: 'Organiser sa réception de mariage en Seine-et-Marne : guide pratique', keywords: ['réception mariage Seine-et-Marne', 'guide mariage 77', 'organiser fête mariage IDF'], relatedThemes: ['Organisation & Planning', 'Salle de réception'] },
+]
+
+// Pre-compute slug for every topic (derived from title)
+function _slugify(title) {
+  return title
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-|-$/g, '')
+    .slice(0, 80)
+}
+
+BLOG_TOPICS.forEach((t) => {
+  if (!t.slug) t.slug = _slugify(t.title)
+})

@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import { makePageTypeStorage, getCityPagesConfig } from '../../utils/cityPageStorage'
 import { getCityBySlug, getNearbyCities, haversineKm } from '../../data/idf-cities'
+import { PAGE_TYPES } from '../../data/pageTypes'
 
 // ── Paradise 77 location (5 avenue Fridingen, 77100 Nanteuil-lès-Meaux) ──────
 const PARADISE_LAT = 48.9617
@@ -898,36 +899,66 @@ function SectionFAQ({ city, businessName }) {
 
 // ── 10. Maillage interne — Zone d'intervention ─────────────────────────────────
 
-function NearbyLinks({ citySlug, pages, city, businessName, basePath }) {
+function NearbyLinks({ citySlug, allTypePages, city, businessName, currentBasePath }) {
   const nearby = getNearbyCities(citySlug, 5)
-  const visibleNearby = nearby.filter((c) => pages && pages[c.slug])
-  if (visibleNearby.length === 0) return null
+
+  // For each nearby city, collect links to every page type that has been generated
+  const nearbyCitiesWithLinks = nearby.map((c) => {
+    const typeLinks = PAGE_TYPES.flatMap((pt) => {
+      const pages = allTypePages[pt.id]
+      if (!pages || !pages[c.slug]) return []
+      return [{ basePath: pt.basePath, label: pt.label, icon: pt.icon, id: pt.id }]
+    })
+    return { city: c, typeLinks }
+  }).filter((item) => item.typeLinks.length > 0)
+
+  if (nearbyCitiesWithLinks.length === 0) return null
 
   const v = cityVariant(city.name, 2)
   const intros = [
-    `${businessName} intervient dans toute la région Île-de-France et bien au-delà de ${city.name}. Retrouvez ci-dessous les pages dédiées aux communes les plus proches (moins de 5 km) qui bénéficient également de nos services de salle de mariage et de réception.`,
-    `Notre zone d'intervention couvre ${city.name} et toutes les communes environnantes dans un rayon de 5 km. ${businessName} est facilement accessible depuis chacune de ces villes voisines pour l'organisation de vos mariages, réceptions et autres événements festifs.`,
+    `${businessName} intervient dans toute la région Île-de-France et bien au-delà de ${city.name}. Retrouvez ci-dessous les pages dédiées aux communes les plus proches (moins de 5 km) — mariages, réceptions, anniversaires, baptêmes, fiançailles et séminaires — qui bénéficient également de nos services.`,
+    `Notre zone d'intervention couvre ${city.name} et toutes les communes environnantes dans un rayon de 5 km. ${businessName} est facilement accessible depuis chacune de ces villes voisines pour l'organisation de tous vos événements : mariages, réceptions, anniversaires, baptêmes, fiançailles et séminaires.`,
   ]
 
   return (
     <Section id="maillage" title="🗺️ Notre zone d'intervention">
-      <p style={{ color: 'var(--text)', fontSize: '15px', lineHeight: 1.85, marginBottom: '20px' }}>
+      <p style={{ color: 'var(--text)', fontSize: '15px', lineHeight: 1.85, marginBottom: '24px' }}>
         {intros[v]}
       </p>
-      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '10px', marginBottom: '20px' }}>
-        {visibleNearby.map((c) => (
-          <Link
-            key={c.slug}
-            to={`${basePath}/${c.slug}`}
-            style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', padding: '8px 16px', background: 'var(--gold-pale)', border: '1px solid var(--gold)', borderRadius: '20px', fontSize: '13px', fontWeight: '600', color: 'var(--dark)', textDecoration: 'none', transition: 'background 0.15s, transform 0.15s' }}
-            onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--gold)'; e.currentTarget.style.color = 'white' }}
-            onMouseLeave={(e) => { e.currentTarget.style.background = 'var(--gold-pale)'; e.currentTarget.style.color = 'var(--dark)' }}
-          >
-            \uD83D\uDCCD {c.name}
-          </Link>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+        {nearbyCitiesWithLinks.map(({ city: c, typeLinks }) => (
+          <div key={c.slug} style={{ background: 'white', border: '1px solid var(--border)', borderRadius: '12px', padding: '16px 20px', boxShadow: 'var(--shadow-sm)' }}>
+            <div style={{ fontFamily: 'var(--font-heading)', fontWeight: '700', fontSize: '15px', color: 'var(--dark)', marginBottom: '10px' }}>
+              📍 {c.name}
+            </div>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
+              {typeLinks.map((tl) => (
+                <Link
+                  key={tl.id}
+                  to={`${tl.basePath}/${c.slug}`}
+                  style={{
+                    display: 'inline-flex', alignItems: 'center', gap: '5px',
+                    padding: '6px 14px',
+                    background: tl.basePath === currentBasePath ? 'var(--gold)' : 'var(--gold-pale)',
+                    border: '1px solid var(--gold)',
+                    borderRadius: '20px', fontSize: '12px', fontWeight: '600',
+                    color: tl.basePath === currentBasePath ? 'white' : 'var(--dark)',
+                    textDecoration: 'none', transition: 'background 0.15s, color 0.15s',
+                  }}
+                  onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--gold)'; e.currentTarget.style.color = 'white' }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.background = tl.basePath === currentBasePath ? 'var(--gold)' : 'var(--gold-pale)'
+                    e.currentTarget.style.color = tl.basePath === currentBasePath ? 'white' : 'var(--dark)'
+                  }}
+                >
+                  {tl.icon} {tl.label.replace(/^Pages /, '')}
+                </Link>
+              ))}
+            </div>
+          </div>
         ))}
       </div>
-      <p style={{ color: 'var(--text-light)', fontSize: '13px', lineHeight: 1.7 }}>
+      <p style={{ color: 'var(--text-light)', fontSize: '13px', lineHeight: 1.7, marginTop: '16px' }}>
         Vous ne trouvez pas votre commune ? {businessName} accueille des clients de toute l&#x27;Île-de-France. Contactez-nous directement pour tout renseignement.
       </p>
     </Section>
@@ -938,11 +969,11 @@ function NearbyLinks({ citySlug, pages, city, businessName, basePath }) {
 
 export default function CityPage({ pageType }) {
   const { citySlug } = useParams()
-  const [page, setPage]         = useState(null)
-  const [gallery, setGallery]   = useState([])
-  const [config, setConfig]     = useState(null)
-  const [allPages, setAllPages] = useState({})
-  const [loading, setLoading]   = useState(true)
+  const [page, setPage]             = useState(null)
+  const [gallery, setGallery]       = useState([])
+  const [config, setConfig]         = useState(null)
+  const [allTypePages, setAllTypePages] = useState({})
+  const [loading, setLoading]       = useState(true)
 
   // Use the page-type-scoped storage
   const storage = makePageTypeStorage(pageType?.id || 'mariage')
@@ -950,14 +981,25 @@ export default function CityPage({ pageType }) {
 
   useEffect(() => {
     setLoading(true)
-    Promise.all([storage.getPages(), storage.getGallery(), getCityPagesConfig()])
-      .then(([pages, gal, cfg]) => {
-        setAllPages(pages || {})
-        setPage(pages?.[citySlug] || null)
-        setGallery(gal || [])
-        setConfig(cfg)
-        setLoading(false)
+    // Load current type pages + gallery + config + ALL other type pages in parallel
+    const allTypeStorages = PAGE_TYPES.map((pt) => makePageTypeStorage(pt.id))
+    Promise.all([
+      storage.getPages(),
+      storage.getGallery(),
+      getCityPagesConfig(),
+      ...allTypeStorages.map((s) => s.getPages()),
+    ]).then(([pages, gal, cfg, ...typePagesArr]) => {
+      setPage(pages?.[citySlug] || null)
+      setGallery(gal || [])
+      setConfig(cfg)
+      // Build a map: { [typeId]: pagesMap }
+      const typeMap = {}
+      PAGE_TYPES.forEach((pt, i) => {
+        typeMap[pt.id] = typePagesArr[i] || {}
       })
+      setAllTypePages(typeMap)
+      setLoading(false)
+    })
   }, [citySlug, pageType?.id]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const city = getCityBySlug(citySlug)
@@ -1090,7 +1132,7 @@ export default function CityPage({ pageType }) {
         </Section>
 
         {/* 12. Maillage interne */}
-        <NearbyLinks citySlug={citySlug} pages={allPages} city={city} businessName={businessName} basePath={basePath} />
+        <NearbyLinks citySlug={citySlug} allTypePages={allTypePages} city={city} businessName={businessName} currentBasePath={basePath} />
 
         {/* Actualités locales */}
         <CityNews city={city} />

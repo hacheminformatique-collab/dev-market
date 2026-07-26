@@ -1,9 +1,6 @@
 import { useState, useEffect } from 'react'
 import {
-  getCityPagesConfig, saveCityPagesConfig,
-  getCityPages, saveCityPages,
-  getCityGallery, saveCityGallery,
-  backupCityPages, getCityPagesBackups,
+  makePageTypeStorage,
   generateCityContent,
 } from '../../../utils/cityPageStorage'
 import { DEPARTMENTS, ALL_CITIES } from '../../../data/idf-cities'
@@ -47,7 +44,10 @@ const SUB_TABS = [
 
 // ── Main component ─────────────────────────────────────────────────────────
 
-export default function PagesClientTab() {
+export default function PagesClientTab({ pageType }) {
+  // Derive storage helpers for this page type
+  const storage = makePageTypeStorage(pageType.id)
+
   const [subTab, setSubTab]         = useState('selection')
   const [config, setConfig]         = useState(null)
   const [pages, setPages]           = useState({})
@@ -62,20 +62,33 @@ export default function PagesClientTab() {
   const [focusDept, setFocusDept]   = useState(null)
   const [citySearch, setCitySearch] = useState('')
 
-  // Load everything on mount
+  // Reset state when page type changes
+  useEffect(() => {
+    setSubTab('selection')
+    setConfig(null)
+    setPages({})
+    setGallery([])
+    setBackups([])
+    setSelDepts({})
+    setFocusDept(null)
+    setCitySearch('')
+    setGenDone(false)
+  }, [pageType.id])
+
+  // Load everything on mount / when page type changes
   useEffect(() => {
     Promise.all([
-      getCityPagesConfig(),
-      getCityPages(),
-      getCityGallery(),
-      getCityPagesBackups(),
+      storage.getConfig(),
+      storage.getPages(),
+      storage.getGallery(),
+      storage.getBackups(),
     ]).then(([cfg, pgs, gal, bkps]) => {
       setConfig(cfg)
       setPages(pgs || {})
       setGallery(gal || [])
       setBackups(bkps || [])
     })
-  }, [])
+  }, [pageType.id]) // eslint-disable-line react-hooks/exhaustive-deps
 
   if (!config) {
     return <div style={{ color: '#888', padding: '40px', textAlign: 'center' }}>Chargement…</div>
@@ -89,7 +102,7 @@ export default function PagesClientTab() {
 
   async function handleSaveConfig() {
     setSaving(true)
-    await saveCityPagesConfig(config)
+    await storage.saveConfig(config)
     setSaving(false)
   }
 
@@ -172,10 +185,10 @@ export default function PagesClientTab() {
     setGenProgress({ done: 0, total: selectedSlugs.length, current: '' })
 
     // 1. Backup existing pages
-    await backupCityPages()
+    await storage.backupPages()
 
     // 2. Load existing pages to keep unselected ones
-    const existing = await getCityPages()
+    const existing = await storage.getPages()
     const updated = { ...existing }
 
     // 3. Generate content per city
@@ -191,17 +204,18 @@ export default function PagesClientTab() {
         config.businessName,
         config.businessType,
         config.githubToken,
+        pageType.mainKeyword,
       )
       updated[slug] = { content, generatedAt: new Date().toISOString() }
     }
 
-    await saveCityPages(updated)
+    await storage.savePages(updated)
     setPages(updated)
     setGenerating(false)
     setGenDone(true)
     setGenProgress({ done: selectedSlugs.length, total: selectedSlugs.length, current: '' })
     // Refresh backups list
-    const bkps = await getCityPagesBackups()
+    const bkps = await storage.getBackups()
     setBackups(bkps)
   }
 
@@ -214,7 +228,7 @@ export default function PagesClientTab() {
       reader.onload = async (ev) => {
         const updated = [...gallery, ev.target.result]
         setGallery(updated)
-        await saveCityGallery(updated)
+        await storage.saveGallery(updated)
       }
       reader.readAsDataURL(file)
     })
@@ -224,7 +238,7 @@ export default function PagesClientTab() {
   async function handleGalleryRemove(idx) {
     const updated = gallery.filter((_, i) => i !== idx)
     setGallery(updated)
-    await saveCityGallery(updated)
+    await storage.saveGallery(updated)
   }
 
   async function handleRestoreBackup(idx) {
@@ -236,9 +250,9 @@ export default function PagesClientTab() {
     setRestoringIdx(idx)
     try {
       const snapshot = backup.snapshot || {}
-      await saveCityPages(snapshot)
+      await storage.savePages(snapshot)
       setPages(snapshot)
-      const bkps = await getCityPagesBackups()
+      const bkps = await storage.getBackups()
       setBackups(bkps || [])
     } finally {
       setRestoringIdx(null)
@@ -291,8 +305,11 @@ export default function PagesClientTab() {
       {/* ── SELECTION ─────────────────────────────────────────────────────── */}
       {subTab === 'selection' && (
         <div>
-          <p style={{ color: 'var(--text-light)', marginBottom: '16px', fontSize: '13px' }}>
+          <p style={{ color: 'var(--text-light)', marginBottom: '8px', fontSize: '13px' }}>
             Sélectionnez les départements (colonne gauche) ou des villes spécifiques (colonne droite) puis cliquez sur <strong>Générer</strong>.
+          </p>
+          <p style={{ color: '#888', marginBottom: '16px', fontSize: '12px' }}>
+            Mot-clé principal généré : <strong style={{ color: 'var(--gold)' }}>{pageType.mainKeyword}</strong>
           </p>
 
           {/* Stats */}
@@ -496,7 +513,7 @@ export default function PagesClientTab() {
                   return (
                     <a
                       key={slug}
-                      href={`/villes/${slug}`}
+                      href={`${pageType.basePath}/${slug}`}
                       target="_blank"
                       rel="noreferrer"
                       style={{

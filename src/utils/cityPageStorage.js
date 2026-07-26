@@ -5,12 +5,23 @@
  * PHP back-end as the rest of the application
  * (`/api/storage.php?key=<key>`).  We keep a separate module so the main
  * storage.js stays focused on the original features.
+ *
+ * Multi-type support:
+ *   The 'mariage' type uses the original legacy keys for backward compatibility.
+ *   All other types use keys suffixed with the type id (e.g. _reception).
+ *   The photo gallery is shared across all types (same business, same photos).
  */
 
 const KEY_CONFIG   = 'paradise_city_pages_config'
 const KEY_PAGES    = 'paradise_city_pages'
 const KEY_GALLERY  = 'paradise_city_gallery'
 const KEY_BACKUP   = 'paradise_city_pages_backup'
+
+// ── Per-type key builders ──────────────────────────────────────────────────
+
+function _keyConfig(typeId)  { return typeId === 'mariage' ? KEY_CONFIG  : `paradise_city_pages_config_${typeId}` }
+function _keyPages(typeId)   { return typeId === 'mariage' ? KEY_PAGES   : `paradise_city_pages_${typeId}` }
+function _keyBackup(typeId)  { return typeId === 'mariage' ? KEY_BACKUP  : `paradise_city_pages_backup_${typeId}` }
 
 // ── Helpers ────────────────────────────────────────────────────────────────
 
@@ -109,6 +120,69 @@ export async function getCityPagesBackups() {
   return (await _get(KEY_BACKUP)) || []
 }
 
+// ── Per-type storage factory ────────────────────────────────────────────────
+
+/**
+ * Returns a set of storage helpers scoped to a given page type.
+ *
+ * The 'mariage' type maps to the legacy keys for full backward compatibility.
+ * All other types use keys suffixed with the type id.
+ * The photo gallery is always shared (same business → same photos).
+ */
+export function makePageTypeStorage(typeId) {
+  const kConfig = _keyConfig(typeId)
+  const kPages  = _keyPages(typeId)
+  const kBackup = _keyBackup(typeId)
+
+  async function getConfig() {
+    // For non-mariage types, fall back to the global mariage config for
+    // shared fields (businessName, token, social, maps key) when no
+    // type-specific config exists yet.
+    const global = await _get(KEY_CONFIG)
+    const local  = await _get(kConfig)
+    const base   = {
+      ...DEFAULT_CONFIG,
+      ...(global || {}),   // inherit shared settings
+      ...(local  || {}),   // override with type-specific values
+    }
+    return base
+  }
+
+  async function saveConfig(config) {
+    await _set(kConfig, config)
+  }
+
+  async function getPages() {
+    return (await _get(kPages)) || {}
+  }
+
+  async function savePages(pages) {
+    await _set(kPages, pages)
+  }
+
+  async function getGallery() {
+    return (await _get(KEY_GALLERY)) || []
+  }
+
+  async function saveGallery(photos) {
+    await _set(KEY_GALLERY, photos)
+  }
+
+  async function backupPages() {
+    const current = await getPages()
+    if (!current || Object.keys(current).length === 0) return
+    const existing = (await _get(kBackup)) || []
+    const entry = { snapshot: current, backedUpAt: new Date().toISOString() }
+    await _set(kBackup, [entry, ...existing].slice(0, 5))
+  }
+
+  async function getBackups() {
+    return (await _get(kBackup)) || []
+  }
+
+  return { getConfig, saveConfig, getPages, savePages, getGallery, saveGallery, backupPages, getBackups }
+}
+
 // ── AI content generation ──────────────────────────────────────────────────
 
 /**
@@ -121,12 +195,19 @@ export async function getCityPagesBackups() {
  * Falls back to a varied local template when the API is unavailable or the
  * token is not configured.
  */
-export async function generateCityContent(cityName, deptName, keywords, businessName, businessType, githubToken) {
+export async function generateCityContent(cityName, deptName, keywords, businessName, businessType, githubToken, mainKeyword) {
+  // Resolve the primary keyword for this page type (default: location salle de mariage)
+  const primaryKw = mainKeyword || 'location salle de mariage'
+  // Derive a short event label from the keyword for use in prompts/templates
+  const eventLabel = primaryKw.replace(/^location (de )?salle (de |pour )?/i, '').trim() || 'mariage'
+
   if (githubToken) {
     try {
-      const prompt = `Tu es un expert en rédaction SEO pour des salles de réception et de mariage en France.
+      const prompt = `Tu es un expert en rédaction SEO pour des salles de réception en France.
 Génère un contenu SEO très riche, UNIQUE et ORIGINAL pour la page web de la ville de "${cityName}" (${deptName}).
-L'établissement s'appelle "${businessName}" — une salle de mariage et réception de prestige en Seine-et-Marne (77).
+L'établissement s'appelle "${businessName}" — une salle de réception de prestige en Seine-et-Marne (77).
+
+Le mot-clé principal de cette page est : "${primaryKw}"
 
 RÈGLES ABSOLUES ANTI-CONTENU-DUPLIQUÉ :
 - Le contenu doit être ENTIÈREMENT ORIGINAL et adapté SPÉCIFIQUEMENT à "${cityName}" — ne jamais réutiliser le même texte que pour une autre ville
@@ -136,7 +217,8 @@ RÈGLES ABSOLUES ANTI-CONTENU-DUPLIQUÉ :
 
 INSTRUCTIONS DE RÉDACTION :
 - Le texte DOIT faire AU MINIMUM 1500 mots
-- Les termes suivants DOIVENT chacun apparaître AU MOINS 30 fois dans l'ensemble du texte : "salle de mariage", "réception", "le Paradise 77", "mariage"
+- Le mot-clé principal "${primaryKw}" DOIT apparaître AU MOINS 30 fois dans l'ensemble du texte
+- "le Paradise 77" et "${eventLabel}" doivent également être répétés de nombreuses fois
 - Intègre ces termes dans les titres (H2 et H3) également, pas seulement dans le corps du texte
 - Utilise le format markdown : ## pour les titres H2 et ### pour les sous-titres H3
 - Commence DIRECTEMENT par un titre ## (sans introduction ni meta-commentary)
@@ -147,18 +229,18 @@ INSTRUCTIONS DE RÉDACTION :
 - Chaque page doit raconter une histoire légèrement différente : angle "romanesque" pour une ville, angle "pratique/logistique" pour une autre, angle "tradition locale" pour une autre, etc.
 
 Structure recommandée (librement réinterprétée pour chaque ville) :
-## Salle de mariage et réception à ${cityName} — le Paradise 77
-### Votre salle de mariage de prestige près de ${cityName}
-## Organiser votre mariage à ${cityName} avec le Paradise 77
-### La salle de réception idéale pour votre mariage à ${cityName}
-## Le Paradise 77 : salle de mariage incontournable près de ${cityName}
-## Nos offres de réception et mariage pour ${cityName}
-## Pourquoi choisir le Paradise 77 pour votre mariage près de ${cityName}
-## Capacité et prestations de notre salle de mariage
-## Traiteur et services pour votre réception à ${cityName}
-## Témoignages — mariages et réceptions organisés depuis ${cityName}
-## Réserver votre salle de mariage à ${cityName}
-## Le Paradise 77 : votre partenaire mariage en ${deptName}`
+## ${primaryKw.charAt(0).toUpperCase() + primaryKw.slice(1)} à ${cityName} — le Paradise 77
+### Votre salle de ${eventLabel} de prestige près de ${cityName}
+## Organiser votre ${eventLabel} à ${cityName} avec le Paradise 77
+### La salle idéale pour votre ${eventLabel} à ${cityName}
+## Le Paradise 77 : salle incontournable pour ${primaryKw} près de ${cityName}
+## Nos offres pour ${primaryKw} à ${cityName}
+## Pourquoi choisir le Paradise 77 pour votre ${eventLabel} près de ${cityName}
+## Capacité et prestations de notre salle
+## Traiteur et services pour votre ${eventLabel} à ${cityName}
+## Témoignages — ${eventLabel}s organisés depuis ${cityName}
+## Réserver votre salle pour ${eventLabel} à ${cityName}
+## Le Paradise 77 : votre partenaire ${eventLabel} en ${deptName}`
 
       const res = await fetch('https://models.inference.ai.azure.com/chat/completions', {
         method: 'POST',
@@ -185,13 +267,65 @@ Structure recommandée (librement réinterprétée pour chaque ville) :
   // Pick one of several structural variants based on a simple city-name hash
   // so different cities don't all receive the exact same wording.
   const kws = keywords ? keywords.split(',').map((k) => k.trim()).filter(Boolean) : []
-  const kw0 = kws[0] || 'mariage'
+  const kw0 = kws[0] || eventLabel
   const kw1 = kws[1] || 'anniversaire'
   const kw2 = kws[2] || 'baptême'
   const kw3 = kws[3] || 'soirée privée'
 
   // Simple deterministic variant selector (0–2) based on city name
   const variant = cityName.split('').reduce((acc, c) => acc + c.charCodeAt(0), 0) % 3
+
+  // For non-mariage types, use a generic template that references primaryKw / eventLabel
+  if (mainKeyword && mainKeyword !== 'location salle de mariage') {
+    const cap = (s) => s.charAt(0).toUpperCase() + s.slice(1)
+    return `## ${cap(primaryKw)} à ${cityName} — le Paradise 77
+
+### Votre salle de ${eventLabel} de prestige près de ${cityName}
+
+Bienvenue sur la page dédiée aux habitants de ${cityName} qui souhaitent organiser un **${eventLabel}** mémorable. **Le Paradise 77** est la salle de réception de prestige en Seine-et-Marne, idéalement située pour accueillir les familles et professionnels de ${cityName} et de ses environs. Depuis ${cityName}, rejoindre notre salle est rapide et confortable, quel que soit le moyen de transport choisi. Le Paradise 77 met tout en œuvre pour que votre ${eventLabel} soit un moment inoubliable. Notre équipe spécialisée dans les réceptions vous accompagne à chaque étape.
+
+## ${cap(primaryKw)} : pourquoi choisir le Paradise 77 depuis ${cityName}
+
+### Une salle de réception reconnue pour ses prestations d'exception
+
+Les habitants de ${cityName} font confiance au Paradise 77 pour la ${primaryKw}. Notre salle de réception propose un cadre somptueux et des services sur mesure. Le Paradise 77 se distingue par sa capacité à organiser des événements dans des conditions optimales. Notre salle bénéficie d'équipements modernes pour rendre chaque ${eventLabel} mémorable. Le Paradise 77 adapte chaque prestation aux désirs de nos clients depuis ${cityName}. Notre salle de réception est disponible tout au long de l'année.
+
+## Nos formules de ${eventLabel} pour ${cityName}
+
+### Des packages complets au Paradise 77
+
+Le Paradise 77 propose des formules adaptées à toutes les envies et tous les budgets. Notre salle de réception offre des packages tout inclus pour simplifier l'organisation depuis ${cityName}. Notre salle peut être louée à la demi-journée ou à la journée entière. Nous proposons des menus variés et personnalisables avec nos traiteurs partenaires.
+
+Parmi nos prestations :
+• **${cap(kw0)}** — notre salle se transforme en cadre de rêve
+• **${cap(kw1)}** — la salle de réception accueille tous vos proches dans la joie
+• **${cap(kw2)}** — le Paradise 77 sublime votre réception
+• **${cap(kw3)}** — notre salle s'adapte à toutes vos fêtes
+
+## Capacité et équipements de notre salle
+
+### Une salle de réception moderne et spacieuse
+
+La salle du Paradise 77 est l'une des plus grandes salles de réception de la ${deptName}. Notre salle accueille confortablement plusieurs centaines d'invités pour votre ${eventLabel}. Le Paradise 77 dispose d'une salle modulable selon vos besoins. Notre salle est équipée des dernières technologies son et lumière. La salle du Paradise 77 offre un parking privé, idéal pour les invités venant de ${cityName}. Notre salle dispose d'espaces extérieurs aménagés.
+
+## Traiteur et restauration pour votre ${eventLabel} à ${cityName}
+
+### Un service de restauration d'exception
+
+Le Paradise 77 propose un service traiteur haut de gamme pour accompagner votre ${eventLabel}. Notre salle dispose d'une cuisine entièrement équipée. Le Paradise 77 collabore avec des traiteurs spécialisés depuis ${cityName}. Notre salle de réception offre des menus personnalisables selon vos goûts et votre budget.
+
+## Réserver votre salle au Paradise 77 depuis ${cityName}
+
+### Comment organiser votre ${eventLabel} avec nous ?
+
+Réserver la salle du Paradise 77 depuis ${cityName} est simple et rapide. Notre salle de réception est disponible toute l'année. Le Paradise 77 vous reçoit pour une visite sur rendez-vous. Notre salle propose des formules sur mesure adaptées à votre budget depuis ${cityName}. Contactez le Paradise 77 pour organiser votre ${eventLabel} depuis ${cityName}.
+
+## Le Paradise 77 : votre partenaire ${eventLabel} en ${deptName}
+
+### La salle la plus appréciée près de ${cityName}
+
+Le Paradise 77 est la salle de réception de référence pour ${cityName} et toute la ${deptName}. Notre salle dessert ${cityName} et toutes les communes environnantes. Le Paradise 77 est facilement accessible depuis ${cityName} par autoroute et transports en commun. Depuis ${cityName}, choisissez le Paradise 77 pour votre ${eventLabel} — vous ne le regretterez jamais.`
+  }
 
   if (variant === 1) {
     return `## Le Paradise 77 vous accueille depuis ${cityName} pour votre mariage

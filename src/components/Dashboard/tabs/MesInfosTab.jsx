@@ -1,7 +1,8 @@
 import { useState } from 'react'
 import { getSettings, saveSettings } from '../../../utils/storage'
-import { getCityPages } from '../../../utils/cityPageStorage'
+import { makePageTypeStorage } from '../../../utils/cityPageStorage'
 import { buildSitemapXml, buildRobotsTxt, downloadTextFile } from '../../../utils/seoFiles'
+import { PAGE_TYPES } from '../../../data/pageTypes'
 
 export default function MesInfosTab() {
   const [data, setData] = useState(getSettings())
@@ -27,14 +28,21 @@ export default function MesInfosTab() {
     setSeoBusy(true)
     setSeoMessage('')
     try {
-      const pages = await getCityPages()
-      const sitemapXml = buildSitemapXml({ baseUrl: data.siteUrl, cityPages: pages })
+      // Load pages for all page types
+      const allTypePages = {}
+      let totalPages = 0
+      await Promise.all(PAGE_TYPES.map(async (pt) => {
+        const pages = await makePageTypeStorage(pt.id).getPages()
+        allTypePages[pt.id] = pages || {}
+        totalPages += Object.keys(pages || {}).length
+      }))
+      const sitemapXml = buildSitemapXml({ baseUrl: data.siteUrl, allTypePages })
       const robotsTxt = buildRobotsTxt(data.siteUrl)
       downloadTextFile('sitemap.xml', sitemapXml, 'application/xml;charset=utf-8')
       downloadTextFile('robots.txt', robotsTxt, 'text/plain;charset=utf-8')
-      setSeoMessage(`✅ Fichiers générés (${Object.keys(pages || {}).length} pages villes incluses).`)
+      setSeoMessage(`✅ Fichiers générés (${totalPages} pages villes incluses).`)
     } catch {
-      setSeoMessage('❌ Échec de génération. Vérifiez l’URL du site et réessayez.')
+      setSeoMessage("❌ Échec de génération. Vérifiez l'URL du site et réessayez.")
     } finally {
       setSeoBusy(false)
     }

@@ -1,3 +1,5 @@
+import { PAGE_TYPES } from '../data/pageTypes'
+
 function normalizeBaseUrl(rawUrl) {
   const fallback = window.location.origin
   const input = (rawUrl || '').trim() || fallback
@@ -15,7 +17,13 @@ function xmlEscape(value) {
     .replaceAll("'", '&apos;')
 }
 
-export function buildSitemapXml({ baseUrl, cityPages = {} }) {
+/**
+ * @param {object} opts
+ * @param {string}  opts.baseUrl
+ * @param {object}  [opts.cityPages]        – legacy mariage pages { [slug]: { content, generatedAt } }
+ * @param {object}  [opts.allTypePages]     – { [typeId]: { [slug]: { content, generatedAt } } }
+ */
+export function buildSitemapXml({ baseUrl, cityPages = {}, allTypePages = {} }) {
   const normalizedBase = normalizeBaseUrl(baseUrl)
   const today = new Date().toISOString().slice(0, 10)
 
@@ -24,16 +32,25 @@ export function buildSitemapXml({ baseUrl, cityPages = {} }) {
     { path: '/devis', changefreq: 'weekly', priority: '0.8', lastmod: today },
   ]
 
-  Object.entries(cityPages || {}).forEach(([slug, page]) => {
-    if (!slug || !page?.content) return
-    const generatedAt = page?.generatedAt ? new Date(page.generatedAt) : null
-    const validDate = generatedAt && !Number.isNaN(generatedAt.getTime())
-    rows.push({
-      path: `/villes/${slug}`,
-      changefreq: 'monthly',
-      priority: '0.7',
-      lastmod: validDate ? generatedAt.toISOString().slice(0, 10) : today,
+  // Helper to add pages for a given basePath
+  function addPageRows(basePath, pages) {
+    Object.entries(pages || {}).forEach(([slug, page]) => {
+      if (!slug || !page?.content) return
+      const generatedAt = page?.generatedAt ? new Date(page.generatedAt) : null
+      const validDate = generatedAt && !Number.isNaN(generatedAt.getTime())
+      rows.push({
+        path: `${basePath}/${slug}`,
+        changefreq: 'monthly',
+        priority: '0.7',
+        lastmod: validDate ? generatedAt.toISOString().slice(0, 10) : today,
+      })
     })
+  }
+
+  // Add pages for every known page type (via allTypePages)
+  PAGE_TYPES.forEach((pt) => {
+    const pages = allTypePages[pt.id] || (pt.id === 'mariage' ? cityPages : {})
+    addPageRows(pt.basePath, pages)
   })
 
   const uniq = new Map()

@@ -1,9 +1,10 @@
 import { useState, useEffect, lazy, Suspense } from 'react'
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
+import { BrowserRouter, Routes, Route, Navigate, useParams } from 'react-router-dom'
 import HomePage from './components/HomePage'
 import SyncIndicator from './components/SyncIndicator'
 import SeoManager from './components/SeoManager'
 import { initStorage } from './utils/storage'
+import { PAGE_TYPES_BY_ID } from './data/pageTypes'
 
 const AdminLogin = lazy(() => import('./components/AdminLogin'))
 const Dashboard = lazy(() => import('./components/Dashboard/Dashboard'))
@@ -11,6 +12,12 @@ const WizardForm = lazy(() => import('./components/Wizard/WizardForm'))
 const EspaceClient = lazy(() => import('./components/EspaceClient/EspaceClient'))
 const EspaceStaff = lazy(() => import('./components/EspaceStaff/EspaceStaff'))
 const CityPage = lazy(() => import('./components/VillesPages/CityPage'))
+
+// Redirect /villes/:citySlug → /locationsalledemariage/:citySlug (backward compat)
+function LegacyVillesRedirect() {
+  const { citySlug } = useParams()
+  return <Navigate to={`/locationsalledemariage/${citySlug}`} replace />
+}
 
 function ProtectedDashboard() {
   if (!sessionStorage.getItem('adminAuth')) {
@@ -72,7 +79,15 @@ function App() {
           <Route path="/devis" element={<WizardForm />} />
           <Route path="/espace-client/:devisId" element={<EspaceClient />} />
           <Route path="/espace-staff/:staffId" element={<EspaceStaff />} />
-          <Route path="/villes/:citySlug" element={<CityPage />} />
+          {/* Legacy /villes/ redirect to mariage pages */}
+          <Route path="/villes/:citySlug" element={<LegacyVillesRedirect />} />
+          {/* City pages per type */}
+          <Route path="/locationsalledemariage/:citySlug" element={<CityPage pageType={PAGE_TYPES_BY_ID['mariage']} />} />
+          <Route path="/locationsalledereception/:citySlug" element={<CityPage pageType={PAGE_TYPES_BY_ID['reception']} />} />
+          <Route path="/locationsalleanniversaire/:citySlug" element={<CityPage pageType={PAGE_TYPES_BY_ID['anniversaire']} />} />
+          <Route path="/locationsallebapteme/:citySlug" element={<CityPage pageType={PAGE_TYPES_BY_ID['bapteme']} />} />
+          <Route path="/locationsallefiancaille/:citySlug" element={<CityPage pageType={PAGE_TYPES_BY_ID['fiancaille']} />} />
+          <Route path="/locationsalleseminaire/:citySlug" element={<CityPage pageType={PAGE_TYPES_BY_ID['seminaire']} />} />
         </Routes>
       </Suspense>
       <SyncIndicator />

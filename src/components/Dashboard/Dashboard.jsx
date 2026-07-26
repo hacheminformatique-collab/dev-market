@@ -15,6 +15,7 @@ import StockTab from './tabs/StockTab'
 import MatieresTab from './tabs/MatieresTab'
 import ComptabiliteTab from './tabs/ComptabiliteTab'
 import PagesClientTab from './tabs/PagesClientTab'
+import { PAGE_TYPES } from '../../data/pageTypes'
 
 const TABS = [
   { id: 'clients',    icon: '👥', label: 'Clients & Devis' },
@@ -27,7 +28,8 @@ const TABS = [
   { id: 'menus',      icon: '🍽️', label: 'Menus' },
   { id: 'gateaux',    icon: '🎂', label: 'Gâteaux' },
   { id: 'prestations',icon: '🎵', label: 'Prestations' },
-  { id: 'pages',      icon: '🌍', label: 'Pages Client' },
+  // ── City page types (one tab per type) ────────────────────────────────────
+  ...PAGE_TYPES.map((pt) => ({ id: pt.dashboardId, icon: pt.icon, label: pt.label })),
   { id: 'infos',      icon: '⚙️', label: 'Mes Infos' },
   { id: 'motdepasse', icon: '🔑', label: 'Code PIN' },
 ]
@@ -67,10 +69,14 @@ export default function Dashboard() {
       case 'menus':       return <MenuTab key={refreshKey} />
       case 'gateaux':     return <GateauTab key={refreshKey} />
       case 'prestations': return <PrestationTab key={refreshKey} />
-      case 'pages':       return <PagesClientTab key={refreshKey} />
       case 'infos':       return <MesInfosTab key={refreshKey} />
       case 'motdepasse':  return <MotDePasseTab key={refreshKey} />
-      default: return null
+      default: {
+        // City page type tabs
+        const pt = PAGE_TYPES.find((p) => p.dashboardId === activeTab)
+        if (pt) return <PagesClientTab key={pt.id} pageType={pt} />
+        return null
+      }
     }
   }
 

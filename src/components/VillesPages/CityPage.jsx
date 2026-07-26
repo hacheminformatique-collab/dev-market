@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useParams, Link } from 'react-router-dom'
-import { getCityPages, getCityGallery, getCityPagesConfig } from '../../utils/cityPageStorage'
+import { makePageTypeStorage, getCityPagesConfig } from '../../utils/cityPageStorage'
 import { getCityBySlug, getNearbyCities, haversineKm } from '../../data/idf-cities'
 
 // ── Paradise 77 location (5 avenue Fridingen, 77100 Nanteuil-lès-Meaux) ──────
@@ -877,7 +877,7 @@ function SectionFAQ({ city, businessName }) {
 
 // ── 10. Maillage interne — Zone d'intervention ─────────────────────────────────
 
-function NearbyLinks({ citySlug, pages, city, businessName }) {
+function NearbyLinks({ citySlug, pages, city, businessName, basePath }) {
   const nearby = getNearbyCities(citySlug, 5)
   const visibleNearby = nearby.filter((c) => pages && pages[c.slug])
   if (visibleNearby.length === 0) return null
@@ -897,7 +897,7 @@ function NearbyLinks({ citySlug, pages, city, businessName }) {
         {visibleNearby.map((c) => (
           <Link
             key={c.slug}
-            to={`/villes/${c.slug}`}
+            to={`${basePath}/${c.slug}`}
             style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', padding: '8px 16px', background: 'var(--gold-pale)', border: '1px solid var(--gold)', borderRadius: '20px', fontSize: '13px', fontWeight: '600', color: 'var(--dark)', textDecoration: 'none', transition: 'background 0.15s, transform 0.15s' }}
             onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--gold)'; e.currentTarget.style.color = 'white' }}
             onMouseLeave={(e) => { e.currentTarget.style.background = 'var(--gold-pale)'; e.currentTarget.style.color = 'var(--dark)' }}
@@ -915,7 +915,7 @@ function NearbyLinks({ citySlug, pages, city, businessName }) {
 
 // ── Main page ──────────────────────────────────────────────────────────────────
 
-export default function CityPage() {
+export default function CityPage({ pageType }) {
   const { citySlug } = useParams()
   const [page, setPage]         = useState(null)
   const [gallery, setGallery]   = useState([])
@@ -923,9 +923,13 @@ export default function CityPage() {
   const [allPages, setAllPages] = useState({})
   const [loading, setLoading]   = useState(true)
 
+  // Use the page-type-scoped storage
+  const storage = makePageTypeStorage(pageType?.id || 'mariage')
+  const basePath = pageType?.basePath || '/locationsalledemariage'
+
   useEffect(() => {
     setLoading(true)
-    Promise.all([getCityPages(), getCityGallery(), getCityPagesConfig()])
+    Promise.all([storage.getPages(), storage.getGallery(), getCityPagesConfig()])
       .then(([pages, gal, cfg]) => {
         setAllPages(pages || {})
         setPage(pages?.[citySlug] || null)
@@ -933,7 +937,7 @@ export default function CityPage() {
         setConfig(cfg)
         setLoading(false)
       })
-  }, [citySlug])
+  }, [citySlug, pageType?.id]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const city = getCityBySlug(citySlug)
 
@@ -1065,7 +1069,7 @@ export default function CityPage() {
         </Section>
 
         {/* 12. Maillage interne */}
-        <NearbyLinks citySlug={citySlug} pages={allPages} city={city} businessName={businessName} />
+        <NearbyLinks citySlug={citySlug} pages={allPages} city={city} businessName={businessName} basePath={basePath} />
 
         {/* Actualités locales */}
         <CityNews city={city} />

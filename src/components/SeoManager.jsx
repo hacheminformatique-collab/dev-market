@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'react'
 import { useLocation } from 'react-router-dom'
 import { getCityBySlug } from '../data/idf-cities'
-import { getCityPages } from '../utils/cityPageStorage'
+import { makePageTypeStorage } from '../utils/cityPageStorage'
 import { getSettings } from '../utils/storage'
+import { PAGE_TYPES } from '../data/pageTypes'
 
 function normalizeSiteUrl(rawUrl) {
   const fallback = window.location.origin
@@ -47,12 +48,18 @@ function upsertJsonLd(value) {
   tag.textContent = JSON.stringify(value)
 }
 
-function buildSeoData(pathname, settings, cityPages) {
+function buildSeoData(pathname, settings, cityPages, detectedPageType) {
   const businessName = settings?.nom?.trim() || 'Le Paradise 77'
   const baseUrl = normalizeSiteUrl(settings?.siteUrl)
   const canonical = new URL(pathname, baseUrl).toString()
   const imageUrl = new URL('/favicon.svg', baseUrl).toString()
-  const citySlug = pathname.startsWith('/villes/') ? pathname.split('/')[2] : ''
+
+  // Detect city slug from any known page-type base path
+  let citySlug = ''
+  if (detectedPageType) {
+    const parts = pathname.split('/')
+    citySlug = parts[parts.length - 1] || ''
+  }
   const hasGeneratedCityPage = Boolean(citySlug && cityPages?.[citySlug]?.content)
   const isIndexable = pathname === '/' || hasGeneratedCityPage
 
@@ -122,14 +129,22 @@ function buildSeoData(pathname, settings, cityPages) {
     }
   }
 
-  if (pathname.startsWith('/villes/')) {
+  if (detectedPageType && citySlug) {
     const city = getCityBySlug(citySlug)
     if (city && hasGeneratedCityPage) {
+      const title = (detectedPageType.seoCityTitle || 'Page ville — {{business}}')
+        .replace('{{city}}', city.name)
+        .replace('{{dept}}', city.deptName)
+        .replace('{{business}}', businessName)
+      const description = (detectedPageType.seoCityDesc || '')
+        .replace('{{city}}', city.name)
+        .replace('{{dept}}', city.deptName)
+        .replace('{{business}}', businessName)
       return {
         ...base,
-        title: `Salle de mariage à ${city.name} — ${businessName}`,
-        description: `${businessName} accompagne vos mariages et réceptions à ${city.name} (${city.deptName}). Découvrez nos prestations et demandez un devis gratuit.`,
-        keywords: `${base.keywords}, ${city.name}, ${city.deptName}, salle mariage ${city.name}`,
+        title,
+        description,
+        keywords: `${base.keywords}, ${city.name}, ${city.deptName}, ${detectedPageType.mainKeyword} ${city.name}`,
         jsonLd: {
           '@context': 'https://schema.org',
           '@graph': [
@@ -188,19 +203,26 @@ export default function SeoManager() {
   const location = useLocation()
   const [cityPages, setCityPages] = useState({})
 
+  // Detect the current page type from the URL path
+  const detectedPageType = PAGE_TYPES.find((pt) =>
+    location.pathname.startsWith(pt.basePath + '/')
+  ) || null
+
   useEffect(() => {
     let cancelled = false
-    getCityPages().then((pages) => {
-      if (!cancelled) setCityPages(pages || {})
-    })
-    return () => {
-      cancelled = true
+    if (detectedPageType) {
+      makePageTypeStorage(detectedPageType.id).getPages().then((pages) => {
+        if (!cancelled) setCityPages(pages || {})
+      })
+    } else {
+      setCityPages({})
     }
-  }, [])
+    return () => { cancelled = true }
+  }, [location.pathname, detectedPageType?.id]) // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     const settings = getSettings()
-    const seo = buildSeoData(location.pathname, settings, cityPages)
+    const seo = buildSeoData(location.pathname, settings, cityPages, detectedPageType)
 
     document.documentElement.lang = 'fr'
     document.title = seo.title
@@ -222,7 +244,7 @@ export default function SeoManager() {
     upsertMeta('name', 'twitter:image', seo.imageUrl)
     upsertLink('canonical', seo.canonical)
     upsertJsonLd(seo.jsonLd)
-  }, [cityPages, location.pathname])
+  }, [cityPages, location.pathname, detectedPageType]) // eslint-disable-line react-hooks/exhaustive-deps
 
   return null
 }

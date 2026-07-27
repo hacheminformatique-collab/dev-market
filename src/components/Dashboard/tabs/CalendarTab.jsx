@@ -5,6 +5,7 @@ import {
   getStaff,
   getCalOverrides, saveCalOverrides,
   getCalStaff, saveCalStaff,
+  getCalManualEvents, saveCalManualEvents,
 } from '../../../utils/storage'
 
 // ── Pricing helpers (same logic as Step3Formule) ─────────────────────────────
@@ -279,32 +280,39 @@ function EventDetail({ client, staffList, assignedStaffIds, calOverride, onClose
         </button>
       </div>
 
-      {/* Staff assignment */}
-      <div style={{ marginBottom: '12px' }}>
-        <div style={{ fontWeight: '700', marginBottom: '8px', color: '#1a1a2e' }}>👷 Staff assigné</div>
-        {staffList.length === 0 && (
-          <p style={{ fontSize: '13px', color: '#888' }}>Aucun employé enregistré.</p>
-        )}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-          {staffList.map((s) => (
-            <label key={s.id} style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '13px', cursor: 'pointer' }}>
-              <input
-                type="checkbox"
-                checked={assignedStaffIds.includes(s.id)}
-                onChange={() => onStaffChange(s.id)}
-              />
-              <span>{s.prenom} {s.nom}</span>
-              <span style={{ fontSize: '11px', color: '#888' }}>{s.poste}</span>
-              <span style={{ marginLeft: 'auto', color: '#c9a84c', fontWeight: '600' }}>{formatMoney(s.tarifEvenement)}</span>
-            </label>
-          ))}
-        </div>
-        {assignedStaffIds.length > 0 && (
-          <div style={{ marginTop: '8px', fontWeight: '700', color: '#1a1a2e', fontSize: '14px', borderTop: '1px solid #e0e0e0', paddingTop: '8px' }}>
-            💰 Masse salariale : {formatMoney(payroll)}
+      {/* Staff assignment – only shown for non-dry-rental events */}
+      {!isSeche && (
+        <div style={{ marginBottom: '12px' }}>
+          <div style={{ fontWeight: '700', marginBottom: '8px', color: '#1a1a2e' }}>👷 Staff assigné</div>
+          {staffList.length === 0 && (
+            <p style={{ fontSize: '13px', color: '#888' }}>Aucun employé enregistré.</p>
+          )}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+            {staffList.map((s) => (
+              <label key={s.id} style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '13px', cursor: 'pointer' }}>
+                <input
+                  type="checkbox"
+                  checked={assignedStaffIds.includes(s.id)}
+                  onChange={() => onStaffChange(s.id)}
+                />
+                <span>{s.prenom} {s.nom}</span>
+                <span style={{ fontSize: '11px', color: '#888' }}>{s.poste}</span>
+                <span style={{ marginLeft: 'auto', color: '#c9a84c', fontWeight: '600' }}>{formatMoney(s.tarifEvenement)}</span>
+              </label>
+            ))}
           </div>
-        )}
-      </div>
+          {assignedStaffIds.length > 0 && (
+            <div style={{ marginTop: '8px', fontWeight: '700', color: '#1a1a2e', fontSize: '14px', borderTop: '1px solid #e0e0e0', paddingTop: '8px' }}>
+              💰 Masse salariale : {formatMoney(payroll)}
+            </div>
+          )}
+        </div>
+      )}
+      {isSeche && (
+        <div style={{ marginBottom: '12px', background: '#f8f5f0', borderRadius: '8px', padding: '10px', fontSize: '13px', color: '#888' }}>
+          👷 Calcul staff / masse salariale non applicable pour une location sèche.
+        </div>
+      )}
 
       {/* Bread */}
       <div style={{ marginBottom: '12px', background: '#f8f5f0', borderRadius: '8px', padding: '10px' }}>
@@ -350,28 +358,212 @@ function EventDetail({ client, staffList, assignedStaffIds, calOverride, onClose
   )
 }
 
+// ── Price Grid ────────────────────────────────────────────────────────────────
+
+function PriceGrid() {
+  const [open, setOpen] = useState(false)
+  const rows = [
+    {
+      label: '🌧️ Basse saison (déc–mars)',
+      prestaLunJeu: 1000, prestaVen: 1500, prestaSam: 2500,
+      secheLunJeu: 2000, secheVen: 2500, secheSam: 3500,
+    },
+    {
+      label: '☀️ Haute saison (avr–nov)',
+      prestaLunJeu: 1500, prestaVen: 2500, prestaSam: 3000,
+      secheLunJeu: 2500, secheVen: 3500, secheSam: 4500,
+    },
+  ]
+  return (
+    <div style={{ marginTop: '20px', borderRadius: '12px', border: '1.5px solid #e0e0e0', overflow: 'hidden' }}>
+      <button
+        onClick={() => setOpen((v) => !v)}
+        style={{ width: '100%', display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 16px', background: '#1a1a2e', border: 'none', cursor: 'pointer', color: 'white', fontWeight: '700', fontSize: '14px' }}
+      >
+        <span>📊 Grille tarifaire saison / jour</span>
+        <span>{open ? '▲' : '▼'}</span>
+      </button>
+      {open && (
+        <div style={{ overflowX: 'auto', padding: '0' }}>
+          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
+            <thead>
+              <tr style={{ background: '#f8f5f0' }}>
+                <th style={{ padding: '8px 12px', textAlign: 'left', borderBottom: '1px solid #e0e0e0' }}>Saison</th>
+                <th style={{ padding: '8px 12px', textAlign: 'center', borderBottom: '1px solid #e0e0e0' }}>Lun–Jeu</th>
+                <th style={{ padding: '8px 12px', textAlign: 'center', borderBottom: '1px solid #e0e0e0' }}>Vendredi</th>
+                <th style={{ padding: '8px 12px', textAlign: 'center', borderBottom: '1px solid #e0e0e0' }}>Samedi</th>
+              </tr>
+            </thead>
+            <tbody>
+              {rows.map((r) => (
+                <>
+                  <tr key={`${r.label}-presta`}>
+                    <td style={{ padding: '6px 12px', borderBottom: '1px solid #f0f0f0', fontWeight: '600', color: '#1a1a2e' }} rowSpan={2}>{r.label}</td>
+                    <td style={{ padding: '6px 12px', textAlign: 'center', borderBottom: '1px solid #f0f0f0', color: '#555' }}>
+                      <span style={{ fontSize: '11px', color: '#888' }}>Prestation</span><br /><strong>{r.prestaLunJeu.toLocaleString('fr-FR')} €</strong>
+                    </td>
+                    <td style={{ padding: '6px 12px', textAlign: 'center', borderBottom: '1px solid #f0f0f0', color: '#555' }}>
+                      <span style={{ fontSize: '11px', color: '#888' }}>Prestation</span><br /><strong>{r.prestaVen.toLocaleString('fr-FR')} €</strong>
+                    </td>
+                    <td style={{ padding: '6px 12px', textAlign: 'center', borderBottom: '1px solid #f0f0f0', color: '#555' }}>
+                      <span style={{ fontSize: '11px', color: '#888' }}>Prestation</span><br /><strong>{r.prestaSam.toLocaleString('fr-FR')} €</strong>
+                    </td>
+                  </tr>
+                  <tr key={`${r.label}-seche`} style={{ background: '#fdf8ee' }}>
+                    <td style={{ padding: '6px 12px', textAlign: 'center', borderBottom: '2px solid #e0e0e0', color: '#c9a84c' }}>
+                      <span style={{ fontSize: '11px', color: '#888' }}>Sèche</span><br /><strong>{r.secheLunJeu.toLocaleString('fr-FR')} €</strong>
+                    </td>
+                    <td style={{ padding: '6px 12px', textAlign: 'center', borderBottom: '2px solid #e0e0e0', color: '#c9a84c' }}>
+                      <span style={{ fontSize: '11px', color: '#888' }}>Sèche</span><br /><strong>{r.secheVen.toLocaleString('fr-FR')} €</strong>
+                    </td>
+                    <td style={{ padding: '6px 12px', textAlign: 'center', borderBottom: '2px solid #e0e0e0', color: '#c9a84c' }}>
+                      <span style={{ fontSize: '11px', color: '#888' }}>Sèche</span><br /><strong>{r.secheSam.toLocaleString('fr-FR')} €</strong>
+                    </td>
+                  </tr>
+                </>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ── Manual Event Modal ────────────────────────────────────────────────────────
+
+const EVENT_TYPES = ['Anniversaire', 'Babyshower', 'Baptême', 'Fiançaille', 'Mariage', 'Autres', 'Bloqué', 'Maintenance']
+
+function ManualEventModal({ onSave, onClose }) {
+  const [form, setForm] = useState({ date: '', label: '', type: 'Anniversaire', notes: '' })
+
+  function handleSave() {
+    if (!form.date || !form.label) return
+    onSave({ ...form, id: `manual-${Date.now()}`, isManual: true })
+  }
+
+  return (
+    <div className="modal-overlay">
+      <div className="modal" style={{ maxWidth: '420px' }}>
+        <button className="modal-close" onClick={onClose}>✕</button>
+        <h3 className="modal-title">➕ Ajouter un événement manuellement</h3>
+
+        <div className="form-group">
+          <label>Date *</label>
+          <input type="date" className="form-control" value={form.date} onChange={(e) => setForm((f) => ({ ...f, date: e.target.value }))} />
+        </div>
+        <div className="form-group">
+          <label>Nom / Libellé *</label>
+          <input type="text" className="form-control" placeholder="Ex: Mariage Dupont" value={form.label} onChange={(e) => setForm((f) => ({ ...f, label: e.target.value }))} />
+        </div>
+        <div className="form-group">
+          <label>Type d&apos;événement</label>
+          <select className="form-control" value={form.type} onChange={(e) => setForm((f) => ({ ...f, type: e.target.value }))}>
+            {EVENT_TYPES.map((t) => <option key={t} value={t}>{t}</option>)}
+          </select>
+        </div>
+        <div className="form-group">
+          <label>Notes (optionnel)</label>
+          <textarea className="form-control" rows={2} value={form.notes} onChange={(e) => setForm((f) => ({ ...f, notes: e.target.value }))} />
+        </div>
+
+        <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end', marginTop: '16px' }}>
+          <button className="btn btn-outline btn-sm" onClick={onClose}>Annuler</button>
+          <button className="btn btn-primary btn-sm" onClick={handleSave} disabled={!form.date || !form.label}>💾 Enregistrer</button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ── Manual Event Detail ───────────────────────────────────────────────────────
+
+function ManualEventDetail({ event, staffList, assignedStaffIds, onClose, onDelete, onStaffChange }) {
+  const payroll = staffList
+    .filter((s) => assignedStaffIds.includes(s.id))
+    .reduce((sum, s) => sum + (s.tarifEvenement || 0), 0)
+
+  return (
+    <div className="card" style={{ position: 'sticky', top: 0, alignSelf: 'start', maxHeight: '90vh', overflowY: 'auto' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+        <h4 style={{ color: '#1a1a2e', margin: 0 }}>📌 {event.label}</h4>
+        <button style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '18px' }} onClick={onClose}>✕</button>
+      </div>
+
+      <div style={{ fontSize: '13px', lineHeight: '1.8', marginBottom: '12px', background: '#f8f5f0', borderRadius: '8px', padding: '10px' }}>
+        <div>🎉 <strong>{event.type}</strong></div>
+        <div>📅 <strong>{dateLabel(event.date)}</strong></div>
+        {event.notes && <div>📝 {event.notes}</div>}
+        <div style={{ fontSize: '11px', color: '#888', marginTop: '4px' }}>Événement manuel (non lié à un devis client)</div>
+      </div>
+
+      <div style={{ marginBottom: '12px' }}>
+        <div style={{ fontWeight: '700', marginBottom: '8px', color: '#1a1a2e' }}>👷 Assigner le staff</div>
+        {staffList.length === 0 && <p style={{ fontSize: '13px', color: '#888' }}>Aucun employé enregistré.</p>}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+          {staffList.map((s) => (
+            <label key={s.id} style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '13px', cursor: 'pointer' }}>
+              <input type="checkbox" checked={assignedStaffIds.includes(s.id)} onChange={() => onStaffChange(s.id)} />
+              <span>{s.prenom} {s.nom}</span>
+              <span style={{ fontSize: '11px', color: '#888' }}>{s.poste}</span>
+              <span style={{ marginLeft: 'auto', color: '#c9a84c', fontWeight: '600' }}>{formatMoney(s.tarifEvenement)}</span>
+            </label>
+          ))}
+        </div>
+        {assignedStaffIds.length > 0 && (
+          <div style={{ marginTop: '8px', fontWeight: '700', color: '#1a1a2e', fontSize: '14px', borderTop: '1px solid #e0e0e0', paddingTop: '8px' }}>
+            💰 Masse salariale : {formatMoney(payroll)}
+          </div>
+        )}
+      </div>
+
+      <div>
+        <button className="btn btn-danger btn-sm" onClick={() => { if (confirm(`Supprimer l'événement "${event.label}" ?`)) onDelete() }}>
+          🗑️ Supprimer l&apos;événement
+        </button>
+      </div>
+    </div>
+  )
+}
+
 // ── CalendarTab ───────────────────────────────────────────────────────────────
 
 export default function CalendarTab() {
   const [clients, setClients] = useState(getClients())
   const [calOverrides, setCalOverrides] = useState(getCalOverrides())
   const [calStaff, setCalStaff] = useState(getCalStaff())
+  const [calManualEvents, setCalManualEvents] = useState(getCalManualEvents())
   const staffList = getStaff()
 
   const [selectedClientId, setSelectedClientId] = useState(null)
+  const [selectedManualId, setSelectedManualId] = useState(null)
   const [priceOverrideDate, setPriceOverrideDate] = useState(null)
+  const [showAddEventModal, setShowAddEventModal] = useState(false)
 
   const selectedClient = clients.find((c) => c.id === selectedClientId) || null
-  const assignedStaffIds = selectedClient ? (calStaff[selectedClient.id] || []) : []
+  const selectedManual = calManualEvents.find((e) => e.id === selectedManualId) || null
+  const assignedStaffIds = selectedClient
+    ? (calStaff[selectedClient.id] || [])
+    : selectedManual
+      ? (calStaff[selectedManual.id] || [])
+      : []
 
-  const events = clients
-    .filter((c) => c.dateEvenement)
-    .map((c) => ({
-      id: c.id,
-      date: c.dateEvenement,
-      label: `${c.prenom || ''} ${c.nom || ''} – ${c.typeEvenement || ''}`,
-      type: c.typeEvenement || '',
-    }))
+  // Combined events: client devis + manual events
+  const events = [
+    ...clients
+      .filter((c) => c.dateEvenement)
+      .map((c) => ({
+        id: c.id,
+        date: c.dateEvenement,
+        label: `${c.prenom || ''} ${c.nom || ''} – ${c.typeEvenement || ''}`,
+        type: c.typeEvenement || '',
+        isManual: false,
+      })),
+    ...calManualEvents.map((e) => ({
+      ...e,
+      label: `📌 ${e.label}`,
+    })),
+  ]
 
   const promoDateKeys = new Set(
     Object.entries(calOverrides)
@@ -380,13 +572,27 @@ export default function CalendarTab() {
   )
 
   function handleEventClick(id) {
-    setSelectedClientId((prev) => (prev === id ? null : id))
+    const isManual = calManualEvents.some((e) => e.id === id)
+    if (isManual) {
+      setSelectedManualId((prev) => (prev === id ? null : id))
+      setSelectedClientId(null)
+    } else {
+      setSelectedClientId((prev) => (prev === id ? null : id))
+      setSelectedManualId(null)
+    }
   }
 
   function handleEventDrop(id, newDateStr) {
+    // Check if it's a manual event
+    const isManual = calManualEvents.some((e) => e.id === id)
+    if (isManual) {
+      const updated = calManualEvents.map((e) => e.id === id ? { ...e, date: newDateStr } : e)
+      saveCalManualEvents(updated)
+      setCalManualEvents(updated)
+      return
+    }
     const updated = clients.map((c) => {
       if (c.id !== id) return c
-      // Recalculate prixSalle based on new date (unless there's a custom override)
       const override = calOverrides[newDateStr]
       const newPrice = override?.customPrice != null
         ? override.customPrice
@@ -395,9 +601,6 @@ export default function CalendarTab() {
     })
     saveClients(updated)
     setClients(updated)
-    if (selectedClientId === id) {
-      setSelectedClientId(id)
-    }
   }
 
   function handleDelete() {
@@ -408,18 +611,27 @@ export default function CalendarTab() {
     setSelectedClientId(null)
   }
 
+  function handleManualDelete() {
+    if (!selectedManual) return
+    const updated = calManualEvents.filter((e) => e.id !== selectedManual.id)
+    saveCalManualEvents(updated)
+    setCalManualEvents(updated)
+    setSelectedManualId(null)
+  }
+
   function handleReschedule(newDate) {
     if (!selectedClient) return
     handleEventDrop(selectedClient.id, newDate)
   }
 
   function handleStaffChange(staffId) {
-    if (!selectedClient) return
-    const current = calStaff[selectedClient.id] || []
+    const eventId = selectedClient?.id || selectedManual?.id
+    if (!eventId) return
+    const current = calStaff[eventId] || []
     const updated = current.includes(staffId)
       ? current.filter((id) => id !== staffId)
       : [...current, staffId]
-    const newCalStaff = { ...calStaff, [selectedClient.id]: updated }
+    const newCalStaff = { ...calStaff, [eventId]: updated }
     saveCalStaff(newCalStaff)
     setCalStaff(newCalStaff)
   }
@@ -442,7 +654,6 @@ export default function CalendarTab() {
     saveCalOverrides(newOverrides)
     setCalOverrides(newOverrides)
 
-    // If the currently selected client is on this date, update prixSalle
     if (selectedClient && selectedClient.dateEvenement?.slice(0, 10) === key) {
       const newPrice = overrideData?.customPrice != null
         ? overrideData.customPrice
@@ -461,25 +672,42 @@ export default function CalendarTab() {
     setPriceOverrideDate(dateStr)
   }
 
+  function handleAddManualEvent(eventData) {
+    const updated = [...calManualEvents, eventData]
+    saveCalManualEvents(updated)
+    setCalManualEvents(updated)
+    setShowAddEventModal(false)
+  }
+
+  const showDetailPanel = !!(selectedClient || selectedManual)
+
   return (
     <div>
       <div style={{ marginBottom: '16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '8px' }}>
         <h3 style={{ color: '#1a1a2e', margin: 0 }}>📅 Calendrier des événements</h3>
-        <div style={{ fontSize: '12px', color: '#888', display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
-          <span>💡 Cliquez sur un événement pour voir les détails</span>
-          <span>↔️ Glissez pour reporter</span>
-          <span>📅 Cliquez sur une date libre pour gérer le tarif/promo</span>
+        <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap' }}>
+          <div style={{ fontSize: '12px', color: '#888', display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
+            <span>💡 Cliquez sur un événement pour voir les détails</span>
+            <span>↔️ Glissez pour reporter</span>
+            <span>📅 Cliquez sur une date libre pour gérer le tarif/promo</span>
+          </div>
+          <button className="btn btn-primary btn-sm" onClick={() => setShowAddEventModal(true)}>
+            ➕ Ajouter un événement
+          </button>
         </div>
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: selectedClient ? '1fr 380px' : '1fr', gap: '20px', alignItems: 'start' }}>
-        <CalendarView
-          events={events}
-          promoDateKeys={promoDateKeys}
-          onEventClick={handleEventClick}
-          onEventDrop={handleEventDrop}
-          onDateClick={handleDateClick}
-        />
+      <div style={{ display: 'grid', gridTemplateColumns: showDetailPanel ? '1fr 380px' : '1fr', gap: '20px', alignItems: 'start' }}>
+        <div>
+          <CalendarView
+            events={events}
+            promoDateKeys={promoDateKeys}
+            onEventClick={handleEventClick}
+            onEventDrop={handleEventDrop}
+            onDateClick={handleDateClick}
+          />
+          <PriceGrid />
+        </div>
 
         {selectedClient && (
           <EventDetail
@@ -494,6 +722,16 @@ export default function CalendarTab() {
             onPriceOverride={handlePriceOverride}
           />
         )}
+        {selectedManual && (
+          <ManualEventDetail
+            event={selectedManual}
+            staffList={staffList}
+            assignedStaffIds={assignedStaffIds}
+            onClose={() => setSelectedManualId(null)}
+            onDelete={handleManualDelete}
+            onStaffChange={handleStaffChange}
+          />
+        )}
       </div>
 
       {priceOverrideDate && (
@@ -502,6 +740,13 @@ export default function CalendarTab() {
           currentOverride={calOverrides[priceOverrideDate] || null}
           onSave={handleSavePriceOverride}
           onClose={() => setPriceOverrideDate(null)}
+        />
+      )}
+
+      {showAddEventModal && (
+        <ManualEventModal
+          onSave={handleAddManualEvent}
+          onClose={() => setShowAddEventModal(false)}
         />
       )}
     </div>

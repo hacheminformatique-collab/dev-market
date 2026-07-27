@@ -211,7 +211,7 @@ export default function EspaceClient() {
     if (!pendingSignatureData) return
     const sigData = pendingSignatureData
     const updated = clients.map((c) =>
-      (c.id === devisId || c.devisNumber === devisId) ? { ...c, signature: sigData, status: 'signé', signedAt: new Date().toISOString() } : c
+      (c.id === devisId || c.devisNumber === devisId) ? { ...c, signature: sigData, status: 'signé_client', signedAt: new Date().toISOString() } : c
     )
     saveClients(updated)
     const signedDevis = updated.find((c) => c.id === devis?.id) || updated.find((c) => c.devisNumber === devis?.devisNumber)
@@ -285,8 +285,11 @@ export default function EspaceClient() {
     setClients(updatedClients)
   }
 
-  const statusColor = devis.status === 'signé' ? '#27ae60' : devis.status === 'annulé' ? '#e74c3c' : '#c9a84c'
-  const statusLabel = devis.status === 'brouillon_envoyé' ? 'Brouillon envoyé' : (devis.status || 'En cours')
+  const statusColor = devis.status === 'validé_admin' ? '#27ae60' : devis.status === 'signé_client' ? '#f39c12' : devis.status === 'signé' ? '#27ae60' : devis.status === 'annulé' ? '#e74c3c' : '#c9a84c'
+  const statusLabel = devis.status === 'brouillon_envoyé' ? 'Brouillon envoyé'
+    : devis.status === 'signé_client' ? '⏳ En attente de validation'
+    : devis.status === 'validé_admin' ? '✅ Réservation confirmée'
+    : (devis.status || 'En cours')
 
   // Build WhatsApp link - normalize phone to international format (France)
   const rawPhone = (settings.whatsapp || '0782821582').replace(/\s/g, '')
@@ -352,6 +355,18 @@ export default function EspaceClient() {
             </button>
           ))}
         </div>
+
+        {/* Pending validation info */}
+        {devis.status === 'signé_client' && (
+          <div style={{ background: '#fff8e1', border: '1.5px solid #f39c12', borderRadius: '10px', padding: '14px 16px', marginBottom: '20px', fontSize: '13px', color: '#8a6d00' }}>
+            ⏳ <strong>Votre devis est signé et en attente de validation définitive par notre équipe.</strong> Nous vous enverrons une confirmation par email sous peu.
+          </div>
+        )}
+        {devis.status === 'validé_admin' && (
+          <div style={{ background: '#f0fff4', border: '1.5px solid #27ae60', borderRadius: '10px', padding: '14px 16px', marginBottom: '20px', fontSize: '13px', color: '#155724' }}>
+            ✅ <strong>Votre réservation est confirmée définitivement !</strong> Votre événement est enregistré dans notre agenda.
+          </div>
+        )}
 
         {/* Tab: Mon devis */}
         {activeTab === 'devis' && (

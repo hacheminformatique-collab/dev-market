@@ -247,6 +247,8 @@ if ($ownerEmail) {
             . "Solde restant : " . ($receiptSolde !== '' ? $receiptSolde : 'Non renseigné') . "\n";
     } elseif ($notificationType === 'devis_brouillon') {
         $adminSubject = 'Nouveau devis envoyé non signé : ' . $devisNumber;
+    } elseif ($notificationType === 'validation_admin') {
+        $adminSubject = 'Devis validé et confirmé : ' . $devisNumber;
     } else {
         $adminSubject = 'Nouveau devis signé : ' . $devisNumber;
     }
@@ -282,6 +284,16 @@ if ($clientEmail) {
         $clientSubject = 'Votre devis est prêt : ' . $devisNumber;
         $clientMessage .= "Votre devis a été préparé et envoyé sans signature.\n"
             . "Depuis votre espace client, vous pourrez l'ouvrir, le relire, puis le valider avec votre signature électronique.\n\n"
+            . "Cordialement,\nLE PARADISE";
+    } elseif ($notificationType === 'validation_admin') {
+        $clientSubject = '✅ Réservation confirmée : ' . $devisNumber;
+        $clientMessage .= "Nous avons le plaisir de vous confirmer définitivement votre réservation.\n\n"
+            . "Votre événement est maintenant enregistré dans notre agenda. La date est bloquée pour vous.\n\n"
+            . "Pour finaliser votre dossier, merci de déposer dans votre espace client les pièces suivantes :\n"
+            . "- Carte d'identité (recto)\n"
+            . "- Carte d'identité (verso)\n"
+            . "- Attestation d'assurance\n\n"
+            . "Retrouvez tous les détails de votre événement sur votre espace client :\n{$espaceClientUrl}\n\n"
             . "Cordialement,\nLE PARADISE";
     } elseif ($notificationType === 'payment_receipt') {
         $clientSubject = 'Reçu de paiement : ' . ($receiptNumber !== '' ? $receiptNumber : $devisNumber);

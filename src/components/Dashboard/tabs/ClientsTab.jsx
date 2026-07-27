@@ -261,6 +261,16 @@ export default function ClientsTab() {
     if (selected?.id === id) setSelected((prev) => ({ ...prev, status }))
   }
 
+  function handleAdminValidate(id) {
+    if (!confirm('Valider et signer définitivement ce devis ? Une confirmation sera envoyée au client.')) return
+    const updated = clients.map((c) => c.id === id ? { ...c, status: 'validé_admin', adminValidatedAt: new Date().toISOString() } : c)
+    saveClients(updated)
+    setClients(updated)
+    const validated = updated.find((c) => c.id === id)
+    if (validated) setSelected(validated)
+    if (validated) notifyEvent({ ...validated, notificationType: 'validation_admin' })
+  }
+
   async function handleAddPayment() {
     const montant = parseFloat(newPayment.montant)
     if (!montant || montant <= 0 || !selected) return
@@ -452,7 +462,9 @@ export default function ClientsTab() {
   )
 
   const statusColor = (s) => {
+    if (s === 'validé_admin') return 'badge-green'
     if (s === 'signé') return 'badge-green'
+    if (s === 'signé_client') return 'badge-gold'
     if (s === 'annulé') return 'badge-red'
     if (s === 'brouillon_envoyé') return 'badge-gold'
     return 'badge-gold'
@@ -460,6 +472,8 @@ export default function ClientsTab() {
 
   const statusLabel = (s) => {
     if (s === 'brouillon_envoyé') return 'Brouillon envoyé'
+    if (s === 'signé_client') return '⚡ Signature client – en attente validation'
+    if (s === 'validé_admin') return '✅ Validé (confirmé)'
     return s || 'en cours'
   }
 
@@ -513,6 +527,16 @@ export default function ClientsTab() {
                   </td>
                   <td onClick={(e) => e.stopPropagation()}>
                     <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap' }}>
+                      {c.status === 'signé_client' && (
+                        <button
+                          className="btn btn-sm"
+                          style={{ background: '#27ae60', color: 'white', fontWeight: '600' }}
+                          onClick={() => handleAdminValidate(c.id)}
+                          title="Valider et signer définitivement"
+                        >
+                          ✅ Valider
+                        </button>
+                      )}
                       <button className="btn btn-sm btn-outline" onClick={() => generatePDF(c)} title="PDF">📄</button>
                       <button className="btn btn-sm" style={{ background: '#25D366', color: 'white' }} onClick={() => sendDocumentReminder(c)} title="Relance documents">📎</button>
                       <button className="btn btn-sm" style={{ background: '#3498db', color: 'white' }} onClick={() => sendPaymentReminder(c)} title="Relance paiement">💳</button>
@@ -534,6 +558,26 @@ export default function ClientsTab() {
               <h4 style={{ color: '#1a1a2e' }}>{selected.devisNumber}</h4>
               <button style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '18px' }} onClick={() => { setSelected(null); setEditMode(false); setEditData(null) }}>✕</button>
             </div>
+
+            {selected.status === 'signé_client' && (
+              <div style={{ background: '#fff8e1', border: '2px solid #f39c12', borderRadius: '8px', padding: '12px', marginBottom: '12px' }}>
+                <div style={{ fontWeight: '700', color: '#b8860b', marginBottom: '6px' }}>⚡ En attente de votre validation</div>
+                <p style={{ fontSize: '13px', color: '#555', margin: '0 0 10px' }}>Le client a signé son devis. Validez-le pour confirmer la réservation et envoyer la confirmation définitive.</p>
+                <button
+                  className="btn btn-primary"
+                  style={{ background: '#27ae60', width: '100%' }}
+                  onClick={() => handleAdminValidate(selected.id)}
+                >
+                  ✅ Valider et confirmer la réservation
+                </button>
+              </div>
+            )}
+
+            {selected.status === 'validé_admin' && (
+              <div style={{ background: '#f0fff4', border: '1.5px solid #27ae60', borderRadius: '8px', padding: '10px', marginBottom: '12px', fontSize: '13px', color: '#27ae60', fontWeight: '600' }}>
+                ✅ Réservation confirmée définitivement
+              </div>
+            )}
 
             <div style={{ fontSize: '14px', lineHeight: '1.8' }}>
               <p><strong>Client :</strong> {selected.prenom} {selected.nom}</p>

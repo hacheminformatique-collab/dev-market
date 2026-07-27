@@ -3,6 +3,23 @@ import { useState, useEffect } from 'react'
 const MONTHS = ['Janvier', 'Février', 'Mars', 'Avril', 'Mai', 'Juin', 'Juillet', 'Août', 'Septembre', 'Octobre', 'Novembre', 'Décembre']
 const DAYS = ['Lun', 'Mar', 'Mer', 'Jeu', 'Ven', 'Sam', 'Dim']
 
+// A date is "blocked" (admin validated) when status is signé, validé_admin
+// A date is "pending" (client signed, awaiting admin) when status is signé_client or brouillon_envoyé
+function buildBookingMaps(clients) {
+  const booked = new Set()  // dates with admin-validated reservations
+  const pending = new Set() // dates with pending (not yet admin-validated) devis
+  ;(clients || []).forEach((c) => {
+    if (!c.dateEvenement) return
+    const key = c.dateEvenement.slice(0, 10)
+    if (c.status === 'signé' || c.status === 'validé_admin') {
+      booked.add(key)
+    } else if (c.status === 'signé_client' || c.status === 'brouillon_envoyé') {
+      pending.add(key)
+    }
+  })
+  return { booked, pending }
+}
+
 /**
  * @param {object} props
  * @param {string}  props.value        – selected date string 'YYYY-MM-DD'
@@ -23,9 +40,13 @@ export default function InlineCalendar({ value, onChange, minDate, promoDates })
 
   const [viewYear, setViewYear] = useState(initYear)
   const [viewMonth, setViewMonth] = useState(initMonth)
+  const [pendingWarning, setPendingWarning] = useState(null) // dateStr of the pending date the user clicked
 
   // Live-load promo dates from server if not provided
   const [serverPromos, setServerPromos] = useState(null)
+  const [bookedDates, setBookedDates] = useState(new Set())
+  const [pendingDates, setPendingDates] = useState(new Set())
+
   useEffect(() => {
     if (promoDates !== undefined) return // caller-provided, skip fetch
     fetch('/api/storage.php?key=paradise_cal_overrides')
@@ -42,6 +63,20 @@ export default function InlineCalendar({ value, onChange, minDate, promoDates })
       })
       .catch(() => {})
   }, [promoDates])
+
+  // Fetch client reservations to show booked/pending dates
+  useEffect(() => {
+    fetch('/api/storage.php?key=paradise_clients')
+      .then((r) => r.ok ? r.json() : null)
+      .then((clients) => {
+        if (Array.isArray(clients)) {
+          const { booked, pending } = buildBookingMaps(clients)
+          setBookedDates(booked)
+          setPendingDates(pending)
+        }
+      })
+      .catch(() => {})
+  }, [])
 
   const activePromos = promoDates !== undefined ? (promoDates || new Set()) : (serverPromos || new Set())
 
@@ -71,7 +106,14 @@ export default function InlineCalendar({ value, onChange, minDate, promoDates })
     const yyyy = date.getFullYear()
     const mm = String(date.getMonth() + 1).padStart(2, '0')
     const dd = String(date.getDate()).padStart(2, '0')
-    onChange(`${yyyy}-${mm}-${dd}`)
+    const key = `${yyyy}-${mm}-${dd}`
+    if (bookedDates.has(key)) return // blocked – cannot select
+    if (pendingDates.has(key)) {
+      setPendingWarning(key)
+      return
+    }
+    setPendingWarning(null)
+    onChange(key)
   }
 
   function isSelected(day) {
@@ -84,7 +126,25 @@ export default function InlineCalendar({ value, onChange, minDate, promoDates })
   function isDisabled(day) {
     if (!day) return true
     const date = new Date(viewYear, viewMonth, day)
-    return date < minD
+    if (date < minD) return true
+    const mm = String(viewMonth + 1).padStart(2, '0')
+    const dd = String(day).padStart(2, '0')
+    const key = `${viewYear}-${mm}-${dd}`
+    return bookedDates.has(key)
+  }
+
+  function isBooked(day) {
+    if (!day) return false
+    const mm = String(viewMonth + 1).padStart(2, '0')
+    const dd = String(day).padStart(2, '0')
+    return bookedDates.has(`${viewYear}-${mm}-${dd}`)
+  }
+
+  function isPending(day) {
+    if (!day) return false
+    const mm = String(viewMonth + 1).padStart(2, '0')
+    const dd = String(day).padStart(2, '0')
+    return pendingDates.has(`${viewYear}-${mm}-${dd}`)
   }
 
   function isToday(day) {
@@ -122,6 +182,23 @@ export default function InlineCalendar({ value, onChange, minDate, promoDates })
           const dis = isDisabled(day)
           const tod = isToday(day)
           const promo = isPromo(day)
+          const booked = isBooked(day)
+          const pend = isPending(day)
+          let bg = 'transparent'
+          if (sel) bg = '#c9a84c'
+          else if (booked) bg = '#f5f5f5'
+          else if (pend) bg = '#fff8e1'
+          else if (promo) bg = '#fff0f0'
+          else if (tod) bg = '#fdf3d9'
+          let color = '#222'
+          if (sel) color = 'white'
+          else if (dis) color = '#ccc'
+          else if (booked) color = '#bbb'
+          else if (tod) color = '#b8860b'
+          let border = '1px solid transparent'
+          if (pend && !sel) border = '1px solid #f39c12'
+          else if (promo && !sel) border = '1px solid #e74c3c'
+          else if (tod && !sel) border = '1px solid #c9a84c'
           return (
             <div
               key={i}
@@ -133,15 +210,45 @@ export default function InlineCalendar({ value, onChange, minDate, promoDates })
                 fontSize: '14px',
                 fontWeight: sel ? '700' : tod ? '600' : '400',
                 cursor: day && !dis ? 'pointer' : 'default',
-                background: sel ? '#c9a84c' : promo ? '#fff0f0' : tod ? '#fdf3d9' : 'transparent',
-                color: sel ? 'white' : dis ? '#ccc' : tod ? '#b8860b' : '#222',
-                border: promo && !sel ? '1px solid #e74c3c' : tod && !sel ? '1px solid #c9a84c' : '1px solid transparent',
+                background: bg,
+                color,
+                border,
                 transition: 'background 0.15s',
                 position: 'relative',
                 overflow: 'hidden',
               }}
             >
-              {promo && !dis && (
+              {booked && day && (
+                <div style={{
+                  position: 'absolute',
+                  top: 0, left: 0, right: 0,
+                  background: '#888',
+                  color: 'white',
+                  fontSize: '7px',
+                  fontWeight: '700',
+                  textAlign: 'center',
+                  lineHeight: '10px',
+                  padding: '0 1px',
+                }}>
+                  RÉSERVÉ
+                </div>
+              )}
+              {pend && !booked && day && (
+                <div style={{
+                  position: 'absolute',
+                  top: 0, left: 0, right: 0,
+                  background: '#f39c12',
+                  color: 'white',
+                  fontSize: '7px',
+                  fontWeight: '700',
+                  textAlign: 'center',
+                  lineHeight: '10px',
+                  padding: '0 1px',
+                }}>
+                  EN COURS
+                </div>
+              )}
+              {promo && !dis && !booked && !pend && (
                 <div style={{
                   position: 'absolute',
                   top: 0, left: 0, right: 0,
@@ -156,13 +263,27 @@ export default function InlineCalendar({ value, onChange, minDate, promoDates })
                   PROMO
                 </div>
               )}
-              <span style={{ position: 'relative', zIndex: 1, marginTop: promo ? '8px' : 0, display: 'block' }}>
+              <span style={{ position: 'relative', zIndex: 1, marginTop: (booked || pend || promo) ? '8px' : 0, display: 'block' }}>
                 {day || ''}
               </span>
             </div>
           )
         })}
       </div>
+
+      {/* Pending date warning */}
+      {pendingWarning && (
+        <div style={{ padding: '10px 16px', background: '#fff8e1', borderTop: '1px solid #f39c12', fontSize: '13px', color: '#b8860b' }}>
+          ⚠️ Un devis est en cours de traitement pour cette date. Vous pouvez tout de même soumettre votre demande et notre équipe reviendra vers vous.
+          <button
+            type="button"
+            onClick={() => { setPendingWarning(null); onChange(pendingWarning) }}
+            style={{ marginLeft: '8px', background: '#f39c12', color: 'white', border: 'none', borderRadius: '4px', padding: '2px 8px', cursor: 'pointer', fontSize: '12px' }}
+          >
+            Continuer quand même
+          </button>
+        </div>
+      )}
 
       {/* Selected date display */}
       {selectedDate && (
@@ -171,12 +292,12 @@ export default function InlineCalendar({ value, onChange, minDate, promoDates })
         </div>
       )}
 
-      {/* Promo legend */}
-      {activePromos.size > 0 && (
-        <div style={{ padding: '6px 16px', background: '#fff5f5', textAlign: 'center', fontSize: '11px', color: '#e74c3c', borderTop: '1px solid #fdd' }}>
-          🏷️ Les dates en rouge bénéficient d&apos;une <strong>offre promotionnelle</strong> — contactez-nous !
-        </div>
-      )}
+      {/* Legends */}
+      <div style={{ padding: '6px 16px', background: '#f9f9f9', borderTop: '1px solid #eee', fontSize: '11px', color: '#888', display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
+        <span>⬛ Réservé (indisponible)</span>
+        <span style={{ color: '#f39c12' }}>🟡 Devis en cours</span>
+        {activePromos.size > 0 && <span style={{ color: '#e74c3c' }}>🔴 Offre promo</span>}
+      </div>
     </div>
   )
 }

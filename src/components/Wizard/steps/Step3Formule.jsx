@@ -25,6 +25,10 @@ export function getFormuleTarif(dateStr, formuleNom) {
   return getSaisonTarif(dateStr, formuleNom)
 }
 
+function getBasePriceSec(dateStr) {
+  return getSaisonTarif(dateStr, 'Location sèche')
+}
+
 export default function Step3Formule({ data, onChange, onNext, onBack }) {
   const formules = getFormules()
   const dateStr = data.dateEvenement
@@ -60,6 +64,9 @@ export default function Step3Formule({ data, onChange, onNext, onBack }) {
         {formules.map((f) => {
           const tarif = getSaisonTarif(dateStr, f.nomFormule)
           const isSelected = data.formule?.id === f.id
+          const isSec = f.nomFormule?.toLowerCase().includes('sèche')
+          const tarifSec = dateStr ? getBasePriceSec(dateStr) : 0
+          const remise = (!isSec && dateStr) ? (tarifSec - tarif) : 0
           return (
             <div
               key={f.id}
@@ -80,6 +87,16 @@ export default function Step3Formule({ data, onChange, onNext, onBack }) {
               )}
               <h3 style={{ color: '#1a1a2e', marginBottom: '8px' }}>{f.nomFormule}</h3>
               <p className="text-muted" style={{ fontSize: '14px', marginBottom: '16px' }}>{f.contenuFormule}</p>
+              {dateStr && remise > 0 ? (
+                <div style={{ marginBottom: '4px' }}>
+                  <div style={{ fontSize: '13px', color: '#888', textDecoration: 'line-through' }}>
+                    Tarif de base : {tarifSec.toLocaleString('fr-FR')} €
+                  </div>
+                  <div style={{ fontSize: '13px', color: '#27ae60', fontWeight: '600' }}>
+                    🏷️ Remise prestation : -{remise.toLocaleString('fr-FR')} €
+                  </div>
+                </div>
+              ) : null}
               <div style={{ fontSize: '24px', fontWeight: '800', color: '#c9a84c' }}>
                 {dateStr ? `${tarif.toLocaleString('fr-FR')} €` : '—'}
               </div>

@@ -14,6 +14,7 @@ const KEYS = {
   matieresPremieresRecettes: 'paradise_matieres_recettes',
   calOverrides: 'paradise_cal_overrides',
   calStaff: 'paradise_cal_staff',
+  calManualEvents: 'paradise_cal_manual_events',
 }
 
 // ---------------------------------------------------------------------------
@@ -273,6 +274,7 @@ const DEFAULTS = {
   matieresPremieresRecettes: [],
   calOverrides: {},
   calStaff: {},
+  calManualEvents: [],
 }
 
 // Read from in-memory cache (synchronous)
@@ -405,6 +407,9 @@ export const saveCalOverrides = (data) => _save(KEYS.calOverrides, data)
 
 export const getCalStaff = () => _get(KEYS.calStaff) || {}
 export const saveCalStaff = (data) => _save(KEYS.calStaff, data)
+
+export const getCalManualEvents = () => _get(KEYS.calManualEvents) || []
+export const saveCalManualEvents = (data) => _save(KEYS.calManualEvents, data)
 
 export function generateDevisNumber() {
   const now = new Date()

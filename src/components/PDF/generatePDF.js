@@ -67,6 +67,19 @@ ${forme} au capital de ${capital} - SIREN ${siren} - TVA ${tva}
 RCS ${rcs.toUpperCase()} (inscrit le ${dateStr}) - NAF ${ape}`
 }
 
+/**
+ * Format a monetary amount for use inside PDF tables.
+ * Avoids locale-specific non-breaking spaces (U+202F / U+00A0) that can cause
+ * jsPDF-autotable to split numbers at unexpected positions.
+ */
+function formatPdfMoney(n) {
+  const val = Number(n || 0).toFixed(2).replace('.', ',')
+  // insert regular thousand separator
+  const [int, dec] = val.split(',')
+  const intFmt = int.replace(/\B(?=(\d{3})+(?!\d))/g, ' ')
+  return `${intFmt},${dec} EUR`
+}
+
 function formatMoney(n) {
   return Number(n || 0).toLocaleString('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' €'
 }
@@ -101,75 +114,93 @@ export function generatePDF(devis, options = {}) {
   const doc = new jsPDF({ unit: 'mm', format: 'a4' })
   const pageW = doc.internal.pageSize.getWidth()
   const pageH = doc.internal.pageSize.getHeight()
+  const marginL = 20
+  const marginR = 14
+  const usableW = pageW - marginL - marginR   // 176 mm
   let y = 20
 
-  // ---- Header ----
-  doc.setFillColor(26, 26, 46)
-  doc.rect(0, 0, pageW, 40, 'F')
+  // ---- Header — fond blanc, encadré discret ----
+  doc.setFillColor(245, 245, 250)
+  doc.rect(0, 0, pageW, 44, 'F')
+  doc.setDrawColor(200, 200, 210)
+  doc.line(0, 44, pageW, 44)
 
-  let headerTextX = 20
+  let headerTextX = marginL
   if (settings.logo) {
     try {
-      doc.addImage(settings.logo, 12, 7, 32, 24)
-      headerTextX = 50
-    } catch { /* fall back to text-only header */ }
+      doc.addImage(settings.logo, marginL, 6, 28, 22)
+      headerTextX = marginL + 32
+    } catch { /* fallback to text-only header */ }
   }
 
-  doc.setTextColor(201, 168, 76)
-  doc.setFontSize(settings.logo ? 18 : 22)
+  doc.setTextColor(30, 30, 50)
+  doc.setFontSize(settings.logo ? 17 : 20)
   doc.setFont('helvetica', 'bold')
   doc.text(nomEnseigne, headerTextX, 18)
-  doc.setFontSize(10)
+  doc.setFontSize(9)
   doc.setFont('helvetica', 'normal')
-  doc.setTextColor(200, 200, 200)
+  doc.setTextColor(80, 80, 100)
   doc.text(adresseSiege, headerTextX, 26)
-  doc.text(`Tél : ${telContact}  |  ${emailContact}`, headerTextX, 32)
+  doc.text(`Tél : ${telContact}   ${emailContact}`, headerTextX, 32)
 
-  // Devis title on right
-  doc.setTextColor(255, 255, 255)
-  doc.setFontSize(16)
+  // Devis title — right side
+  doc.setTextColor(30, 30, 50)
+  doc.setFontSize(20)
   doc.setFont('helvetica', 'bold')
-  doc.text('DEVIS', pageW - 20, 18, { align: 'right' })
+  doc.text('DEVIS', pageW - marginR, 18, { align: 'right' })
   doc.setFontSize(10)
   doc.setFont('helvetica', 'normal')
-  doc.text(devis.devisNumber || '', pageW - 20, 26, { align: 'right' })
+  doc.setTextColor(80, 80, 100)
+  doc.text(devis.devisNumber || '', pageW - marginR, 26, { align: 'right' })
   const dateStr = new Date(devis.createdAt || Date.now()).toLocaleDateString('fr-FR')
-  doc.text(`Date: ${dateStr}`, pageW - 20, 32, { align: 'right' })
+  doc.text(`Date : ${dateStr}`, pageW - marginR, 33, { align: 'right' })
 
-  y = 50
+  y = 54
 
   // ---- Client info ----
-  doc.setTextColor(50, 50, 50)
-  doc.setFontSize(11)
+  doc.setFillColor(248, 248, 252)
+  doc.setDrawColor(220, 220, 230)
+  doc.roundedRect(marginL, y, usableW / 2 - 4, 32, 3, 3, 'FD')
+  doc.setTextColor(30, 30, 50)
+  doc.setFontSize(9)
   doc.setFont('helvetica', 'bold')
-  doc.text('CLIENT', 20, y)
+  doc.text('CLIENT', marginL + 4, y + 7)
   doc.setFont('helvetica', 'normal')
-  doc.setFontSize(10)
-  y += 6
-  doc.text(`${devis.prenom || ''} ${devis.nom || ''}`, 20, y); y += 5
-  if (devis.adresse) { doc.text(devis.adresse, 20, y); y += 5 }
-  doc.text(`Email: ${devis.email || ''}`, 20, y); y += 5
-  doc.text(`Tél: ${devis.telephone || ''}`, 20, y); y += 10
+  doc.setTextColor(50, 50, 50)
+  doc.text(`${devis.prenom || ''} ${devis.nom || ''}`.trim(), marginL + 4, y + 14)
+  if (devis.adresse) doc.text(devis.adresse, marginL + 4, y + 19)
+  doc.text(`Email : ${devis.email || '—'}`, marginL + 4, y + 24)
+  doc.text(`Tél : ${devis.telephone || '—'}`, marginL + 4, y + 29)
 
   // ---- Event info ----
+  const evBoxX = marginL + usableW / 2 + 4
+  const evBoxW = usableW / 2 - 4
+  doc.setFillColor(248, 248, 252)
+  doc.roundedRect(evBoxX, y, evBoxW, 32, 3, 3, 'FD')
+  doc.setTextColor(30, 30, 50)
   doc.setFont('helvetica', 'bold')
-  doc.setFontSize(11)
-  doc.text('ÉVÉNEMENT', 20, y)
+  doc.text('ÉVÉNEMENT', evBoxX + 4, y + 7)
   doc.setFont('helvetica', 'normal')
-  doc.setFontSize(10)
-  y += 6
+  doc.setTextColor(50, 50, 50)
   const evDate = devis.dateEvenement ? new Date(devis.dateEvenement).toLocaleDateString('fr-FR') : '—'
-  doc.text(`Type: ${devis.typeEvenement || '—'}`, 20, y)
-  doc.text(`Date: ${evDate}`, 110, y)
-  y += 5
+  doc.text(`Type : ${devis.typeEvenement || '—'}`, evBoxX + 4, y + 14)
+  doc.text(`Date : ${evDate}`, evBoxX + 4, y + 19)
   const nbAdultes = parseInt(devis.nbAdultes) || devis.nbPersonnes || 0
   const nbEnfants = parseInt(devis.nbEnfants) || 0
   const nbPersonnes = nbAdultes + nbEnfants
-  doc.text(`Personnes: ${nbPersonnes} (${nbAdultes} adultes${nbEnfants > 0 ? ` + ${nbEnfants} enfants` : ''})`, 20, y)
-  if (devis.heureDebut) doc.text(`Horaires: ${devis.heureDebut} — ${devis.heureFin || ''}`, 110, y)
-  y += 5
-  doc.text(`Formule: ${devis.formule?.nomFormule || '—'}`, 20, y)
-  y += 12
+  doc.text(`Pers. : ${nbPersonnes} (${nbAdultes} ad.${nbEnfants > 0 ? ` + ${nbEnfants} enf.` : ''})`, evBoxX + 4, y + 24)
+  if (devis.heureDebut) doc.text(`Horaires : ${devis.heureDebut} — ${devis.heureFin || ''}`, evBoxX + 4, y + 29)
+
+  y += 40
+
+  // Formule
+  doc.setFont('helvetica', 'bold')
+  doc.setFontSize(9)
+  doc.setTextColor(30, 30, 50)
+  doc.text(`Formule : `, marginL, y)
+  doc.setFont('helvetica', 'normal')
+  doc.text(devis.formule?.nomFormule || '—', marginL + 22, y)
+  y += 10
 
   // ---- Pricing table ----
   const prixSalle = devis.prixSalle || 0
@@ -178,7 +209,6 @@ export function generatePDF(devis, options = {}) {
   const traiteurTotal = menuTotal + gateauTotal
   const prestationsTotal = (devis.prestations || []).reduce((s, p) => s + (p.tarif || 0), 0)
 
-  // Calculate remise for "location avec prestation"
   const isAvecPrestation = devis.formule?.nomFormule && !devis.formule.nomFormule.toLowerCase().includes('sèche')
   let remiseMontant = 0
   if (isAvecPrestation && devis.dateEvenement) {
@@ -211,36 +241,35 @@ export function generatePDF(devis, options = {}) {
     rows.push([
       `Location salle\n${devis.formule?.nomFormule || ''}`,
       '20%',
-      formatMoney(salle.ht),
-      formatMoney(salle.tva),
-      formatMoney(prixSalle),
+      formatPdfMoney(salle.ht),
+      formatPdfMoney(salle.tva),
+      formatPdfMoney(prixSalle),
     ])
   }
   if (isAvecPrestation && remiseMontant > 0) {
     const prixSecBase = prixSalle + remiseMontant
     rows.push([
-      `REMISE prestation incluse\n(Tarif sèche ${formatMoney(prixSecBase)} – prestation → ${formatMoney(prixSalle)})`,
+      `REMISE prestation incluse\nTarif seche ${formatPdfMoney(prixSecBase)} -> prestation ${formatPdfMoney(prixSalle)}`,
       '20%',
-      formatMoney(-remiseMontant / 1.20),
-      formatMoney(-remiseMontant / 1.20 * 0.20),
-      formatMoney(-remiseMontant),
+      formatPdfMoney(-remiseMontant / 1.20),
+      formatPdfMoney(-remiseMontant / 1.20 * 0.20),
+      formatPdfMoney(-remiseMontant),
     ])
   }
 
-  // Menu details
   if ((devis.menus || []).length > 0) {
     const menuLines = (devis.menus || []).filter((m) => m.tarif > 0).map((m) => {
       const total = calcMenuItemTotal(m, nbAdultes, nbEnfants)
-      return `${m.nomMenu} (${m.tarif}€/pers.) = ${formatMoney(total)}`
+      return `${m.nomMenu} (${m.tarif} EUR/pers.) = ${formatPdfMoney(total)}`
     }).join('\n')
     if (menuLines && menuTotal > 0) {
       const menuHT = vatBreakdown(menuTotal, 0.10)
       rows.push([
-        `Traiteur — Menus\n${menuLines}`,
+        `Traiteur - Menus\n${menuLines}`,
         '10%',
-        formatMoney(menuHT.ht),
-        formatMoney(menuHT.tva),
-        formatMoney(menuTotal),
+        formatPdfMoney(menuHT.ht),
+        formatPdfMoney(menuHT.tva),
+        formatPdfMoney(menuTotal),
       ])
     }
   }
@@ -248,11 +277,11 @@ export function generatePDF(devis, options = {}) {
   if (gateauTotal > 0) {
     const gateauHT = vatBreakdown(gateauTotal, 0.10)
     rows.push([
-      `Gâteau — ${devis.gateau?.nomGateau || ''}\n(${nbPersonnes} pers. × ${devis.gateau?.tarif}€)`,
+      `Gateau - ${devis.gateau?.nomGateau || ''}\n${nbPersonnes} pers. x ${devis.gateau?.tarif} EUR`,
       '10%',
-      formatMoney(gateauHT.ht),
-      formatMoney(gateauHT.tva),
-      formatMoney(gateauTotal),
+      formatPdfMoney(gateauHT.ht),
+      formatPdfMoney(gateauHT.tva),
+      formatPdfMoney(gateauTotal),
     ])
   }
 
@@ -261,34 +290,68 @@ export function generatePDF(devis, options = {}) {
     rows.push([
       `${p.nomPresta}\n${p.description || ''}`,
       '20%',
-      formatMoney(pHT.ht),
-      formatMoney(pHT.tva),
-      formatMoney(p.tarif),
+      formatPdfMoney(pHT.ht),
+      formatPdfMoney(pHT.tva),
+      formatPdfMoney(p.tarif),
     ])
   }
 
+  // Column widths: sum = usableW = 176 mm
+  // Désignation: 88  TVA%: 12  HT: 26  TVA€: 22  TTC: 28
   autoTable(doc, {
     startY: y,
+    margin: { left: marginL, right: marginR },
     head: [['Désignation', 'TVA', 'HT', 'TVA €', 'TTC']],
     body: rows,
     foot: [
-      ['', 'Sous-total HT', formatMoney(totalHT), '', ''],
-      ['', 'TVA', formatMoney(totalTVA), '', ''],
-      ['', 'TOTAL TTC', '', '', formatMoney(totalTTC)],
+      ['', 'Sous-total HT', formatPdfMoney(totalHT), '', ''],
+      ['', 'TVA totale', formatPdfMoney(totalTVA), '', ''],
+      ['', 'TOTAL TTC', '', '', formatPdfMoney(totalTTC)],
     ],
-    styles: { fontSize: 9, cellPadding: 4 },
-    headStyles: { fillColor: [26, 26, 46], textColor: [255, 255, 255] },
-    footStyles: { fillColor: [240, 240, 240], fontStyle: 'bold' },
-    columnStyles: {
-      0: { cellWidth: 80 },
-      1: { cellWidth: 15, halign: 'center' },
-      2: { cellWidth: 30, halign: 'right' },
-      3: { cellWidth: 25, halign: 'right' },
-      4: { cellWidth: 30, halign: 'right' },
+    styles: {
+      fontSize: 9,
+      cellPadding: { top: 4, bottom: 4, left: 4, right: 4 },
+      textColor: [30, 30, 30],
+      font: 'helvetica',
+      overflow: 'linebreak',
     },
+    headStyles: {
+      fillColor: [50, 50, 70],
+      textColor: [255, 255, 255],
+      fontStyle: 'bold',
+      fontSize: 9,
+      halign: 'center',
+    },
+    footStyles: {
+      fillColor: [235, 235, 245],
+      textColor: [30, 30, 30],
+      fontStyle: 'bold',
+      fontSize: 9,
+    },
+    columnStyles: {
+      0: { cellWidth: 88, fontStyle: 'normal' },
+      1: { cellWidth: 12, halign: 'center' },
+      2: { cellWidth: 26, halign: 'right' },
+      3: { cellWidth: 22, halign: 'right' },
+      4: { cellWidth: 28, halign: 'right', fontStyle: 'bold' },
+    },
+    alternateRowStyles: { fillColor: [249, 249, 253] },
+    didDrawCell: () => {},
   })
 
   y = doc.lastAutoTable.finalY + 12
+
+  // ---- Totals highlight box ----
+  if (y > pageH - 50) { doc.addPage(); y = 20 }
+  doc.setFillColor(40, 40, 65)
+  doc.roundedRect(marginL, y, usableW, 14, 2, 2, 'F')
+  doc.setTextColor(255, 255, 255)
+  doc.setFont('helvetica', 'bold')
+  doc.setFontSize(11)
+  doc.text('TOTAL TTC', marginL + 4, y + 9)
+  doc.setFontSize(13)
+  doc.text(formatPdfMoney(totalTTC), pageW - marginR, y + 9, { align: 'right' })
+  y += 20
 
   // ---- Bank info ----
   const bank = settings.bankInfo || {}
@@ -296,14 +359,15 @@ export function generatePDF(devis, options = {}) {
     if (y > pageH - 60) { doc.addPage(); y = 20 }
     doc.setFont('helvetica', 'bold')
     doc.setFontSize(10)
-    doc.setTextColor(50, 50, 50)
-    doc.text('RÈGLEMENT', 20, y)
+    doc.setTextColor(30, 30, 50)
+    doc.text('RÈGLEMENT', marginL, y)
     doc.setFont('helvetica', 'normal')
     y += 5
     doc.setFontSize(9)
-    if (bank.titulaire) { doc.text(`Titulaire: ${bank.titulaire}`, 20, y); y += 4 }
-    doc.text(`IBAN: ${bank.iban}`, 20, y); y += 4
-    if (bank.bic) { doc.text(`BIC: ${bank.bic}`, 20, y); y += 4 }
+    doc.setTextColor(50, 50, 50)
+    if (bank.titulaire) { doc.text(`Titulaire : ${bank.titulaire}`, marginL, y); y += 4 }
+    doc.text(`IBAN : ${bank.iban}`, marginL, y); y += 4
+    if (bank.bic) { doc.text(`BIC : ${bank.bic}`, marginL, y); y += 4 }
     y += 8
   }
 
@@ -311,23 +375,23 @@ export function generatePDF(devis, options = {}) {
   if (y > pageH - 70) { doc.addPage(); y = 20 }
   doc.setFont('helvetica', 'bold')
   doc.setFontSize(10)
-  doc.setTextColor(26, 26, 46)
-  doc.text('BON POUR ACCORD', 20, y)
+  doc.setTextColor(30, 30, 50)
+  doc.text('BON POUR ACCORD', marginL, y)
   y += 6
   doc.setFont('helvetica', 'normal')
   doc.setFontSize(9)
   doc.setTextColor(60, 60, 60)
-  doc.text('Lu et approuvé — Signature du client :', 20, y)
+  doc.text('Lu et approuvé — Signature du client :', marginL, y)
   y += 6
-  doc.setDrawColor(150, 150, 150)
-  doc.rect(20, y, 80, 30)
+  doc.setDrawColor(180, 180, 190)
+  doc.rect(marginL, y, 80, 30)
   if (devis.signature) {
-    try { doc.addImage(devis.signature, 'PNG', 22, y + 2, 76, 26) } catch { /* ignore signature rendering errors */ }
+    try { doc.addImage(devis.signature, 'PNG', marginL + 2, y + 2, 76, 26) } catch { /* ignore signature rendering errors */ }
   }
   doc.setFontSize(8)
   doc.setTextColor(110, 110, 110)
   if (devis.signedAt) {
-    doc.text(`Signé électroniquement le ${new Date(devis.signedAt).toLocaleDateString('fr-FR')}`, 20, y + 35)
+    doc.text(`Signé électroniquement le ${new Date(devis.signedAt).toLocaleDateString('fr-FR')}`, marginL, y + 35)
   }
 
   // ---- CGV ----
@@ -335,17 +399,17 @@ export function generatePDF(devis, options = {}) {
   y = 20
   doc.setFont('helvetica', 'bold')
   doc.setFontSize(12)
-  doc.setTextColor(26, 26, 46)
-  doc.text('CONDITIONS GÉNÉRALES DE LOCATION ET DE PRESTATIONS', 20, y)
+  doc.setTextColor(30, 30, 50)
+  doc.text('CONDITIONS GÉNÉRALES DE LOCATION ET DE PRESTATIONS', marginL, y)
   y += 8
 
   doc.setFont('helvetica', 'normal')
   doc.setFontSize(8)
-  doc.setTextColor(60, 60, 60)
-  const lines = doc.splitTextToSize(buildCGV(settings), pageW - 40)
+  doc.setTextColor(50, 50, 50)
+  const lines = doc.splitTextToSize(buildCGV(settings), pageW - marginL - marginR)
   lines.forEach((line) => {
     if (y > pageH - 20) { doc.addPage(); y = 20 }
-    doc.text(line, 20, y)
+    doc.text(line, marginL, y)
     y += 4
   })
 
@@ -354,28 +418,28 @@ export function generatePDF(devis, options = {}) {
   y += 8
   doc.setFont('helvetica', 'bold')
   doc.setFontSize(10)
-  doc.setTextColor(26, 26, 46)
-  doc.text('BON POUR ACCORD', 20, y)
+  doc.setTextColor(30, 30, 50)
+  doc.text('BON POUR ACCORD', marginL, y)
   y += 6
   doc.setFont('helvetica', 'normal')
   doc.setFontSize(9)
   doc.setTextColor(60, 60, 60)
-  doc.text('Lu et approuvé — Signature du client :', 20, y)
+  doc.text('Lu et approuvé — Signature du client :', marginL, y)
   y += 6
   if (devis.signature) {
     try {
-      doc.addImage(devis.signature, 'PNG', 20, y, 80, 30)
+      doc.addImage(devis.signature, 'PNG', marginL, y, 80, 30)
       y += 34
-    } catch (e) { y += 34 }
+    } catch { y += 34 }
   } else {
-    doc.setDrawColor(150, 150, 150)
-    doc.rect(20, y, 80, 30)
+    doc.setDrawColor(180, 180, 190)
+    doc.rect(marginL, y, 80, 30)
     y += 34
   }
   doc.setFontSize(8)
   doc.setTextColor(100, 100, 100)
   if (devis.signedAt) {
-    doc.text(`Signé électroniquement le ${new Date(devis.signedAt).toLocaleDateString('fr-FR')}`, 20, y)
+    doc.text(`Signé électroniquement le ${new Date(devis.signedAt).toLocaleDateString('fr-FR')}`, marginL, y)
   }
 
   // ---- Footer on all pages ----
@@ -388,7 +452,7 @@ export function generatePDF(devis, options = {}) {
       `${forme} ${raisonSociale} — ${adresseSiege} — RCS ${rcs} : ${siren}`,
       pageW / 2, pageH - 8, { align: 'center' }
     )
-    doc.text(`Page ${i} / ${pageCount}`, pageW - 15, pageH - 8, { align: 'right' })
+    doc.text(`Page ${i} / ${pageCount}`, pageW - marginR, pageH - 8, { align: 'right' })
   }
 
   if (download) doc.save(`${devis.devisNumber || 'devis'}.pdf`)

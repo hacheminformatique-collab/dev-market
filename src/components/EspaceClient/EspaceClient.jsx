@@ -95,7 +95,22 @@ function Voyant({ ok }) {
 
 function openDataUrl(dataUrl) {
   if (!dataUrl || !dataUrl.startsWith('data:')) return
-  window.open(dataUrl, '_blank', 'noopener,noreferrer')
+  try {
+    const [meta, base64] = dataUrl.split(',')
+    if (!meta || base64 === undefined) { window.open(dataUrl, '_blank', 'noopener,noreferrer'); return }
+    const mimeMatch = meta.match(/data:([^;]+);base64/)
+    if (!mimeMatch) { window.open(dataUrl, '_blank', 'noopener,noreferrer'); return }
+    const mimeType = mimeMatch[1]
+    const binary = atob(base64)
+    const bytes = new Uint8Array(binary.length)
+    for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i)
+    const blob = new Blob([bytes], { type: mimeType })
+    const blobUrl = URL.createObjectURL(blob)
+    setTimeout(() => URL.revokeObjectURL(blobUrl), 60_000)
+    window.open(blobUrl, '_blank', 'noopener,noreferrer')
+  } catch {
+    window.open(dataUrl, '_blank', 'noopener,noreferrer')
+  }
 }
 
 function DocUploadRow({ label, docKey, docs, onChange }) {
@@ -166,7 +181,12 @@ export default function EspaceClient() {
     ]).then(([serverDocs, receiptsById, receiptsByNumber]) => {
       if (cancelled) return
       if (serverDocs) setDocs(serverDocs)
-      setReceipts(receiptsById || receiptsByNumber || {})
+      const resolved = (receiptsById && Object.keys(receiptsById).length > 0)
+        ? receiptsById
+        : (receiptsByNumber && Object.keys(receiptsByNumber).length > 0)
+          ? receiptsByNumber
+          : {}
+      setReceipts(resolved)
     })
     return () => { cancelled = true }
   }, [devisId, devis?.id, devis?.devisNumber])

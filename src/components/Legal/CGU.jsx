@@ -1,11 +1,17 @@
+import { getSettings } from '../../utils/storage'
 import LegalLayout from './LegalLayout'
 
 export default function CGU() {
+  const s = getSettings()
+  const l = s.legalInfo || {}
+  const raisonSociale = l.raisonSociale || 'SARL AFM'
+  const adresse = l.adresse || '5 avenue Fridingen, 77100 Nanteuil les Meaux'
+
   return (
     <LegalLayout title="Conditions Générales d'Utilisation">
       <h2 style={h2}>1. Objet</h2>
       <p>
-        Les présentes Conditions Générales d&apos;Utilisation (CGU) régissent l&apos;accès et l&apos;utilisation du site internet de la salle de réception Le Paradise, exploité par la SARL AFM, 5 avenue Fridingen, 77100 Nanteuil les Meaux.
+        Les présentes Conditions Générales d&apos;Utilisation (CGU) régissent l&apos;accès et l&apos;utilisation du site internet de la salle de réception {l.enseigne || s.nom || 'Le Paradise'}, exploité par {raisonSociale}, {adresse}.
       </p>
 
       <h2 style={h2}>2. Acceptation</h2>
@@ -26,7 +32,7 @@ export default function CGU() {
 
       <h2 style={h2}>4. Accès au site</h2>
       <p>
-        Le site est accessible 24h/24 et 7j/7, sauf interruption, programmée ou non, pour des raisons de maintenance ou de force majeure. La SARL AFM ne saurait être tenue responsable de toute interruption de service.
+        Le site est accessible 24h/24 et 7j/7, sauf interruption, programmée ou non, pour des raisons de maintenance ou de force majeure. {raisonSociale} ne saurait être tenue responsable de toute interruption de service.
       </p>
 
       <h2 style={h2}>5. Responsabilité de l&apos;utilisateur</h2>
@@ -36,7 +42,7 @@ export default function CGU() {
 
       <h2 style={h2}>6. Demandes de devis</h2>
       <p>
-        Les demandes de devis effectuées via le formulaire en ligne constituent une simple demande d&apos;information. Elles ne constituent pas une commande ferme et ne génèrent aucune obligation contractuelle de la part de la SARL AFM tant qu&apos;aucun contrat écrit n&apos;a été signé.
+        Les demandes de devis effectuées via le formulaire en ligne constituent une simple demande d&apos;information. Elles ne constituent pas une commande ferme et ne génèrent aucune obligation contractuelle de la part de {raisonSociale} tant qu&apos;aucun contrat écrit n&apos;a été signé.
       </p>
 
       <h2 style={h2}>7. Propriété intellectuelle</h2>
@@ -46,7 +52,7 @@ export default function CGU() {
 
       <h2 style={h2}>8. Modification des CGU</h2>
       <p>
-        La SARL AFM se réserve le droit de modifier les présentes CGU à tout moment. Les modifications prennent effet dès leur publication sur le site.
+        {raisonSociale} se réserve le droit de modifier les présentes CGU à tout moment. Les modifications prennent effet dès leur publication sur le site.
       </p>
 
       <h2 style={h2}>9. Droit applicable et juridiction</h2>

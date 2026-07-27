@@ -2,13 +2,29 @@ import jsPDF from 'jspdf'
 import autoTable from 'jspdf-autotable'
 import { getSettings } from '../../utils/storage'
 
-const CGV = `CONDITIONS GÉNÉRALES DE LOCATION ET DE PRESTATIONS - LE PARADISE RÉCEPTION
+function buildCGV(settings) {
+  const l = settings.legalInfo || {}
+  const rs      = l.raisonSociale   || 'AFM'
+  const enseigne = l.enseigne       || settings.nom || 'PARADISE'
+  const forme   = l.formeJuridique  || 'SARL'
+  const capital = l.capital         || '7 500,00 EUR'
+  const siret   = l.siret           || '904 543 816'
+  const siren   = l.siren           || '904 543 816'
+  const tva     = l.tva             || 'FR06904543816'
+  const rcs     = l.rcs             || 'Meaux'
+  const adresse = l.adresse         || '5 avenue FRIDINGEN 77100 NANTEUIL LES MEAUX'
+  const ape     = l.ape             || '68.20B'
+  const dateStr = l.dateImmatriculation
+    ? new Date(l.dateImmatriculation).toLocaleDateString('fr-FR')
+    : '01/11/2021'
+
+  return `CONDITIONS GÉNÉRALES DE LOCATION ET DE PRESTATIONS - ${enseigne.toUpperCase()}
 
 ARTICLE 1 : OBJET ET IDENTITÉ DU PRESTATAIRE
-Les presentes conditions regissent les relations contractuelles entre la societe AFM (Enseigne PARADISE), SARL au capital de 7 500,00 EUR, immatriculee au RCS de Meaux sous le SIRET 904 543 816, dont le siege social est situe au 5 avenue FRIDINGEN 77100 NANTEUIL LES MEAUX, et le Client. Elles s'appliquent de plein droit a toutes les prestations de location de salle (seche ou avec options), de restauration (Traiteur) et de services evenementiels proposees par AFM.
+Les presentes conditions regissent les relations contractuelles entre la societe ${rs} (Enseigne ${enseigne}), ${forme} au capital de ${capital}, immatriculee au RCS de ${rcs} sous le SIRET ${siret}, dont le siege social est situe au ${adresse}, et le Client. Elles s'appliquent de plein droit a toutes les prestations de location de salle (seche ou avec options), de restauration (Traiteur) et de services evenementiels proposees par ${rs}.
 
 ARTICLE 2 : DESTINATION DES LIEUX
-Le lieu de reception est exclusivement destine a accueillir l'evenement precise sur le devis. Les locaux sont loues a titre prive et temporaire pour la duree strictement definie au contrat. Toute modification de l'objet de l'evenement sans accord ecrit de AFM peut entrainer l'annulation immediate du contrat.
+Le lieu de reception est exclusivement destine a accueillir l'evenement precise sur le devis. Les locaux sont loues a titre prive et temporaire pour la duree strictement definie au contrat. Toute modification de l'objet de l'evenement sans accord ecrit de ${rs} peut entrainer l'annulation immediate du contrat.
 
 ARTICLE 3 : ÉQUIPEMENTS
 Le Client declare parfaitement connaitre les lieux loues pour les avoir visites. Toute friture ou cuisson vive reste strictement interdite a l'interieur.
@@ -20,7 +36,7 @@ ARTICLE 5 : MODALITÉS DE PAIEMENT
 Les prix sont exprimes en euros TTC. Taux de TVA : 10% pour la restauration, 20% pour la location et les services. Un acompte de 1 500 EUR minimum est exige a la signature. Le solde total doit etre regle au plus tard 45 jours avant l'evenement.
 
 ARTICLE 6 : ANNULATION PAR LE CLIENT
-En cas d'annulation, les acomptes verses restent definitivement acquis a la societe AFM. La date etant reservee exclusivement pour le Client, le solde reste du a AFM a titre de dedommagement. Conformement a l'Art. L221-28 du Code de la Consommation, aucun droit de retractation ne s'applique.
+En cas d'annulation, les acomptes verses restent definitivement acquis a la societe ${rs}. La date etant reservee exclusivement pour le Client, le solde reste du a ${rs} a titre de dedommagement. Conformement a l'Art. L221-28 du Code de la Consommation, aucun droit de retractation ne s'applique.
 
 ARTICLE 7 : NOMBRE DE CONVIVES
 Le nombre exact de convives doit etre confirme par ecrit au plus tard 15 jours ouvrables avant l'evenement. Une baisse de plus de 10% de l'effectif ne pourra donner lieu a une reduction du prix total convenu.
@@ -29,7 +45,7 @@ ARTICLE 8 : DÉPÔT DE GARANTIE
 Un depot de garantie de 3 000 EUR par cheque est exige le jour de l'evenement. Il sera restitue dans un delai de 7 jours ouvres apres verification des equipements.
 
 ARTICLE 9 : RESPONSABILITÉ ET ASSURANCES
-Le Client doit fournir une attestation d'assurance Responsabilite Civile "Organisateur d'evenement" au plus tard 30 jours avant l'evenement. AFM decline toute responsabilite en cas de vol ou de dommage subi par les biens personnels.
+Le Client doit fournir une attestation d'assurance Responsabilite Civile "Organisateur d'evenement" au plus tard 30 jours avant l'evenement. ${rs} decline toute responsabilite en cas de vol ou de dommage subi par les biens personnels.
 
 ARTICLE 10 : SÉCURITÉ ET ORDRE PUBLIC
 L'usage de flammes reelles, chichas, encens, cierges magiques est strictement interdit. Les tirs de mortiers, feux d'artifice et petards sont strictement interdits. Le service d'alcool aux mineurs est strictement interdit.
@@ -41,14 +57,15 @@ ARTICLE 12 : FORCE MAJEURE
 En cas d'evenement imprevisible, la prestation pourra etre reportee via un avoir de 12 mois. Aucun remboursement ne pourra etre exige.
 
 ARTICLE 13 : RÉSOLUTION ET LITIGES
-Le present contrat sera resilie immediatement en cas de violation d'une clause de securite majeure. A defaut d'accord amiable, tout litige sera porte devant le Tribunal de MEAUX (77).
+Le present contrat sera resilie immediatement en cas de violation d'une clause de securite majeure. A defaut d'accord amiable, tout litige sera porte devant le Tribunal de ${rcs.toUpperCase()} (77).
 
 ARTICLE 14 : PROTECTION DES DONNÉES (RGPD)
-Les informations collectees sont necessaires pour la gestion de votre reservation. Vous disposez d'un droit d'acces et de rectification en contactant la SARL AFM.
+Les informations collectees sont necessaires pour la gestion de votre reservation. Vous disposez d'un droit d'acces et de rectification en contactant la ${forme} ${rs}.
 
-AFM - PARADISE - 5 AVENUE FRIDINGEN, 77100 NANTEUIL LES MEAUX
-SARL au capital de 7 500,00 EUR - SIREN 904 543 816 - TVA FR06904543816
-RCS MEAUX (inscrit le 01/11/2021) - NAF 68.20B`
+${rs.toUpperCase()} - ${enseigne.toUpperCase()} - ${adresse.toUpperCase()}
+${forme} au capital de ${capital} - SIREN ${siren} - TVA ${tva}
+RCS ${rcs.toUpperCase()} (inscrit le ${dateStr}) - NAF ${ape}`
+}
 
 function formatMoney(n) {
   return Number(n || 0).toLocaleString('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' €'
@@ -70,6 +87,16 @@ function calcMenuItemTotal(item, nbAdultes, nbEnfants) {
 
 export function generatePDF(devis) {
   const settings = getSettings()
+  const l = settings.legalInfo || {}
+  const nomEnseigne = l.enseigne || settings.nom || 'LE PARADISE'
+  const adresseSiege = l.adresse || '5 avenue Fridingen, 77100 Nanteuil les Meaux'
+  const telContact = l.telephone || '0782821582'
+  const emailContact = l.email || 'contact@leparadise77.fr'
+  const raisonSociale = l.raisonSociale || 'SARL AFM'
+  const forme = l.formeJuridique || 'SARL'
+  const rcs = l.rcs || 'Meaux'
+  const siren = l.siren || '904543816'
+
   const doc = new jsPDF({ unit: 'mm', format: 'a4' })
   const pageW = doc.internal.pageSize.getWidth()
   const pageH = doc.internal.pageSize.getHeight()
@@ -78,16 +105,24 @@ export function generatePDF(devis) {
   // ---- Header ----
   doc.setFillColor(26, 26, 46)
   doc.rect(0, 0, pageW, 40, 'F')
+
+  let headerTextX = 20
+  if (settings.logo) {
+    try {
+      doc.addImage(settings.logo, 12, 7, 32, 24)
+      headerTextX = 50
+    } catch { /* fall back to text-only header */ }
+  }
+
   doc.setTextColor(201, 168, 76)
-  doc.setFontSize(22)
+  doc.setFontSize(settings.logo ? 18 : 22)
   doc.setFont('helvetica', 'bold')
-  doc.text('LE PARADISE', 20, 18)
+  doc.text(nomEnseigne, headerTextX, 18)
   doc.setFontSize(10)
   doc.setFont('helvetica', 'normal')
   doc.setTextColor(200, 200, 200)
-  doc.text('Salle de réception — Nanteuil les Meaux', 20, 26)
-  doc.text('5 avenue Fridingen, 77100 Nanteuil les Meaux', 20, 32)
-  doc.text('Tel: 0782821582 | contact@leparadise77.fr', 20, 38)
+  doc.text(adresseSiege, headerTextX, 26)
+  doc.text(`Tél : ${telContact}  |  ${emailContact}`, headerTextX, 32)
 
   // Devis title on right
   doc.setTextColor(255, 255, 255)
@@ -252,7 +287,7 @@ export function generatePDF(devis) {
   doc.setFont('helvetica', 'normal')
   doc.setFontSize(8)
   doc.setTextColor(60, 60, 60)
-  const lines = doc.splitTextToSize(CGV, pageW - 40)
+  const lines = doc.splitTextToSize(buildCGV(settings), pageW - 40)
   lines.forEach((line) => {
     if (y > pageH - 20) { doc.addPage(); y = 20 }
     doc.text(line, 20, y)
@@ -295,7 +330,7 @@ export function generatePDF(devis) {
     doc.setFontSize(8)
     doc.setTextColor(150, 150, 150)
     doc.text(
-      `SARL AFM — 5 avenue Fridingen, 77100 Nanteuil les Meaux — RCS Meaux: 904543816`,
+      `${forme} ${raisonSociale} — ${adresseSiege} — RCS ${rcs} : ${siren}`,
       pageW / 2, pageH - 8, { align: 'center' }
     )
     doc.text(`Page ${i} / ${pageCount}`, pageW - 15, pageH - 8, { align: 'right' })

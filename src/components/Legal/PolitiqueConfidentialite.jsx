@@ -1,13 +1,21 @@
+import { getSettings } from '../../utils/storage'
 import LegalLayout from './LegalLayout'
 
 export default function PolitiqueConfidentialite() {
+  const s = getSettings()
+  const l = s.legalInfo || {}
+  const raisonSociale = l.raisonSociale || 'SARL AFM'
+  const adresse = l.adresse || '5 avenue Fridingen, 77100 Nanteuil les Meaux'
+  const email = l.email || 'contact@leparadise77.fr'
+  const telephone = l.telephone || '07 82 82 15 82'
+
   return (
     <LegalLayout title="Politique de confidentialité & RGPD">
       <h2 style={h2}>1. Responsable du traitement</h2>
       <p>
-        <strong>SARL AFM</strong><br />
-        5 avenue Fridingen, 77100 Nanteuil les Meaux<br />
-        E-mail : contact@leparadise77.fr — Tél. : 07 82 82 15 82
+        <strong>{raisonSociale}</strong><br />
+        {adresse}<br />
+        E-mail : {email} — Tél. : {telephone}
       </p>
 
       <h2 style={h2}>2. Données collectées</h2>
@@ -43,7 +51,7 @@ export default function PolitiqueConfidentialite() {
 
       <h2 style={h2}>6. Destinataires des données</h2>
       <p>
-        Vos données sont strictement réservées à l&apos;usage interne de la SARL AFM. Elles ne sont en aucun cas transmises, vendues ou louées à des tiers, sauf obligation légale.
+        Vos données sont strictement réservées à l&apos;usage interne de {raisonSociale}. Elles ne sont en aucun cas transmises, vendues ou louées à des tiers, sauf obligation légale.
       </p>
 
       <h2 style={h2}>7. Vos droits</h2>
@@ -59,7 +67,7 @@ export default function PolitiqueConfidentialite() {
         <li><strong>Droit à la portabilité</strong> — recevoir vos données dans un format structuré.</li>
       </ul>
       <p>
-        Pour exercer ces droits, contactez-nous à : <strong>contact@leparadise77.fr</strong>
+        Pour exercer ces droits, contactez-nous à : <strong>{email}</strong>
       </p>
 
       <h2 style={h2}>8. Cookies</h2>

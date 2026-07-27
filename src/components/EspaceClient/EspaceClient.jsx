@@ -32,27 +32,62 @@ async function fetchDocsFromServer(devisId) {
   return null
 }
 
-async function compressImageDataUrl(dataUrl, maxWidthPx = 1200, quality = 0.75) {
+function getDataUrlSizeBytes(dataUrl) {
+  if (!dataUrl || typeof dataUrl !== 'string') return 0
+  const commaIdx = dataUrl.indexOf(',')
+  if (commaIdx < 0) return new TextEncoder().encode(dataUrl).length
+  const base64 = dataUrl.slice(commaIdx + 1)
+  const paddingMatch = base64.match(/=+$/)
+  const padding = paddingMatch ? paddingMatch[0].length : 0
+  return Math.max(0, Math.floor((base64.length * 3) / 4) - padding)
+}
+
+async function compressImageDataUrl(dataUrl, targetBytes = 1_400_000) {
   if (!dataUrl || !dataUrl.startsWith('data:image/')) return dataUrl // PDF ou autre : pas de compression
-  return new Promise((resolve) => {
+
+  const profiles = [
+    { maxWidthPx: 1400, quality: 0.78 },
+    { maxWidthPx: 1200, quality: 0.72 },
+    { maxWidthPx: 900, quality: 0.65 },
+    { maxWidthPx: 700, quality: 0.55 },
+  ]
+
+  const sourceImage = await new Promise((resolve) => {
     const img = new Image()
-    img.onload = () => {
-      let w = img.width
-      let h = img.height
-      if (w > maxWidthPx) {
-        h = Math.round((h * maxWidthPx) / w)
-        w = maxWidthPx
+    img.onload = () => resolve(img)
+    img.onerror = () => resolve(null)
+    img.src = dataUrl
+  })
+  if (!sourceImage) return dataUrl
+
+  let best = dataUrl
+  let bestSize = getDataUrlSizeBytes(dataUrl)
+
+  for (const profile of profiles) {
+    const candidate = await new Promise((resolve) => {
+      let w = sourceImage.width
+      let h = sourceImage.height
+      if (w > profile.maxWidthPx) {
+        h = Math.round((h * profile.maxWidthPx) / w)
+        w = profile.maxWidthPx
       }
       const canvas = document.createElement('canvas')
       canvas.width = w
       canvas.height = h
       const ctx = canvas.getContext('2d')
-      ctx.drawImage(img, 0, 0, w, h)
-      resolve(canvas.toDataURL('image/jpeg', quality))
+      ctx.drawImage(sourceImage, 0, 0, w, h)
+      resolve(canvas.toDataURL('image/jpeg', profile.quality))
+    })
+
+    const candidateSize = getDataUrlSizeBytes(candidate)
+    if (candidateSize < bestSize) {
+      best = candidate
+      bestSize = candidateSize
     }
-    img.onerror = () => resolve(dataUrl) // fallback : image originale
-    img.src = dataUrl
-  })
+    if (bestSize <= targetBytes) break
+  }
+
+  return best
 }
 
 async function saveDocs(devisId, docs) {
@@ -215,7 +250,7 @@ export default function EspaceClient() {
 
     const ok = await saveDocs(devisId, updated)
     if (!ok) {
-      alert("⚠️ Le document n'a pas pu être envoyé au serveur. Il est sauvegardé localement mais ne sera peut-être pas visible depuis le dashboard.\n\nEssayez un fichier plus léger ou une image de résolution moins élevée (idéalement moins de 2 Mo).")
+      alert("⚠️ Le document n'a pas pu être envoyé au serveur. Il est sauvegardé localement mais ne sera peut-être pas visible depuis le dashboard.\n\nEssayez un fichier plus léger (image ou PDF) ou contactez l'équipe pour ajuster la limite serveur.")
     }
 
     // Store only lightweight markers in client record (NOT the actual base64 data)

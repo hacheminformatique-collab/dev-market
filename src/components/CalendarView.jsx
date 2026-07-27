@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useRef } from 'react'
 
 const DAYS = ['Lun', 'Mar', 'Mer', 'Jeu', 'Ven', 'Sam', 'Dim']
 const MONTHS = ['Janvier', 'Février', 'Mars', 'Avril', 'Mai', 'Juin', 'Juillet', 'Août', 'Septembre', 'Octobre', 'Novembre', 'Décembre']
@@ -8,15 +8,32 @@ function getDaysInMonth(year, month) {
 }
 
 function getFirstDayOfMonth(year, month) {
-  // 0=Sun, shift to Mon=0
   const raw = new Date(year, month, 1).getDay()
   return (raw + 6) % 7
 }
 
-export default function CalendarView({ events = [] }) {
+/**
+ * @param {object} props
+ * @param {Array}  props.events        – list of { id, date, label, type }
+ * @param {Set}    props.promoDateKeys – set of 'YYYY-MM-DD' strings with active promo
+ * @param {Set}    props.bookedDateKeys – set of 'YYYY-MM-DD' strings already booked
+ * @param {function} props.onEventClick(id) – called when an event label is clicked
+ * @param {function} props.onEventDrop(id, newDateStr) – called when an event is dropped on a new date
+ * @param {function} props.onDateClick(dateStr) – called when an empty date cell is clicked
+ */
+export default function CalendarView({
+  events = [],
+  promoDateKeys = new Set(),
+  bookedDateKeys = new Set(),
+  onEventClick,
+  onEventDrop,
+  onDateClick,
+}) {
   const today = new Date()
   const [year, setYear] = useState(today.getFullYear())
   const [month, setMonth] = useState(today.getMonth())
+  const [dragOverDate, setDragOverDate] = useState(null)
+  const draggingId = useRef(null)
 
   const prev = () => {
     if (month === 0) { setYear((y) => y - 1); setMonth(11) }
@@ -44,6 +61,35 @@ export default function CalendarView({ events = [] }) {
 
   const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`
 
+  function handleDragStart(e, id) {
+    draggingId.current = id
+    e.dataTransfer.effectAllowed = 'move'
+  }
+
+  function handleDragOver(e, dateKey) {
+    e.preventDefault()
+    e.dataTransfer.dropEffect = 'move'
+    setDragOverDate(dateKey)
+  }
+
+  function handleDragLeave() {
+    setDragOverDate(null)
+  }
+
+  function handleDrop(e, dateKey) {
+    e.preventDefault()
+    setDragOverDate(null)
+    if (draggingId.current && onEventDrop) {
+      onEventDrop(draggingId.current, dateKey)
+    }
+    draggingId.current = null
+  }
+
+  function handleDragEnd() {
+    draggingId.current = null
+    setDragOverDate(null)
+  }
+
   return (
     <div className="cal-wrap">
       <div className="cal-nav">
@@ -58,11 +104,74 @@ export default function CalendarView({ events = [] }) {
           const key = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`
           const dayEvents = eventsByDate[key] || []
           const isToday = key === todayStr
+          const isPromo = promoDateKeys.has(key)
+          const isBooked = bookedDateKeys.has(key)
+          const isDragOver = dragOverDate === key
           return (
-            <div key={key} className={`cal-cell ${isToday ? 'today' : ''} ${dayEvents.length ? 'has-event' : ''}`}>
-              <span className="cal-day-num">{day}</span>
-              {dayEvents.map((ev, j) => (
-                <span key={j} className="cal-event-dot" title={ev.label || ev.type || ''}>{ev.label || ev.type || '📅'}</span>
+            <div
+              key={key}
+              className={`cal-cell ${isToday ? 'today' : ''} ${dayEvents.length ? 'has-event' : ''}`}
+              style={{
+                cursor: onDateClick ? 'pointer' : 'default',
+                border: isDragOver ? '2px dashed #c9a84c' : undefined,
+                background: isDragOver ? '#fdf3d9' : undefined,
+                position: 'relative',
+                minHeight: '60px',
+              }}
+              onDragOver={(e) => handleDragOver(e, key)}
+              onDragLeave={handleDragLeave}
+              onDrop={(e) => handleDrop(e, key)}
+              onClick={() => { if (onDateClick && !dayEvents.length) onDateClick(key) }}
+            >
+              {isPromo && (
+                <div style={{
+                  position: 'absolute',
+                  top: 0, left: 0, right: 0,
+                  background: 'linear-gradient(90deg, #e74c3c, #c0392b)',
+                  color: 'white',
+                  fontSize: '9px',
+                  fontWeight: '700',
+                  textAlign: 'center',
+                  padding: '1px 2px',
+                  letterSpacing: '0.05em',
+                  zIndex: 2,
+                }}>
+                  🏷️ PROMO
+                </div>
+              )}
+              <span className="cal-day-num" style={{ marginTop: isPromo ? '14px' : undefined, display: 'block' }}>{day}</span>
+              {isBooked && !dayEvents.length && (
+                <div style={{ fontSize: '9px', color: '#888', textAlign: 'center' }}>reservé</div>
+              )}
+              {dayEvents.map((ev) => (
+                <div
+                  key={ev.id || ev.label}
+                  className="cal-event-dot"
+                  title={ev.label || ev.type || ''}
+                  draggable={!!onEventDrop}
+                  onDragStart={(e) => handleDragStart(e, ev.id)}
+                  onDragEnd={handleDragEnd}
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    if (onEventClick) onEventClick(ev.id)
+                  }}
+                  style={{
+                    cursor: onEventClick ? 'pointer' : 'default',
+                    fontSize: '10px',
+                    padding: '2px 4px',
+                    borderRadius: '4px',
+                    background: '#1a1a2e',
+                    color: '#c9a84c',
+                    marginTop: '2px',
+                    display: 'block',
+                    overflow: 'hidden',
+                    whiteSpace: 'nowrap',
+                    textOverflow: 'ellipsis',
+                    userSelect: 'none',
+                  }}
+                >
+                  {ev.label || ev.type || '📅'}
+                </div>
               ))}
             </div>
           )

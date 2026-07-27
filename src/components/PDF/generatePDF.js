@@ -178,6 +178,27 @@ export function generatePDF(devis, options = {}) {
   const traiteurTotal = menuTotal + gateauTotal
   const prestationsTotal = (devis.prestations || []).reduce((s, p) => s + (p.tarif || 0), 0)
 
+  // Calculate remise for "location avec prestation"
+  const isAvecPrestation = devis.formule?.nomFormule && !devis.formule.nomFormule.toLowerCase().includes('sèche')
+  let remiseMontant = 0
+  if (isAvecPrestation && devis.dateEvenement) {
+    const month = new Date(devis.dateEvenement).getMonth() + 1
+    const day = new Date(devis.dateEvenement).getDay()
+    const isBasSaison = (month === 12 || month <= 3)
+    let prixSec, prixPresta
+    if (isBasSaison) {
+      if (day === 5) { prixSec = 2500; prixPresta = 1500 }
+      else if (day === 6) { prixSec = 3500; prixPresta = 2500 }
+      else { prixSec = 2000; prixPresta = 1000 }
+    } else {
+      if (day === 5) { prixSec = 3500; prixPresta = 2500 }
+      else if (day === 6) { prixSec = 4500; prixPresta = 3000 }
+      else { prixSec = 2500; prixPresta = 1500 }
+    }
+    remiseMontant = prixSec - prixPresta
+    if (remiseMontant < 0) remiseMontant = 0
+  }
+
   const salle = vatBreakdown(prixSalle, 0.20)
   const traiteur = vatBreakdown(traiteurTotal, 0.10)
   const optionsVat = vatBreakdown(prestationsTotal, 0.20)
@@ -193,6 +214,16 @@ export function generatePDF(devis, options = {}) {
       formatMoney(salle.ht),
       formatMoney(salle.tva),
       formatMoney(prixSalle),
+    ])
+  }
+  if (isAvecPrestation && remiseMontant > 0) {
+    const prixSecBase = prixSalle + remiseMontant
+    rows.push([
+      `REMISE prestation incluse\n(Tarif sèche ${formatMoney(prixSecBase)} – prestation → ${formatMoney(prixSalle)})`,
+      '20%',
+      formatMoney(-remiseMontant / 1.20),
+      formatMoney(-remiseMontant / 1.20 * 0.20),
+      formatMoney(-remiseMontant),
     ])
   }
 

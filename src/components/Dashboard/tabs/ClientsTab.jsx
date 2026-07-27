@@ -640,6 +640,55 @@ export default function ClientsTab() {
               )}
             </div>
 
+            {/* Bread & Beverage calculations */}
+            {(() => {
+              const nbAdultes = parseInt(selected.nbAdultes) || selected.nbPersonnes || 0
+              const nbEnfants = parseInt(selected.nbEnfants) || 0
+              const nbGuests = nbAdultes + nbEnfants
+              if (nbGuests <= 0) return null
+
+              const loaves = Math.ceil(nbGuests * 1.5)
+              const breadCost = loaves * 0.165
+
+              const boissons = (selected.menus || []).filter((m) => m.section === 'Boissons')
+              const beverageCalc = boissons.map((b) => {
+                const n = (b.nomMenu || '').toLowerCase()
+                const isTea = ['thé', 'cafe', 'café', 'tea', 'coffee'].some((kw) => n.includes(kw))
+                if (isTea) return { name: b.nomMenu, qty: null, note: 'Machine à disposition' }
+                const isEau = n.includes('eau') && (n.includes('source') || n.includes('minérale') || n.includes('minerale'))
+                const factor = isEau ? 2 : 1.5
+                return { name: b.nomMenu, qty: Math.ceil(nbGuests / 10 * factor) }
+              })
+
+              return (
+                <div style={{ marginTop: '12px' }}>
+                  <div style={{ background: '#f8f5f0', borderRadius: '8px', padding: '10px', marginBottom: '8px' }}>
+                    <div style={{ fontWeight: '700', marginBottom: '6px', color: '#1a1a2e', fontSize: '13px' }}>🍞 Commande de pain</div>
+                    <div style={{ fontSize: '12px', lineHeight: '1.8', color: '#555' }}>
+                      <div>Nombre de pains : <strong>{loaves}</strong> ({nbGuests} inv. × 1,5)</div>
+                      <div>Coût estimé : <strong>{Number(breadCost).toLocaleString('fr-FR', { minimumFractionDigits: 2 })} €</strong> ({loaves} × 0,165 €)</div>
+                    </div>
+                  </div>
+                  {beverageCalc.length > 0 && (
+                    <div style={{ background: '#f8f5f0', borderRadius: '8px', padding: '10px' }}>
+                      <div style={{ fontWeight: '700', marginBottom: '6px', color: '#1a1a2e', fontSize: '13px' }}>🥤 Besoins en boissons</div>
+                      <div style={{ fontSize: '12px', lineHeight: '1.8', color: '#555' }}>
+                        {beverageCalc.map((b, i) => (
+                          <div key={i}>
+                            <strong>{b.name}</strong> :{' '}
+                            {b.qty != null
+                              ? `${b.qty} bouteille${b.qty > 1 ? 's' : ''}`
+                              : <span style={{ color: '#27ae60' }}>{b.note}</span>
+                            }
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )
+            })()}
+
             {/* Payment progress */}
             {(() => {
               const total = calcTotal(selected)

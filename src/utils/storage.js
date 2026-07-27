@@ -12,6 +12,8 @@ const KEYS = {
   stockBoisson: 'paradise_stock_boisson',
   ingredients: 'paradise_ingredients',
   matieresPremieresRecettes: 'paradise_matieres_recettes',
+  calOverrides: 'paradise_cal_overrides',
+  calStaff: 'paradise_cal_staff',
 }
 
 // ---------------------------------------------------------------------------
@@ -269,6 +271,8 @@ const DEFAULTS = {
   stockBoisson: [],
   ingredients: [],
   matieresPremieresRecettes: [],
+  calOverrides: {},
+  calStaff: {},
 }
 
 // Read from in-memory cache (synchronous)
@@ -395,6 +399,12 @@ export const saveIngredients = (data) => _save(KEYS.ingredients, data)
 
 export const getMatieresPremieresRecettes = () => _get(KEYS.matieresPremieresRecettes) || []
 export const saveMatieresPremieresRecettes = (data) => _save(KEYS.matieresPremieresRecettes, data)
+
+export const getCalOverrides = () => _get(KEYS.calOverrides) || {}
+export const saveCalOverrides = (data) => _save(KEYS.calOverrides, data)
+
+export const getCalStaff = () => _get(KEYS.calStaff) || {}
+export const saveCalStaff = (data) => _save(KEYS.calStaff, data)
 
 export function generateDevisNumber() {
   const now = new Date()

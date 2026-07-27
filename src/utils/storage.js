@@ -205,7 +205,6 @@ const DEFAULTS = {
     pin: '2205',
     siteUrl: '',
     logo: '',
-    tarifPromotionnel: 0,
     bankInfo: {
       iban: '',
       bic: '',

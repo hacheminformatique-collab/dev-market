@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { getFormules, saveFormules, getSettings, saveSettings } from '../../../utils/storage'
+import { getFormules, saveFormules } from '../../../utils/storage'
 import PhotoUpload from '../PhotoUpload'
 
 function FormuleModal({ formule, onSave, onClose }) {
@@ -36,15 +36,6 @@ function FormuleModal({ formule, onSave, onClose }) {
 export default function FormuleSalleTab() {
   const [formules, setFormules] = useState(getFormules())
   const [modal, setModal] = useState(null)
-  const [tarifPromo, setTarifPromo] = useState(() => (getSettings() || {}).tarifPromotionnel || 0)
-  const [promoSaved, setPromoSaved] = useState(false)
-
-  function handleSavePromo() {
-    const settings = getSettings() || {}
-    saveSettings({ ...settings, tarifPromotionnel: Number(tarifPromo) || 0 })
-    setPromoSaved(true)
-    setTimeout(() => setPromoSaved(false), 2000)
-  }
 
   function handleSave(data) {
     let updated
@@ -67,31 +58,6 @@ export default function FormuleSalleTab() {
 
   return (
     <div>
-      {/* Global promotional tariff */}
-      <div className="card mb-3" style={{ borderLeft: '4px solid #c9a84c' }}>
-        <h4 style={{ marginBottom: '4px', color: '#1a1a2e' }}>🏷️ Tarif promotionnel global</h4>
-        <p className="text-muted" style={{ fontSize: '13px', marginBottom: '12px' }}>
-          Ce montant est déduit du tarif de base de <strong>toutes les formules</strong> disponibles lors de la réservation. Laissez à 0 pour désactiver.
-        </p>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <input
-              className="form-control"
-              type="number"
-              min="0"
-              step="50"
-              style={{ width: '140px' }}
-              value={tarifPromo}
-              onChange={(e) => setTarifPromo(e.target.value)}
-            />
-            <span style={{ color: '#555', fontWeight: '600' }}>€</span>
-          </div>
-          <button className="btn btn-primary btn-sm" onClick={handleSavePromo}>
-            {promoSaved ? '✅ Enregistré' : '💾 Enregistrer'}
-          </button>
-        </div>
-      </div>
-
       <div className="flex-between mb-3">
         <h3 style={{ color: '#1a1a2e' }}>Formules de location</h3>
         <button className="btn btn-primary btn-sm" onClick={() => setModal({})}>+ Ajouter</button>

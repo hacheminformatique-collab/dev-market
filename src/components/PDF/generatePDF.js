@@ -210,10 +210,8 @@ export function generatePDF(devis, options = {}) {
   const prestationsTotal = (devis.prestations || []).reduce((s, p) => s + (p.tarif || 0), 0)
 
   const isAvecPrestation = devis.formule?.nomFormule && !devis.formule.nomFormule.toLowerCase().includes('sèche')
-  const tarifPromotionnel = Number(devis.tarifPromotionnel) || 0
-  // Support legacy devis that stored the "prestation" discount as computed remise
-  let remiseMontant = tarifPromotionnel
-  if (remiseMontant === 0 && isAvecPrestation && devis.dateEvenement) {
+  let remiseMontant = 0
+  if (isAvecPrestation && devis.dateEvenement) {
     const month = new Date(devis.dateEvenement).getMonth() + 1
     const day = new Date(devis.dateEvenement).getDay()
     const isBasSaison = (month === 12 || month <= 3)
@@ -248,10 +246,10 @@ export function generatePDF(devis, options = {}) {
       formatPdfMoney(prixSalle),
     ])
   }
-  if (remiseMontant > 0) {
+  if (isAvecPrestation && remiseMontant > 0) {
     const prixSecBase = prixSalle + remiseMontant
     rows.push([
-      `Tarif promotionnel\nTarif de base ${formatPdfMoney(prixSecBase)} -> après remise ${formatPdfMoney(prixSalle)}`,
+      `REMISE prestation incluse\nTarif seche ${formatPdfMoney(prixSecBase)} -> prestation ${formatPdfMoney(prixSalle)}`,
       '20%',
       formatPdfMoney(-remiseMontant / 1.20),
       formatPdfMoney(-remiseMontant / 1.20 * 0.20),

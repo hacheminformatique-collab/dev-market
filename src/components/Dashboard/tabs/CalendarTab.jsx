@@ -261,7 +261,7 @@ function EventDetail({ client, staffList, assignedStaffIds, calOverride, onClose
             <div>💲 Tarif saisonnier ({isSeche ? 'location sèche' : 'avec prestation'}) : <strong>{formatMoney(effectivePrice)}</strong></div>
           )}
           {!isSeche && remise > 0 && (
-            <div style={{ color: '#27ae60' }}>🏷️ Tarif promotionnel : <strong>-{formatMoney(remise)}</strong>
+            <div style={{ color: '#27ae60' }}>🏷️ Remise prestation incluse : <strong>-{formatMoney(remise)}</strong>
               <div style={{ fontSize: '11px', color: '#888' }}>
                 (Tarif sèche {formatMoney(getPriceForDate(dateStr, 'Location sèche'))} – {formatMoney(effectivePrice)} = {formatMoney(remise)})
               </div>

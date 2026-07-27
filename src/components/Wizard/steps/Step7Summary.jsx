@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { getClients, saveClients, generateDevisNumber, notifyEvent } from '../../../utils/storage'
 import { generatePDF } from '../../PDF/generatePDF'
 import SignaturePad from '../../SignaturePad'
+import { getFormuleTarif } from './Step3Formule'
 
 function vatBreakdown(ttc, rate) {
   const ht = ttc / (1 + rate)
@@ -34,9 +35,10 @@ export default function Step7Summary({ data, onBack, onSubmit }) {
   const nbPersonnes = nbAdultes + nbEnfants
   const prixSalle = data.prixSalle || 0
 
+  const isSeche = data.formule?.nomFormule?.toLowerCase().includes('sèche')
   const dateStr = (data.dateEvenement || '').slice(0, 10)
-  const tarifPromotionnel = Number(data.tarifPromotionnel) || 0
-  const basePriceSalle = tarifPromotionnel > 0 ? prixSalle + tarifPromotionnel : prixSalle
+  const basePriceSec = dateStr ? getFormuleTarif(dateStr, 'Location sèche') : 0
+  const remiseSalleTTC = (!isSeche && dateStr && basePriceSec > prixSalle) ? (basePriceSec - prixSalle) : 0
 
   const menuTotal = (data.menus || []).reduce((sum, m) => sum + calcMenuItemTotal(m, nbAdultes, nbEnfants), 0)
   const gateauTotal = (data.gateau?.tarif || 0) * nbPersonnes
@@ -189,25 +191,26 @@ export default function Step7Summary({ data, onBack, onSubmit }) {
           <tbody>
             {prixSalle > 0 && (
               <>
-                {tarifPromotionnel > 0 && (
+                {remiseSalleTTC > 0 && (
                   <tr>
                     <td style={{ padding: '8px 12px' }}>
-                      Tarif de base — {data.formule?.nomFormule}
-                      <div style={{ fontSize: '12px', color: '#888' }}>TVA 20%</div>
+                      Tarif de base location sèche
+                      <div style={{ fontSize: '12px', color: '#888' }}>Avant remise prestation</div>
                     </td>
-                    <td style={{ padding: '8px 12px', textAlign: 'right', color: '#888' }}>{(basePriceSalle / 1.20).toFixed(2)} €</td>
-                    <td style={{ padding: '8px 12px', textAlign: 'right', color: '#888' }}>{(basePriceSalle - basePriceSalle / 1.20).toFixed(2)} €</td>
-                    <td style={{ padding: '8px 12px', textAlign: 'right', color: '#888' }}>{basePriceSalle.toLocaleString('fr-FR')} €</td>
+                    <td style={{ padding: '8px 12px', textAlign: 'right', color: '#888' }}>{(basePriceSec / 1.20).toFixed(2)} €</td>
+                    <td style={{ padding: '8px 12px', textAlign: 'right', color: '#888' }}>{(basePriceSec - basePriceSec / 1.20).toFixed(2)} €</td>
+                    <td style={{ padding: '8px 12px', textAlign: 'right', color: '#888' }}>{basePriceSec.toLocaleString('fr-FR')} €</td>
                   </tr>
                 )}
-                {tarifPromotionnel > 0 && (
+                {remiseSalleTTC > 0 && (
                   <tr style={{ background: '#f0fff4' }}>
                     <td style={{ padding: '8px 12px', color: '#27ae60' }}>
-                      🏷️ Tarif promotionnel
+                      🏷️ Remise prestation incluse
+                      <div style={{ fontSize: '12px', color: '#555' }}>{data.formule?.nomFormule}</div>
                     </td>
-                    <td style={{ padding: '8px 12px', textAlign: 'right', color: '#27ae60', fontWeight: '600' }}>-{(tarifPromotionnel / 1.20).toFixed(2)} €</td>
-                    <td style={{ padding: '8px 12px', textAlign: 'right', color: '#27ae60', fontWeight: '600' }}>-{(tarifPromotionnel - tarifPromotionnel / 1.20).toFixed(2)} €</td>
-                    <td style={{ padding: '8px 12px', textAlign: 'right', color: '#27ae60', fontWeight: '700' }}>-{tarifPromotionnel.toLocaleString('fr-FR')} €</td>
+                    <td style={{ padding: '8px 12px', textAlign: 'right', color: '#27ae60', fontWeight: '600' }}>-{(remiseSalleTTC / 1.20).toFixed(2)} €</td>
+                    <td style={{ padding: '8px 12px', textAlign: 'right', color: '#27ae60', fontWeight: '600' }}>-{(remiseSalleTTC - remiseSalleTTC / 1.20).toFixed(2)} €</td>
+                    <td style={{ padding: '8px 12px', textAlign: 'right', color: '#27ae60', fontWeight: '700' }}>-{remiseSalleTTC.toLocaleString('fr-FR')} €</td>
                   </tr>
                 )}
                 <tr>

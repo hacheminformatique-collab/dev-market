@@ -1,4 +1,4 @@
-import { getFormules } from '../../../utils/storage'
+import { getFormules, getSettings } from '../../../utils/storage'
 
 function getSaisonTarif(dateStr, formuleNom) {
   if (!dateStr) return 0
@@ -25,13 +25,10 @@ export function getFormuleTarif(dateStr, formuleNom) {
   return getSaisonTarif(dateStr, formuleNom)
 }
 
-function getBasePriceSec(dateStr) {
-  return getSaisonTarif(dateStr, 'Location sèche')
-}
-
 export default function Step3Formule({ data, onChange, onNext, onBack }) {
   const formules = getFormules()
   const dateStr = data.dateEvenement
+  const tarifPromotionnel = Number((getSettings() || {}).tarifPromotionnel) || 0
 
   function getSaisonLabel() {
     if (!dateStr) return ''
@@ -47,8 +44,10 @@ export default function Step3Formule({ data, onChange, onNext, onBack }) {
 
   function handleSelect(formule) {
     const tarif = getSaisonTarif(dateStr, formule.nomFormule)
+    const prixNet = Math.max(0, tarif - tarifPromotionnel)
     onChange('formule', formule)
-    onChange('prixSalle', tarif)
+    onChange('prixSalle', prixNet)
+    onChange('tarifPromotionnel', tarifPromotionnel)
   }
 
   return (
@@ -63,10 +62,8 @@ export default function Step3Formule({ data, onChange, onNext, onBack }) {
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: '16px', marginBottom: '24px' }}>
         {formules.map((f) => {
           const tarif = getSaisonTarif(dateStr, f.nomFormule)
+          const prixNet = dateStr ? Math.max(0, tarif - tarifPromotionnel) : 0
           const isSelected = data.formule?.id === f.id
-          const isSec = f.nomFormule?.toLowerCase().includes('sèche')
-          const tarifSec = dateStr ? getBasePriceSec(dateStr) : 0
-          const remise = (!isSec && dateStr) ? (tarifSec - tarif) : 0
           return (
             <div
               key={f.id}
@@ -87,18 +84,25 @@ export default function Step3Formule({ data, onChange, onNext, onBack }) {
               )}
               <h3 style={{ color: '#1a1a2e', marginBottom: '8px' }}>{f.nomFormule}</h3>
               <p className="text-muted" style={{ fontSize: '14px', marginBottom: '16px' }}>{f.contenuFormule}</p>
-              {dateStr && remise > 0 ? (
-                <div style={{ marginBottom: '4px' }}>
-                  <div style={{ fontSize: '13px', color: '#888', textDecoration: 'line-through' }}>
-                    Tarif de base : {tarifSec.toLocaleString('fr-FR')} €
+              {dateStr && (
+                <div style={{ marginBottom: '8px' }}>
+                  <div style={{
+                    fontSize: '13px',
+                    color: tarifPromotionnel > 0 ? '#888' : '#c9a84c',
+                    textDecoration: tarifPromotionnel > 0 ? 'line-through' : 'none',
+                    fontWeight: tarifPromotionnel > 0 ? '400' : '700',
+                  }}>
+                    Tarif de base : {tarif.toLocaleString('fr-FR')} €
                   </div>
-                  <div style={{ fontSize: '13px', color: '#27ae60', fontWeight: '600' }}>
-                    🏷️ Remise prestation : -{remise.toLocaleString('fr-FR')} €
-                  </div>
+                  {tarifPromotionnel > 0 && (
+                    <div style={{ fontSize: '13px', color: '#27ae60', fontWeight: '600', marginTop: '4px' }}>
+                      🏷️ Tarif promotionnel : -{tarifPromotionnel.toLocaleString('fr-FR')} €
+                    </div>
+                  )}
                 </div>
-              ) : null}
+              )}
               <div style={{ fontSize: '24px', fontWeight: '800', color: '#c9a84c' }}>
-                {dateStr ? `${tarif.toLocaleString('fr-FR')} €` : '—'}
+                {dateStr ? `${prixNet.toLocaleString('fr-FR')} €` : '—'}
               </div>
               <div style={{ fontSize: '12px', color: '#888' }}>TTC</div>
               {isSelected && (

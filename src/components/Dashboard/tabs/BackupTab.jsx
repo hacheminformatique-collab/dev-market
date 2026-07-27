@@ -3,6 +3,7 @@ import { PAGE_TYPES } from '../../../data/pageTypes'
 import { makePageTypeStorage } from '../../../utils/cityPageStorage'
 import { getBlogArticles, saveBlogArticles } from '../../../utils/blogStorage'
 import {
+  getSettings, saveSettings,
   getClients, saveClients,
   getStaff, saveStaff,
   getFormules, saveFormules,
@@ -70,11 +71,35 @@ async function collectAllData() {
   }
 }
 
-function collectBusinessData() {
+async function fetchFileAsBase64(url) {
+  try {
+    const res = await fetch(url)
+    if (!res.ok) return null
+    const blob = await res.blob()
+    return new Promise((resolve) => {
+      const reader = new FileReader()
+      reader.onload = () => {
+        const result = reader.result
+        resolve(typeof result === 'string' ? result.split(',')[1] ?? null : null)
+      }
+      reader.onerror = () => resolve(null)
+      reader.readAsDataURL(blob)
+    })
+  } catch { return null }
+}
+
+async function collectBusinessData() {
+  const [favicon32, favicon64] = await Promise.all([
+    fetchFileAsBase64('/favicon.ico'),
+    fetchFileAsBase64('/favicon-64.png'),
+  ])
   return {
     version: 1,
     type: 'business-data',
     exportedAt: new Date().toISOString(),
+    settings: getSettings(),
+    favicon32: favicon32 ?? undefined,
+    favicon64: favicon64 ?? undefined,
     clients: getClients(),
     staff: getStaff(),
     formules: getFormules(),
@@ -93,6 +118,19 @@ function collectBusinessData() {
 }
 
 async function restoreBusinessData(data) {
+  if (data.settings && typeof data.settings === 'object')     saveSettings(data.settings)
+  if (data.favicon32 || data.favicon64) {
+    try {
+      await fetch('/api/favicon-write.php', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          ...(data.favicon32 ? { favicon32: data.favicon32 } : {}),
+          ...(data.favicon64 ? { favicon64: data.favicon64 } : {}),
+        }),
+      })
+    } catch { /* favicon restore failure is non-blocking */ }
+  }
   if (Array.isArray(data.clients))                    saveClients(data.clients)
   if (Array.isArray(data.staff))                      saveStaff(data.staff)
   if (Array.isArray(data.formules))                   saveFormules(data.formules)
@@ -230,14 +268,14 @@ export default function BackupTab() {
 
   // ── Export business data ──────────────────────────────────────────────────
 
-  function handleExportData() {
+  async function handleExportData() {
     setExportingData(true)
     setStatus(null)
     try {
-      const data = collectBusinessData()
+      const data = await collectBusinessData()
       const date = new Date().toISOString().slice(0, 10)
       downloadJson(data, `paradise-data-${date}.json`)
-      setStatus({ type: 'success', msg: `Sauvegarde données téléchargée — ${data.clients?.length ?? 0} clients, ${data.staff?.length ?? 0} staff, ${data.menus?.length ?? 0} menus…` })
+      setStatus({ type: 'success', msg: `Sauvegarde données téléchargée — ${data.clients?.length ?? 0} clients, ${data.staff?.length ?? 0} staff, ${data.menus?.length ?? 0} menus, infos établissement${data.favicon32 || data.favicon64 ? ' + favicon' : ''}.` })
     } catch (e) {
       setStatus({ type: 'error', msg: `Erreur lors de l'export : ${e.message}` })
     } finally {
@@ -309,10 +347,10 @@ export default function BackupTab() {
           🗄️ Sauvegardes data
         </h3>
         <p style={{ fontSize: '13px', color: 'var(--text-light)', marginBottom: '16px', lineHeight: '1.7' }}>
-          Exporte toutes les données métier dans un fichier JSON : clients / devis, staff, calendrier, stock, matières premières, formules, menus, gâteaux, prestations.
+          Exporte toutes les données métier dans un fichier JSON : clients / devis, staff, calendrier, stock, matières premières, formules, menus, gâteaux, prestations, ainsi que les informations de l&apos;établissement (logo, coordonnées, infos légales, favicon).
         </p>
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', marginBottom: '18px' }}>
-          {['👥 Clients / Devis', '📅 Calendrier', '👔 Staff', '📦 Stock', '🧪 Matières premières', '🍽️ Formules', '🥗 Menus', '🎂 Gâteaux', '🎤 Prestations'].map((label) => (
+          {['👥 Clients / Devis', '📅 Calendrier', '👔 Staff', '📦 Stock', '🧪 Matières premières', '🍽️ Formules', '🥗 Menus', '🎂 Gâteaux', '🎤 Prestations', '⚙️ Mes Infos', '🖼️ Logo & Favicon'].map((label) => (
             <span key={label} style={{
               display: 'inline-flex', alignItems: 'center', gap: '4px',
               background: '#f0f4ff', color: '#3b5bdb',
@@ -334,7 +372,7 @@ export default function BackupTab() {
           🔁 Restaurer data
         </h3>
         <p style={{ fontSize: '13px', color: 'var(--text-light)', marginBottom: '8px', lineHeight: '1.7' }}>
-          Importez un fichier de sauvegarde data pour restaurer l&apos;ensemble de vos données métier et écraser les données existantes.
+          Importez un fichier de sauvegarde data pour restaurer l&apos;ensemble de vos données métier, les informations de l&apos;établissement (logo, coordonnées, infos légales) et le favicon, en écrasant les données existantes.
         </p>
         <p style={{ fontSize: '12px', color: '#e53e3e', fontWeight: '600', marginBottom: '18px' }}>
           ⚠️ Attention : cette action écrase définitivement les données actuelles par celles du fichier importé.
@@ -382,6 +420,9 @@ export default function BackupTab() {
               <li><strong>{(dataPreview.stockSec?.length ?? 0) + (dataPreview.stockMatiere?.length ?? 0) + (dataPreview.stockBoisson?.length ?? 0)}</strong> articles en stock</li>
               <li><strong>{dataPreview.ingredients?.length ?? 0}</strong> ingrédients · <strong>{dataPreview.matieresPremieresRecettes?.length ?? 0}</strong> recettes</li>
               <li><strong>{dataPreview.calManualEvents?.length ?? 0}</strong> événements calendrier</li>
+              {dataPreview.settings && (
+                <li>Informations établissement (nom, logo, coordonnées, infos légales{dataPreview.favicon32 || dataPreview.favicon64 ? ', favicon' : ''})</li>
+              )}
             </ul>
             <p style={{ fontSize: '12px', color: '#e53e3e', fontWeight: '600', marginBottom: '24px' }}>
               ⚠️ Cette action remplacera toutes vos données actuelles. Elle est irréversible (sauf si vous avez un autre backup).

@@ -1,26 +1,18 @@
 import { useState, useEffect, useRef } from 'react'
-import { getClients, saveClients, getSettings, getPrestations, getMenus, getGateaux, refreshFromServer } from '../../../utils/storage'
+import { getClients, saveClients, getSettings, getPrestations, getMenus, getGateaux, refreshFromServer, notifyEvent } from '../../../utils/storage'
 import { generatePDF } from '../../PDF/generatePDF'
+import { generatePaymentReceiptPDF } from '../../PDF/generatePaymentReceipt'
 import { useIsMobile } from '../../../hooks/useIsMobile'
+import { getDocsLocal, fetchDocsServer, getReceiptsLocal, fetchReceiptsServer, saveReceiptsAny } from '../../../utils/clientFiles'
 
-function getDocsKey(devisId) { return `paradise_docs_${devisId}` }
 function getDocs(devisId) {
-  try { return JSON.parse(localStorage.getItem(getDocsKey(devisId))) || {} } catch { return {} }
+  const local = getDocsLocal(devisId)
+  if (Object.keys(local).length > 0) return local
+  try { return JSON.parse(localStorage.getItem(`paradise_docs_${devisId}`)) || {} } catch { return {} }
 }
 
 async function fetchDocsFromServer(devisId) {
-  try {
-    const key = getDocsKey(devisId)
-    const res = await fetch(`/api/storage.php?key=${encodeURIComponent(key)}`)
-    if (res.ok) {
-      const data = await res.json()
-      if (data && typeof data === 'object') {
-        try { localStorage.setItem(key, JSON.stringify(data)) } catch { /* ignore */ }
-        return data
-      }
-    }
-  } catch { /* server unreachable - fall back to localStorage */ }
-  return null
+  return fetchDocsServer(devisId)
 }
 
 /**
@@ -39,15 +31,28 @@ async function fetchDocsFromServerByAnyId({ id, devisNumber }) {
   if (devisNumber && devisNumber !== id) {
     const localByNum = getDocs(devisNumber)
     if (Object.keys(localByNum).length > 0) {
-      // Mirror to the id key so future lookups are faster
-      if (id) { try { localStorage.setItem(getDocsKey(id), JSON.stringify(localByNum)) } catch { /* ignore */ } }
       return localByNum
     }
     const data = await fetchDocsFromServer(devisNumber)
     if (data && typeof data === 'object' && Object.keys(data).length > 0) {
-      if (id) { try { localStorage.setItem(getDocsKey(id), JSON.stringify(data)) } catch { /* ignore */ } }
       return data
     }
+  }
+  return null
+}
+
+async function fetchReceiptsFromServerByAnyId({ id, devisNumber }) {
+  if (id) {
+    const localById = getReceiptsLocal(id)
+    if (Object.keys(localById).length > 0) return localById
+    const data = await fetchReceiptsServer(id)
+    if (data && typeof data === 'object' && Object.keys(data).length > 0) return data
+  }
+  if (devisNumber && devisNumber !== id) {
+    const localByNum = getReceiptsLocal(devisNumber)
+    if (Object.keys(localByNum).length > 0) return localByNum
+    const data = await fetchReceiptsServer(devisNumber)
+    if (data && typeof data === 'object' && Object.keys(data).length > 0) return data
   }
   return null
 }
@@ -150,6 +155,11 @@ function openDoc(dataUrl) {
   window.open(blobUrl, '_blank', 'noopener,noreferrer')
 }
 
+function makeReceiptNumber(devisNumber, paymentsCount) {
+  const seq = String(paymentsCount + 1).padStart(3, '0')
+  return `REC-${devisNumber || 'DEV'}-${seq}`
+}
+
 export default function ClientsTab() {
   const [clients, setClients] = useState(getClients())
   const [search, setSearch] = useState('')
@@ -158,6 +168,7 @@ export default function ClientsTab() {
   const [editMode, setEditMode] = useState(false)
   const [editData, setEditData] = useState(null)
   const [fetchedDocs, setFetchedDocs] = useState({})
+  const [fetchedReceipts, setFetchedReceipts] = useState({})
   const [fetchingDocKey, setFetchingDocKey] = useState(null)
   const [refreshing, setRefreshing] = useState(false)
   const selectedRef = useRef(null)
@@ -167,8 +178,8 @@ export default function ClientsTab() {
 
   useEffect(() => { selectedRef.current = selected }, [selected]) // Keep ref in sync for interval callback to avoid stale closure
 
-  // Clear fetched docs cache when selected client changes
-  useEffect(() => { setFetchedDocs({}) }, [selected?.id])
+  // Clear fetched docs/receipts cache when selected client changes
+  useEffect(() => { setFetchedDocs({}); setFetchedReceipts({}) }, [selected?.id])
 
   useEffect(() => {
     function reload() {
@@ -198,6 +209,24 @@ export default function ClientsTab() {
     } finally {
       setFetchingDocKey(null)
     }
+  }
+
+  async function handleViewReceipt(receiptId) {
+    const current = selectedRef.current
+    let store = fetchedReceipts
+    if (!store[receiptId]) {
+      const serverReceipts = await fetchReceiptsFromServerByAnyId({ id: current?.id, devisNumber: current?.devisNumber })
+      if (serverReceipts) {
+        setFetchedReceipts((prev) => ({ ...prev, ...serverReceipts }))
+        store = serverReceipts
+      }
+    }
+    const receipt = store[receiptId]
+    if (!receipt?.dataUrl) {
+      alert('Reçu introuvable sur le serveur.')
+      return
+    }
+    openDoc(receipt.dataUrl)
   }
 
   async function handleManualRefresh() {
@@ -232,17 +261,80 @@ export default function ClientsTab() {
     if (selected?.id === id) setSelected((prev) => ({ ...prev, status }))
   }
 
-  function handleAddPayment() {
+  async function handleAddPayment() {
     const montant = parseFloat(newPayment.montant)
-    if (!montant || montant <= 0) return
+    if (!montant || montant <= 0 || !selected) return
     const payment = { ...newPayment, montant }
+    const paymentsCount = (selected.payments || []).length
+    const receiptId = Date.now().toString()
+    const receiptNumber = makeReceiptNumber(selected.devisNumber, paymentsCount)
     const updated = clients.map((c) =>
-      c.id === selected.id ? { ...c, payments: [...(c.payments || []), payment] } : c
+      c.id === selected.id ? {
+        ...c,
+        payments: [...(c.payments || []), payment],
+        paymentReceipts: [...(c.paymentReceipts || []), {
+          id: receiptId,
+          receiptNumber,
+          montant,
+          mode: payment.mode,
+          date: payment.date,
+          createdAt: new Date().toISOString(),
+        }],
+      } : c
     )
     saveClients(updated)
     setClients(updated)
     const updatedSelected = updated.find((c) => c.id === selected.id)
     setSelected(updatedSelected)
+
+    if (updatedSelected) {
+      const total = calcTotal(updatedSelected)
+      const totalPaid = (updatedSelected.payments || []).reduce((s, p) => s + (p.montant || 0), 0)
+      const soldeRestant = total - totalPaid
+      try {
+        const doc = generatePaymentReceiptPDF({
+          client: updatedSelected,
+          payment,
+          totalPaid,
+          soldeRestant,
+          receiptNumber,
+        })
+        const dataUrl = doc.output('datauristring')
+        const byId = getReceiptsLocal(updatedSelected.id)
+        const merged = {
+          ...byId,
+          [receiptId]: {
+            id: receiptId,
+            receiptNumber,
+            montant,
+            mode: payment.mode,
+            date: payment.date,
+            createdAt: new Date().toISOString(),
+            dataUrl,
+          },
+        }
+        await saveReceiptsAny(updatedSelected.id, merged)
+        if (updatedSelected.devisNumber) {
+          await saveReceiptsAny(updatedSelected.devisNumber, merged)
+        }
+        setFetchedReceipts(merged)
+        notifyEvent({
+          ...updatedSelected,
+          notificationType: 'payment_receipt',
+          paymentReceipt: {
+            receiptNumber,
+            montant,
+            mode: payment.mode,
+            date: payment.date,
+            totalPaid,
+            soldeRestant,
+          },
+        })
+      } catch (error) {
+        console.error('Failed to generate or store payment receipt:', error)
+      }
+    }
+
     setNewPayment({ date: new Date().toISOString().split('T')[0], montant: '', mode: 'Virement' })
   }
 
@@ -362,7 +454,13 @@ export default function ClientsTab() {
   const statusColor = (s) => {
     if (s === 'signé') return 'badge-green'
     if (s === 'annulé') return 'badge-red'
+    if (s === 'brouillon_envoyé') return 'badge-gold'
     return 'badge-gold'
+  }
+
+  const statusLabel = (s) => {
+    if (s === 'brouillon_envoyé') return 'Brouillon envoyé'
+    return s || 'en cours'
   }
 
   return (
@@ -411,7 +509,7 @@ export default function ClientsTab() {
                   <td><strong>{(calcTotal(c) || 0).toLocaleString('fr-FR')} €</strong></td>
                   <td><PaymentBar client={c} /></td>
                   <td>
-                    <span className={`badge ${statusColor(c.status)}`}>{c.status || 'en cours'}</span>
+                    <span className={`badge ${statusColor(c.status)}`}>{statusLabel(c.status)}</span>
                   </td>
                   <td onClick={(e) => e.stopPropagation()}>
                     <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap' }}>
@@ -577,6 +675,17 @@ export default function ClientsTab() {
                   </div>
                 </div>
               ))}
+              {(selected.paymentReceipts || []).length > 0 && (
+                <div style={{ marginTop: '10px', borderTop: '1px solid #eee', paddingTop: '8px' }}>
+                  <div style={{ fontSize: '12px', fontWeight: '700', color: '#666', marginBottom: '6px' }}>Reçus disponibles</div>
+                  {(selected.paymentReceipts || []).slice().reverse().map((receipt) => (
+                    <div key={receipt.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '12px', padding: '4px 0' }}>
+                      <span>{receipt.receiptNumber} — {formatMoney(receipt.montant)}</span>
+                      <button className="btn btn-sm btn-outline" onClick={() => handleViewReceipt(receipt.id)}>📄 Voir</button>
+                    </div>
+                  ))}
+                </div>
+              )}
               {/* Solde */}
               {(() => {
                 const total = calcTotal(selected)
@@ -671,6 +780,21 @@ export default function ClientsTab() {
                   </div>
                 )
               })()}
+              <div style={{ marginTop: '10px', fontSize: '13px', background: '#f8f5f0', borderRadius: '8px', padding: '8px' }}>
+                <div style={{ fontWeight: '600', marginBottom: '4px' }}>🧾 Reçus de paiement</div>
+                {(selected.paymentReceipts || []).length === 0 ? (
+                  <span style={{ color: '#888' }}>Aucun reçu enregistré</span>
+                ) : (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '5px' }}>
+                    {(selected.paymentReceipts || []).slice().reverse().map((receipt) => (
+                      <div key={receipt.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <span>{receipt.receiptNumber}</span>
+                        <button className="btn btn-sm btn-outline" onClick={() => handleViewReceipt(receipt.id)}>👁️ Voir</button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
             </div>
 
             {/* Signature */}
@@ -705,6 +829,7 @@ export default function ClientsTab() {
                 onChange={(e) => handleStatusChange(selected.id, e.target.value)}
               >
                 <option value="en cours">En cours</option>
+                <option value="brouillon_envoyé">Brouillon envoyé</option>
                 <option value="signé">Signé</option>
                 <option value="annulé">Annulé</option>
               </select>
@@ -748,4 +873,3 @@ export default function ClientsTab() {
     </div>
   )
 }
-

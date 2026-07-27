@@ -410,12 +410,16 @@ export function generateDevisNumber() {
   return `${todayPrefix}${nextNum}`
 }
 
-export function notifyNewDevis(devis) {
+export function notifyEvent(payload) {
   fetch('/api/notify.php', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(devis),
+    body: JSON.stringify(payload),
   }).catch((err) => {
-    console.warn('[storage] Failed to send new devis notification:', err)
+    console.warn('[storage] Failed to send notification:', err)
   })
+}
+
+export function notifyNewDevis(devis) {
+  notifyEvent(devis)
 }

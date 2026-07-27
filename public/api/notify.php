@@ -161,6 +161,7 @@ if (is_file($settingsFile) && is_readable($settingsFile)) {
 }
 
 $devisNumber = isset($data['devisNumber']) ? (string) $data['devisNumber'] : 'N/A';
+$notificationType = isset($data['notificationType']) ? (string) $data['notificationType'] : 'devis_signe';
 $prenom = isset($data['prenom']) ? trim((string) $data['prenom']) : '';
 $nom = isset($data['nom']) ? trim((string) $data['nom']) : '';
 $clientName = trim($prenom . ' ' . $nom);
@@ -171,6 +172,13 @@ $eventDateRaw = isset($data['dateEvenement']) ? trim((string) $data['dateEveneme
 $eventDateTs = $eventDateRaw !== '' ? strtotime($eventDateRaw) : false;
 $eventDate = $eventDateTs ? date('d/m/Y', $eventDateTs) : 'Non renseignée';
 $totalTTC = isset($data['totalTTC']) ? number_format((float) $data['totalTTC'], 2, ',', ' ') . ' €' : 'N/A';
+$receipt = isset($data['paymentReceipt']) && is_array($data['paymentReceipt']) ? $data['paymentReceipt'] : [];
+$receiptNumber = isset($receipt['receiptNumber']) ? (string) $receipt['receiptNumber'] : '';
+$receiptAmount = isset($receipt['montant']) ? number_format((float) $receipt['montant'], 2, ',', ' ') . ' €' : '';
+$receiptMode = isset($receipt['mode']) ? (string) $receipt['mode'] : '';
+$receiptDate = isset($receipt['date']) && strtotime((string) $receipt['date']) ? date('d/m/Y', strtotime((string) $receipt['date'])) : '';
+$receiptTotalPaid = isset($receipt['totalPaid']) ? number_format((float) $receipt['totalPaid'], 2, ',', ' ') . ' €' : '';
+$receiptSolde = isset($receipt['soldeRestant']) ? number_format((float) $receipt['soldeRestant'], 2, ',', ' ') . ' €' : '';
 
 $siteUrl = '';
 if (isset($settings['siteUrl']) && is_string($settings['siteUrl'])) {
@@ -220,16 +228,29 @@ function send_with_fallback($to, $subject, $message, $headers, $smtpConfig, $fro
 $adminSent = false;
 $adminVia = 'none';
 if ($ownerEmail) {
-    $adminSubject = 'Nouveau devis signé : ' . $devisNumber;
-    $adminMessage = "Un nouveau devis vient d'être validé.\n\n"
+    $adminSubject = 'Notification client : ' . $devisNumber;
+    $adminMessage = "Nouvelle notification transactionnelle.\n\n"
+        . "Type : {$notificationType}\n"
         . "Devis : {$devisNumber}\n"
         . "Client : " . ($clientName !== '' ? $clientName : 'Non renseigné') . "\n"
         . "Email client : " . ($clientEmail ?: 'Non renseigné') . "\n"
         . "Téléphone : " . ($phone !== '' ? $phone : 'Non renseigné') . "\n"
         . "Événement : " . ($eventType !== '' ? $eventType : 'Non renseigné') . "\n"
         . "Date : {$eventDate}\n"
-        . "Total TTC : {$totalTTC}\n\n"
-        . "Espace client : {$espaceClientUrl}\n";
+        . "Total TTC : {$totalTTC}\n";
+    if ($notificationType === 'payment_receipt') {
+        $adminSubject = 'Nouveau paiement reçu : ' . $devisNumber;
+        $adminMessage .= "Montant versé : {$receiptAmount}\n"
+            . "Mode : " . ($receiptMode !== '' ? $receiptMode : 'Non renseigné') . "\n"
+            . "Date règlement : " . ($receiptDate !== '' ? $receiptDate : 'Non renseignée') . "\n"
+            . "Total réglé : " . ($receiptTotalPaid !== '' ? $receiptTotalPaid : 'Non renseigné') . "\n"
+            . "Solde restant : " . ($receiptSolde !== '' ? $receiptSolde : 'Non renseigné') . "\n";
+    } elseif ($notificationType === 'devis_brouillon') {
+        $adminSubject = 'Nouveau devis envoyé non signé : ' . $devisNumber;
+    } else {
+        $adminSubject = 'Nouveau devis signé : ' . $devisNumber;
+    }
+    $adminMessage .= "\nEspace client : {$espaceClientUrl}\n";
     $adminResult = send_with_fallback(
         $ownerEmail,
         $adminSubject,
@@ -250,17 +271,38 @@ $clientVia = 'none';
 if ($clientEmail) {
     $clientSubject = 'Récapitulatif de votre devis ' . $devisNumber;
     $clientMessage = "Bonjour " . ($prenom !== '' ? $prenom : '') . ",\n\n"
-        . "Merci pour votre demande. Votre devis a bien été enregistré.\n\n"
+        . "Merci pour votre demande.\n\n"
         . "Numéro de devis : {$devisNumber}\n"
         . "Type d'événement : " . ($eventType !== '' ? $eventType : 'Non renseigné') . "\n"
         . "Date de l'événement : {$eventDate}\n"
         . "Total TTC : {$totalTTC}\n\n"
-        . "Vous pouvez suivre votre dossier ici :\n{$espaceClientUrl}\n\n"
-        . "Documents à fournir dans votre espace client :\n"
-        . "- Carte d'identité (recto)\n"
-        . "- Carte d'identité (verso)\n"
-        . "- Attestation d'assurance\n\n"
-        . "Cordialement,\nLE PARADISE";
+        . "Accès espace client :\n{$espaceClientUrl}\n\n";
+
+    if ($notificationType === 'devis_brouillon') {
+        $clientSubject = 'Votre devis est prêt : ' . $devisNumber;
+        $clientMessage .= "Votre devis a été préparé et envoyé sans signature.\n"
+            . "Depuis votre espace client, vous pourrez l'ouvrir, le relire, puis le valider avec votre signature électronique.\n\n"
+            . "Cordialement,\nLE PARADISE";
+    } elseif ($notificationType === 'payment_receipt') {
+        $clientSubject = 'Reçu de paiement : ' . ($receiptNumber !== '' ? $receiptNumber : $devisNumber);
+        $clientMessage .= "Nous confirmons la réception de votre règlement.\n\n"
+            . "Référence reçu : " . ($receiptNumber !== '' ? $receiptNumber : 'Non renseignée') . "\n"
+            . "Montant versé : " . ($receiptAmount !== '' ? $receiptAmount : 'Non renseigné') . "\n"
+            . "Mode de paiement : " . ($receiptMode !== '' ? $receiptMode : 'Non renseigné') . "\n"
+            . "Date du règlement : " . ($receiptDate !== '' ? $receiptDate : 'Non renseignée') . "\n"
+            . "Total déjà réglé : " . ($receiptTotalPaid !== '' ? $receiptTotalPaid : 'Non renseigné') . "\n"
+            . "Solde restant : " . ($receiptSolde !== '' ? $receiptSolde : 'Non renseigné') . "\n\n"
+            . "Le reçu PDF est disponible dans votre espace client.\n\n"
+            . "Cordialement,\nLE PARADISE";
+    } else {
+        $clientSubject = 'Confirmation de signature de votre devis ' . $devisNumber;
+        $clientMessage .= "Votre devis est maintenant signé et validé.\n\n"
+            . "Merci de déposer dans votre espace client les pièces suivantes :\n"
+            . "- Carte d'identité (recto)\n"
+            . "- Carte d'identité (verso)\n"
+            . "- Attestation d'assurance\n\n"
+            . "Cordialement,\nLE PARADISE";
+    }
     $clientResult = send_with_fallback(
         $clientEmail,
         $clientSubject,

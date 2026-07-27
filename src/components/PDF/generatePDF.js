@@ -85,7 +85,8 @@ function calcMenuItemTotal(item, nbAdultes, nbEnfants) {
   return item.tarif * nbAdultes
 }
 
-export function generatePDF(devis) {
+export function generatePDF(devis, options = {}) {
+  const { download = true } = options
   const settings = getSettings()
   const l = settings.legalInfo || {}
   const nomEnseigne = l.enseigne || settings.nom || 'LE PARADISE'
@@ -275,6 +276,29 @@ export function generatePDF(devis) {
     y += 8
   }
 
+  // ---- Signature block on quote page ----
+  if (y > pageH - 70) { doc.addPage(); y = 20 }
+  doc.setFont('helvetica', 'bold')
+  doc.setFontSize(10)
+  doc.setTextColor(26, 26, 46)
+  doc.text('BON POUR ACCORD', 20, y)
+  y += 6
+  doc.setFont('helvetica', 'normal')
+  doc.setFontSize(9)
+  doc.setTextColor(60, 60, 60)
+  doc.text('Lu et approuvé — Signature du client :', 20, y)
+  y += 6
+  doc.setDrawColor(150, 150, 150)
+  doc.rect(20, y, 80, 30)
+  if (devis.signature) {
+    try { doc.addImage(devis.signature, 'PNG', 22, y + 2, 76, 26) } catch { /* ignore signature rendering errors */ }
+  }
+  doc.setFontSize(8)
+  doc.setTextColor(110, 110, 110)
+  if (devis.signedAt) {
+    doc.text(`Signé électroniquement le ${new Date(devis.signedAt).toLocaleDateString('fr-FR')}`, 20, y + 35)
+  }
+
   // ---- CGV ----
   doc.addPage()
   y = 20
@@ -336,5 +360,6 @@ export function generatePDF(devis) {
     doc.text(`Page ${i} / ${pageCount}`, pageW - 15, pageH - 8, { align: 'right' })
   }
 
-  doc.save(`${devis.devisNumber || 'devis'}.pdf`)
+  if (download) doc.save(`${devis.devisNumber || 'devis'}.pdf`)
+  return doc
 }

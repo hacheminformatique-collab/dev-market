@@ -1,35 +1,25 @@
 import { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { getClients, saveClients, getSettings } from '../../utils/storage'
+import { getClients, saveClients, getSettings, notifyEvent } from '../../utils/storage'
 import { generatePDF } from '../PDF/generatePDF'
 import { useIsMobile } from '../../hooks/useIsMobile'
 import SignaturePad from '../SignaturePad'
+import { getDocsLocal, fetchDocsServer, saveDocsAny, getReceiptsLocal, fetchReceiptsServer } from '../../utils/clientFiles'
 
 function formatMoney(n) {
   return Number(n || 0).toLocaleString('fr-FR', { minimumFractionDigits: 2 }) + ' €'
 }
 
-function getDocsKey(devisId) {
-  return `paradise_docs_${devisId}`
-}
-
 function getDocs(devisId) {
-  try { return JSON.parse(localStorage.getItem(getDocsKey(devisId))) || {} } catch { return {} }
+  const local = getDocsLocal(devisId)
+  if (Object.keys(local).length > 0) return local
+  try { return JSON.parse(localStorage.getItem(`paradise_docs_${devisId}`)) || {} } catch { return {} }
 }
 
 async function fetchDocsFromServer(devisId) {
-  try {
-    const key = getDocsKey(devisId)
-    const res = await fetch(`/api/storage.php?key=${encodeURIComponent(key)}`)
-    if (res.ok) {
-      const data = await res.json()
-      if (data && typeof data === 'object') {
-        try { localStorage.setItem(key, JSON.stringify(data)) } catch { /* ignore */ }
-        return data
-      }
-    }
-  } catch { /* server unreachable – fall back to localStorage */ }
-  return null
+  const docs = await fetchDocsServer(devisId)
+  if (docs) return docs
+  return fetchDocsServer(String(devisId || '').replace(/[^a-zA-Z0-9_]/g, '_'))
 }
 
 function getDataUrlSizeBytes(dataUrl) {
@@ -91,24 +81,7 @@ async function compressImageDataUrl(dataUrl, targetBytes = 1_400_000) {
 }
 
 async function saveDocs(devisId, docs) {
-  const key = getDocsKey(devisId)
-  localStorage.setItem(key, JSON.stringify(docs))
-
-  for (let attempt = 0; attempt < 3; attempt++) {
-    try {
-      const res = await fetch(`/api/storage.php?key=${encodeURIComponent(key)}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(docs),
-      })
-      if (res.ok) return true
-      console.warn(`[EspaceClient] Doc sync attempt ${attempt + 1} failed: ${res.status}`)
-    } catch (err) {
-      console.warn(`[EspaceClient] Doc sync attempt ${attempt + 1} error:`, err)
-    }
-    if (attempt < 2) await new Promise(resolve => setTimeout(resolve, 1000 * (attempt + 1)))
-  }
-  return false
+  return saveDocsAny(devisId, docs)
 }
 
 function Voyant({ ok }) {
@@ -118,6 +91,11 @@ function Voyant({ ok }) {
       background: ok ? '#27ae60' : '#e74c3c', marginRight: '8px', flexShrink: 0,
     }} title={ok ? 'Document reçu' : 'Document manquant'} />
   )
+}
+
+function openDataUrl(dataUrl) {
+  if (!dataUrl || !dataUrl.startsWith('data:')) return
+  window.open(dataUrl, '_blank', 'noopener,noreferrer')
 }
 
 function DocUploadRow({ label, docKey, docs, onChange }) {
@@ -161,6 +139,7 @@ export default function EspaceClient() {
   const [signaturePadKey, setSignaturePadKey] = useState(0)
   const [showSig, setShowSig] = useState(false)
   const [docs, setDocs] = useState(() => getDocs(devisId))
+  const [receipts, setReceipts] = useState(() => getReceiptsLocal(devisId))
   const [activeTab, setActiveTab] = useState('devis')
   const [invites, setInvites] = useState(() => devis?.invites || [])
   const [newInvite, setNewInvite] = useState({ nom: '', prenom: '', categorie: 'adulte', allergies: '' })
@@ -180,11 +159,17 @@ export default function EspaceClient() {
 
   useEffect(() => {
     let cancelled = false
-    fetchDocsFromServer(devisId).then((serverDocs) => {
-      if (!cancelled && serverDocs) setDocs(serverDocs)
+    Promise.all([
+      fetchDocsFromServer(devisId),
+      fetchReceiptsServer(devis?.id || devisId),
+      devis?.devisNumber ? fetchReceiptsServer(devis.devisNumber) : Promise.resolve(null),
+    ]).then(([serverDocs, receiptsById, receiptsByNumber]) => {
+      if (cancelled) return
+      if (serverDocs) setDocs(serverDocs)
+      setReceipts(receiptsById || receiptsByNumber || {})
     })
     return () => { cancelled = true }
-  }, [devisId])
+  }, [devisId, devis?.id, devis?.devisNumber])
 
   if (!devis) {
     return (
@@ -229,6 +214,8 @@ export default function EspaceClient() {
       (c.id === devisId || c.devisNumber === devisId) ? { ...c, signature: sigData, status: 'signé', signedAt: new Date().toISOString() } : c
     )
     saveClients(updated)
+    const signedDevis = updated.find((c) => c.id === devis?.id) || updated.find((c) => c.devisNumber === devis?.devisNumber)
+    if (signedDevis) notifyEvent({ ...signedDevis, notificationType: 'devis_signe' })
     setClients(updated)
     setSignatureData(sigData)
     setSigned(true)
@@ -299,6 +286,7 @@ export default function EspaceClient() {
   }
 
   const statusColor = devis.status === 'signé' ? '#27ae60' : devis.status === 'annulé' ? '#e74c3c' : '#c9a84c'
+  const statusLabel = devis.status === 'brouillon_envoyé' ? 'Brouillon envoyé' : (devis.status || 'En cours')
 
   // Build WhatsApp link - normalize phone to international format (France)
   const rawPhone = (settings.whatsapp || '0782821582').replace(/\s/g, '')
@@ -337,7 +325,7 @@ export default function EspaceClient() {
           </div>
           <div>
             <span style={{ background: statusColor + '22', color: statusColor, padding: '6px 16px', borderRadius: '20px', fontWeight: '700', fontSize: '14px' }}>
-              {devis.status || 'En cours'}
+              {statusLabel}
             </span>
           </div>
         </div>
@@ -547,6 +535,25 @@ export default function EspaceClient() {
             <DocUploadRow label="Carte d'identité — recto" docKey="cni_recto" docs={docs} onChange={handleDocChange} />
             <DocUploadRow label="Carte d'identité — verso" docKey="cni_verso" docs={docs} onChange={handleDocChange} />
             <DocUploadRow label="Attestation d'assurance" docKey="assurance" docs={docs} onChange={handleDocChange} />
+
+            <div style={{ marginTop: '20px', borderTop: '1px solid #eee', paddingTop: '16px' }}>
+              <h4 style={{ marginBottom: '8px', color: '#1a1a2e' }}>🧾 Reçus de paiement</h4>
+              {Object.values(receipts || {}).length === 0 ? (
+                <p style={{ fontSize: '13px', color: '#888' }}>Aucun reçu disponible pour le moment.</p>
+              ) : (
+                Object.values(receipts)
+                  .sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0))
+                  .map((receipt) => (
+                    <div key={receipt.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 0', borderBottom: '1px solid #f0f0f0' }}>
+                      <div style={{ fontSize: '13px' }}>
+                        <div style={{ fontWeight: '600' }}>{receipt.receiptNumber || 'Reçu'}</div>
+                        <div style={{ color: '#888' }}>{receipt.date ? new Date(receipt.date).toLocaleDateString('fr-FR') : '—'} — {formatMoney(receipt.montant)}</div>
+                      </div>
+                      <button className="btn btn-sm btn-outline" onClick={() => openDataUrl(receipt.dataUrl)}>📄 Ouvrir</button>
+                    </div>
+                  ))
+              )}
+            </div>
           </div>
         )}
 

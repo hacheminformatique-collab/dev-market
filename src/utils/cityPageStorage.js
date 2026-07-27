@@ -203,8 +203,20 @@ function _cleanAIText(raw) {
   return text
 }
 
-// Delay between automatic retries when the API quota (429) is reached.
-const RATE_LIMIT_WAIT_MS = 65_000
+/**
+ * Error thrown when the GitHub Models API daily request quota is exhausted
+ * (typically 150 requests / 24 h).  The caller should stop generation and
+ * display an informational message rather than an error.
+ */
+export class DailyQuotaError extends Error {
+  /** @param {number} retryAfterSeconds */
+  constructor(retryAfterSeconds) {
+    const hours = Math.ceil(retryAfterSeconds / 3600)
+    super(`Quota journalier API atteint. Quota disponible dans ~${hours}h.`)
+    this.name = 'DailyQuotaError'
+    this.retryAfterSeconds = retryAfterSeconds
+  }
+}
 
 /**
  * Generates rich SEO content for a city using GitHub Models API
@@ -298,17 +310,34 @@ Structure recommandée (librement réinterprétée pour chaque ville) :
     let res = await fetchCompletion()
     if (res.ok) return await parseOkResponse(res)
 
-    // On 429 (quota exceeded): notify the UI, wait 65 s, then retry once.
+    // On 429 (quota exceeded): inspect the wait time to determine the quota type.
     if (res.status === 429) {
-      if (onStatus) onStatus('⏳ Quota API atteint — reprise automatique dans 65s…')
-      await new Promise((resolve) => setTimeout(resolve, RATE_LIMIT_WAIT_MS))
+      let retryAfter = 0
+      try {
+        const errJson = await res.clone().json()
+        const msg = errJson?.error?.message || ''
+        // The API embeds "wait X seconds" in the error message
+        const match = msg.match(/wait\s+(\d+)\s+second/i)
+        if (match) retryAfter = parseInt(match[1], 10)
+      } catch { /* ignore */ }
+
+      // Daily quota (>2 min wait): stop immediately — no point retrying
+      if (retryAfter > 120) {
+        throw new DailyQuotaError(retryAfter)
+      }
+
+      // Per-minute quota (short wait): notify UI, wait, then retry once
+      const waitMs = retryAfter > 0 ? retryAfter * 1000 : 65_000
+      const waitSec = Math.round(waitMs / 1000)
+      if (onStatus) onStatus(`⏳ Quota API atteint — reprise automatique dans ${waitSec}s…`)
+      await new Promise((resolve) => setTimeout(resolve, waitMs))
       if (onStatus) onStatus(cityName)
       res = await fetchCompletion()
       if (res.ok) return await parseOkResponse(res)
-      throw new Error(await buildErrMsg(res) + ' (après nouvelle tentative suite au quota 429)')
+      // If it fails again, fall through to the generic error below
     }
 
-    // Other non-ok responses: extract error details and throw
+    // Other non-ok responses (or 429 retry still failed): extract details and throw
     throw new Error(await buildErrMsg(res))
   }
 

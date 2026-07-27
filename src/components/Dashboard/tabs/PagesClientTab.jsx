@@ -2,13 +2,9 @@ import { useState, useEffect } from 'react'
 import {
   makePageTypeStorage,
   generateCityContent,
+  DailyQuotaError,
 } from '../../../utils/cityPageStorage'
 import { DEPARTMENTS, ALL_CITIES } from '../../../data/idf-cities'
-
-// Delay between consecutive AI page generation requests (milliseconds).
-// At ~5 500 tokens/page, 7 s gives ≈ 47 000 tokens/min — safely under the
-// 60 000 tokens/min quota of the GitHub Models API.
-const INTER_PAGE_DELAY_MS = 7_000
 
 // ── Small helpers ──────────────────────────────────────────────────────────
 
@@ -64,6 +60,7 @@ export default function PagesClientTab({ pageType }) {
   const [genProgress, setGenProgress] = useState({ done: 0, total: 0, current: '' })
   const [genDone, setGenDone]       = useState(false)
   const [genError, setGenError]     = useState('')
+  const [genWarn, setGenWarn]       = useState('')
   const [selDepts, setSelDepts]     = useState({})   // { deptCode: 'all' | Set<slug> }
   const [focusDept, setFocusDept]   = useState(null)
   const [citySearch, setCitySearch] = useState('')
@@ -80,6 +77,7 @@ export default function PagesClientTab({ pageType }) {
     setCitySearch('')
     setGenDone(false)
     setGenError('')
+    setGenWarn('')
   }, [pageType.id])
 
   // Load everything on mount / when page type changes
@@ -197,6 +195,7 @@ export default function PagesClientTab({ pageType }) {
     setGenerating(true)
     setGenDone(false)
     setGenError('')
+    setGenWarn('')
     setGenProgress({ done: 0, total: selectedSlugs.length, current: '' })
 
     // 1. Backup existing pages
@@ -206,7 +205,7 @@ export default function PagesClientTab({ pageType }) {
     const existing = await storage.getPages()
     const updated = { ...existing }
 
-    // 3. Generate content per city
+    // 3. Generate content per city — save each page immediately after generation
     for (let i = 0; i < selectedSlugs.length; i++) {
       const slug = selectedSlugs[i]
       const city = ALL_CITIES.find((c) => c.slug === slug)
@@ -224,19 +223,23 @@ export default function PagesClientTab({ pageType }) {
           (statusMsg) => setGenProgress((prev) => ({ ...prev, current: statusMsg })),
         )
         updated[slug] = { content, generatedAt: new Date().toISOString() }
+        // Save and publish immediately so the page is never lost on interruption
+        await storage.savePages(updated)
+        setPages({ ...updated })
       } catch (e) {
         setGenerating(false)
-        setGenError(`❌ Erreur IA pour "${city.name}" : ${e.message}. Vérifiez votre token GitHub dans ⚙️ Configuration.`)
+        if (e instanceof DailyQuotaError) {
+          // Graceful stop: pages already saved above; show informational warning
+          const done = i
+          setGenProgress({ done, total: selectedSlugs.length, current: '' })
+          setGenWarn(`⏳ Quota journalier API atteint (150 pages/jour). ${done} page${done > 1 ? 's' : ''} générée${done > 1 ? 's' : ''} et sauvegardée${done > 1 ? 's' : ''}. ${e.message} Relancez la génération demain pour les pages restantes.`)
+        } else {
+          setGenError(`❌ Erreur IA pour "${city.name}" : ${e.message}. Vérifiez votre token GitHub dans ⚙️ Configuration.`)
+        }
         return
-      }
-      // Pause between requests to stay within the API rate limit (60 000 tokens/min).
-      if (i < selectedSlugs.length - 1) {
-        await new Promise((resolve) => setTimeout(resolve, INTER_PAGE_DELAY_MS))
       }
     }
 
-    await storage.savePages(updated)
-    setPages(updated)
     setGenerating(false)
     setGenDone(true)
     setGenProgress({ done: selectedSlugs.length, total: selectedSlugs.length, current: '' })
@@ -522,6 +525,23 @@ export default function PagesClientTab({ pageType }) {
               lineHeight: '1.5',
             }}>
               {genError}
+            </div>
+          )}
+
+          {/* Orange warning message (daily quota reached — not a fatal error) */}
+          {genWarn && !generating && (
+            <div style={{
+              marginTop: '16px',
+              background: '#fff8e1',
+              border: '1.5px solid #f9a825',
+              borderRadius: '10px',
+              padding: '14px 18px',
+              color: '#e65100',
+              fontSize: '13px',
+              fontWeight: '600',
+              lineHeight: '1.6',
+            }}>
+              {genWarn}
             </div>
           )}
 

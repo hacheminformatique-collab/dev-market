@@ -22,7 +22,7 @@ const KEYS = {
 // ---------------------------------------------------------------------------
 const RETRY_QUEUE_KEY = 'paradise_retry_queue'
 const MAX_RETRIES = 3
-const RETRY_DELAYS = [1000, 2000, 4000]
+const RETRY_DELAYS = [300, 600, 1200]
 
 let _syncStatus = {
   pending: 0,
@@ -109,7 +109,7 @@ let _visibilityHandler = null
  * Also refreshes immediately when the user returns to the tab.
  * Calls stopAutoRefresh() first to prevent duplicate intervals.
  */
-export function startAutoRefresh(intervalMs = 5000) {
+export function startAutoRefresh(intervalMs = 1500) {
   stopAutoRefresh()
   _autoRefreshInterval = setInterval(() => { refreshFromServer() }, intervalMs)
   _visibilityHandler = () => {

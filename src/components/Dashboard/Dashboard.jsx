@@ -50,7 +50,7 @@ export default function Dashboard() {
     onDataRefresh(handleRefresh)
     // Refresh immediately on mount so the UI is up-to-date without waiting for the first polling tick
     refreshFromServer()
-    startAutoRefresh(5000)
+    startAutoRefresh(1500)
     // Also refresh when the browser window regains focus (e.g. user switches back from phone)
     const handleFocus = () => refreshFromServer()
     window.addEventListener('focus', handleFocus)

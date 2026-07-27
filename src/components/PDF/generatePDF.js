@@ -180,9 +180,9 @@ export function generatePDF(devis, options = {}) {
 
   const salle = vatBreakdown(prixSalle, 0.20)
   const traiteur = vatBreakdown(traiteurTotal, 0.10)
-  const options = vatBreakdown(prestationsTotal, 0.20)
-  const totalHT = salle.ht + traiteur.ht + options.ht
-  const totalTVA = salle.tva + traiteur.tva + options.tva
+  const optionsVat = vatBreakdown(prestationsTotal, 0.20)
+  const totalHT = salle.ht + traiteur.ht + optionsVat.ht
+  const totalTVA = salle.tva + traiteur.tva + optionsVat.tva
   const totalTTC = prixSalle + traiteurTotal + prestationsTotal
 
   const rows = []

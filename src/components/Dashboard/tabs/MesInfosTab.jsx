@@ -39,9 +39,31 @@ export default function MesInfosTab() {
       }))
       const sitemapXml = buildSitemapXml({ baseUrl: data.siteUrl, allTypePages, blogArticles: await getBlogArticles() })
       const robotsTxt = buildRobotsTxt(data.siteUrl)
-      downloadTextFile('sitemap.xml', sitemapXml, 'application/xml;charset=utf-8')
-      downloadTextFile('robots.txt', robotsTxt, 'text/plain;charset=utf-8')
-      setSeoMessage(`✅ Fichiers générés (${totalPages} pages villes incluses).`)
+
+      // Try to write files directly on the server
+      let savedOnServer = false
+      try {
+        const res = await fetch('/api/seo-write.php', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ sitemap: sitemapXml, robots: robotsTxt }),
+        })
+        const json = await res.json()
+        if (res.ok && json.ok) {
+          savedOnServer = true
+        }
+      } catch {
+        // Server write not available – fall through to download
+      }
+
+      if (savedOnServer) {
+        setSeoMessage(`✅ Fichiers déposés sur le serveur (${totalPages} pages villes incluses).`)
+      } else {
+        // Fallback: download files locally
+        downloadTextFile('sitemap.xml', sitemapXml, 'application/xml;charset=utf-8')
+        downloadTextFile('robots.txt', robotsTxt, 'text/plain;charset=utf-8')
+        setSeoMessage(`✅ Fichiers téléchargés (${totalPages} pages villes incluses). Déposez-les à la racine du serveur.`)
+      }
     } catch {
       setSeoMessage("❌ Échec de génération. Vérifiez l'URL du site et réessayez.")
     } finally {

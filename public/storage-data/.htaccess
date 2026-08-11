@@ -1,0 +1,3 @@
+# Deny direct HTTP access to all data files in this directory.
+# The application reads and writes these files only via api/storage.php.
+Require all denied

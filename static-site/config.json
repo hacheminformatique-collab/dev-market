@@ -1,0 +1,19 @@
+{
+  "siteUrl": "https://leparadise77.fr",
+  "name": "Le Paradise",
+  "phone": "+33782821582",
+  "phoneDisplay": "07 82 82 15 82",
+  "email": "contact@leparadise77.fr",
+  "address": "5 avenue Fridingen",
+  "postalCode": "77100",
+  "city": "Nanteuil-lès-Meaux",
+  "company": "SARL AFM",
+  "heroVideo": "assets/hero-paradise.mp4",
+  "heroPoster": "assets/hero-poster.jpg",
+  "socialVideos": [],
+  "managementUrl": "",
+  "hostingProvider": "LWS (Ligne Web Services), 10 rue Penthièvre, 75008 Paris — www.lws.fr",
+  "siret": "904 543 816",
+  "publicationDirector": "Mohamed Hachem, gérant",
+  "contactRetentionMonths": 12
+}

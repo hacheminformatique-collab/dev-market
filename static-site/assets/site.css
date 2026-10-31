@@ -89,6 +89,20 @@ details p { margin-top: 16px; }
 .form-status.error { color: #a32c26; }
 .form-status.success { color: #25613c; }
 .button:disabled { opacity: .6; cursor: wait; }
+.city-editorial { max-width: 960px; margin: auto; padding: 48px 40px; font-size: 15px; line-height: 1.8; }
+.city-location { border-left: 4px solid var(--gold); padding: 16px 20px; background: #f0ece3; }
+.city-toc { display: flex; flex-wrap: wrap; gap: 12px 20px; margin: 28px 0 48px; }
+.city-toc a { color: #715220; text-decoration: underline; text-underline-offset: 4px; }
+.city-section { margin-bottom: 56px; scroll-margin-top: 24px; }
+.city-section h2 { font-size: clamp(1.5rem, 3vw, 1.9rem); font-weight: 600; padding-bottom: 12px; border-bottom: 2px solid var(--gold); margin-bottom: 24px; }
+.city-section h3 { font-size: 1.25rem; font-weight: 600; margin: 28px 0 12px; }
+.city-card { background: white; border: 1px solid #d7cdbb; border-left: 4px solid var(--gold); border-radius: 10px; padding: 20px 24px; margin: 20px 0; }
+.city-card h3 { margin-top: 0; }
+.city-card p:last-child { margin-bottom: 0; }
+.city-steps { padding-left: 28px; }
+.city-steps li { padding: 0 0 16px 12px; }
+.city-steps li::marker { color: var(--gold); font-weight: bold; }
+.city-section summary { font-size: 1.2rem; line-height: 1.4; }
 @media (max-width: 1000px) {
   .site-header { flex-wrap: wrap; }
   .site-header nav { flex-wrap: wrap; gap: 14px; }
@@ -106,6 +120,8 @@ details p { margin-top: 16px; }
   .hero.compact { min-height: 480px; }
   .intro-strip { gap: 12px; font-size: 9px; text-align: center; }
   .section { padding: 55px 24px; }
+  .city-editorial { padding: 32px 20px; }
+  .city-card { padding: 18px; }
   .split, .cards, .site-footer, .form-grid { grid-template-columns: 1fr; }
   .split > img { height: 350px; }
   .gallery { grid-template-columns: 1fr 1fr; }

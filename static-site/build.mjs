@@ -1,6 +1,7 @@
 import { readFile, mkdir, writeFile, cp } from 'node:fs/promises'
 import { fileURLToPath } from 'node:url'
 import path from 'node:path'
+import { renderCityContent } from './city-content.mjs'
 
 const root = path.dirname(fileURLToPath(import.meta.url))
 const out = path.join(root, 'dist')
@@ -140,11 +141,10 @@ for (const department of departments) {
       origin: `${city.name} ${city.postalCode} France`,
       destination: `${config.address} ${config.postalCode} ${config.city} France`,
     }).toString()
-    page(city.file, `Location salle de mariage depuis ${city.name} (${city.postalCode}) — ${config.name}`,
-      `Vous cherchez une salle de mariage depuis ${city.name} (${city.postalCode}) ? Découvrez ${config.name} à ${config.city} : photos, visite et devis.`,
-      breadcrumb(department, city) + hero(`Salle de mariage depuis ${e(city.name)} (${city.postalCode}).`, `Votre réception au Paradise, à ${e(config.city)} — un lieu à découvrir pour votre projet depuis ${e(city.name)}.`, true) +
-      `<section class="section split"><div><p class="eyebrow">${e(department.name)} · ${city.postalCode}</p><h2>Votre mariage, vos proches, votre réception.</h2><p>Vous préparez une réception depuis ${e(city.name)} ? ${e(config.name)} vous accueille au ${e(config.address)}, ${config.postalCode} ${e(config.city)}. La salle ne se trouve pas à ${e(city.name)} : venez la visiter avant de réserver.</p><p>Pour vos invités de ${e(city.name)} et des autres communes de ${e(department.name)}, préparez les déplacements entre votre lieu de cérémonie et la salle, et prévoyez le retour après la réception. Les temps de trajet dépendent de votre point de départ et de la circulation.</p><a class="text-link" href="${e(itinerary.href)}" target="_blank" rel="noopener noreferrer">Calculer l’itinéraire depuis ${e(city.name)} ↗</a><p>Indiquez votre date, votre nombre d’invités et vos envies : nous pourrons étudier une proposition adaptée à votre événement.</p>${button()}</div><img src="assets/tables-reception.jpg" width="1200" height="1600" alt="La salle de réception à Nanteuil-lès-Meaux" loading="lazy"></section>` +
-      offers() + `<section class="section"><h2>Découvrez le cadre de votre réception.</h2>${gallery()}<a class="text-link" href="galerie.html">Photos & vidéos →</a></section>` + faq(city) + finalCta() + network(),
+    page(city.file, `Location de salle de mariage depuis ${city.name} (${city.postalCode}) — ${config.name}`,
+      `Location de salle de mariage et de réception depuis ${city.name} (${city.postalCode}) : découvrez ${config.name} à ${config.city}, prestations, photos et devis.`,
+      breadcrumb(department, city) + hero(`Location de salle de mariage et réception depuis ${e(city.name)} (${city.postalCode}).`, `${e(config.name)}, votre salle de mariage à ${e(config.city)} : préparez votre réception depuis ${e(city.name)} (${e(department.name)}).`, true) +
+      renderCityContent({ city, department, config, escape: e, itinerary: itinerary.href, gallery }) + finalCta() + network(),
       [['Accueil', 'index.html'], [department.name, `${department.code}.html`], [city.name, city.file]])
   }
 }

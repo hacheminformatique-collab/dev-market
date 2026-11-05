@@ -37,7 +37,39 @@ if (!is_string($prompt) || trim($prompt) === '' || strlen($prompt) > 30000) {
 }
 $key = trim(getenv('OPENAI_API_KEY') ?: '');
 if ($key === '') {
-    failGeneration(503, 'Clé OpenAI absente du serveur. Configurez OPENAI_API_KEY dans l’environnement PHP de votre hébergement.');
+    $configPath = dirname($root) . '/private/openai-config.php';
+    clearstatcache(true, $configPath);
+    if (file_exists($configPath)) {
+        $resolvedConfig = realpath($configPath);
+        $documentRoot = realpath($_SERVER['DOCUMENT_ROOT'] ?? $root) ?: $root;
+        foreach ([$root, $documentRoot] as $publicRoot) {
+            if ($resolvedConfig === false || strncmp($resolvedConfig, $publicRoot . DIRECTORY_SEPARATOR, strlen($publicRoot) + 1) === 0) {
+                failGeneration(503, 'Le fichier de configuration OpenAI doit rester hors du dossier public, sans lien vers un fichier public.');
+            }
+        }
+        if (!is_readable($resolvedConfig)) {
+            failGeneration(503, 'Le fichier privé OpenAI n’est pas lisible par PHP. Vérifiez ses permissions.');
+        }
+        ob_start();
+        try {
+            $config = require $resolvedConfig;
+        } catch (\Throwable $error) {
+            ob_end_clean();
+            error_log('[OpenAI] Fichier privé de configuration invalide.');
+            failGeneration(503, 'Le fichier privé OpenAI contient une erreur PHP. Vérifiez sa syntaxe.');
+        }
+        $configOutput = ob_get_clean();
+        if ($configOutput !== '') {
+            failGeneration(503, 'Le fichier privé OpenAI ne doit afficher aucun contenu. Utilisez uniquement le modèle de configuration.');
+        }
+        if (!is_array($config) || !is_string($config['apiKey'] ?? null)) {
+            failGeneration(503, 'Configuration OpenAI invalide : le fichier privé doit retourner un tableau avec apiKey.');
+        }
+        $key = trim($config['apiKey']);
+    }
+}
+if ($key === '' || $key === 'VOTRE_CLE_API_OPENAI' || preg_match('/[\r\n]/', $key)) {
+    failGeneration(503, 'Clé OpenAI absente ou invalide. Configurez OPENAI_API_KEY ou le fichier private/openai-config.php hors du dossier public.');
 }
 if (!function_exists('curl_init')) {
     failGeneration(503, 'L’extension PHP cURL est requise pour OpenAI.');

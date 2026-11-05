@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import { test, before, after } from 'node:test'
 import { createServer } from 'vite'
-import { mkdtemp, cp, mkdir, readFile, writeFile, rm, chmod } from 'node:fs/promises'
+import { mkdtemp, cp, mkdir, readFile, writeFile, rm, chmod, symlink } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
 import { createServer as createTcpServer } from 'node:net'
@@ -276,6 +276,45 @@ function curl_close($curl) {}
   result = await post()
   assert.equal(result.status, 503)
   assert.match((await result.json()).error, /OPENAI_API_KEY/)
+  const privateDirectory = join(directory, 'private')
+  const privateConfig = join(privateDirectory, 'openai-config.php')
+  await mkdir(privateDirectory)
+  await writeFile(privateConfig, "<?php return ['apiKey' => 'test-only-private-key'];")
+  await setResponse({ choices: [{ message: { content: 'Texte avec clé privée' }, finish_reason: 'stop' }] }, 200, { key: '' })
+  result = await post()
+  assert.equal(result.status, 200)
+  assert.deepEqual(await result.json(), { content: 'Texte avec clé privée' })
+  const privateCall = JSON.parse(await readFile(callsFile, 'utf8'))
+  assert.ok(privateCall.options['5'].includes('Authorization: Bearer test-only-private-key'))
+  await assert.rejects(readFile(join(site, 'private/openai-config.php')), { code: 'ENOENT' })
+  assert.ok(!(await (await fetch(`${baseUrl}/private/openai-config.php`)).text()).includes('test-only-private-key'))
+  for (const [config, message] of [
+    ["<?php return ['apiKey' => 'VOTRE_CLE_API_OPENAI'];", /absente ou invalide/],
+    ["<?php return ['apiKey' => []];", /Configuration OpenAI invalide/],
+    ["<?php this is invalid PHP containing secret-test-key", /erreur PHP/],
+    ["<?php echo 'test-only-private-key'; return ['apiKey' => 'test-only-private-key'];", /aucun contenu/],
+  ]) {
+    await writeFile(privateConfig, config)
+    result = await post()
+    assert.equal(result.status, 503)
+    const text = await result.text()
+    assert.match(text, message)
+    assert.ok(!text.includes('secret-test-key'))
+    assert.ok(!text.includes('test-only-private-key'))
+  }
+  await writeFile(privateConfig, "<?php return ['apiKey' => 'test-only-private-key'];")
+  await setResponse({ choices: [{ message: { content: 'Env prioritaire' }, finish_reason: 'stop' }] })
+  assert.equal((await post()).status, 200)
+  const environmentCall = JSON.parse(await readFile(callsFile, 'utf8'))
+  assert.ok(environmentCall.options['5'].includes('Authorization: Bearer test-only-provider-key'))
+  await setResponse({}, 200, { key: '' })
+  await rm(privateConfig)
+  const exposedConfig = join(site, 'exposed-test-config.php')
+  await writeFile(exposedConfig, "<?php return ['apiKey' => 'test-only-private-key'];")
+  await symlink(exposedConfig, privateConfig)
+  result = await post()
+  assert.equal(result.status, 503)
+  assert.match((await result.json()).error, /hors du dossier public/)
 })
 
 test('OpenAI client surfaces network, API and deployment errors and never uses a local fallback', async () => {

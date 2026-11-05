@@ -14,6 +14,8 @@ La generation du blog et son automatisation ne sont pas migrees par ce changemen
    le panneau d'hebergement ou avec son support. Ne jamais mettre la cle dans
    React, une variable `VITE_*`, le stockage du site, une sauvegarde ou Git.
    Verifier que PHP recoit bien la variable (PHP-FPM peut filtrer l'environnement).
+   Sur LWS/cPanel sans variable d'environnement, utiliser le fichier prive
+   decrit ci-dessous.
 3. Activer PHP cURL et les connexions HTTPS sortantes vers `api.openai.com`.
    Autoriser au moins 130 secondes pour une requete PHP sur le serveur et le proxy.
 4. Deployer tout `dist/`, notamment `api/openai-generate.php`, puis enregistrer
@@ -30,6 +32,40 @@ Il n'y a ni relance automatique payante ni remplacement silencieux par un
 modele de texte local. Une interruption reseau peut survenir apres facturation :
 verifier l'usage OpenAI avant de relancer. Les erreurs distinguent configuration
 manquante, cle invalide, quota, acces reseau et reponse vide/tronquee.
+
+### LWS / cPanel : fichier prive hors de public_html
+
+Pour un site deploye directement dans `/home/VOTRE_COMPTE/public_html` :
+
+```text
+/home/VOTRE_COMPTE/
+  private/
+    openai-config.php
+  public_html/
+    api/
+      openai-generate.php
+```
+
+Dans le gestionnaire de fichiers cPanel, remonter au dossier parent de
+`public_html`, creer `private`, puis `openai-config.php`. Copier le contenu
+de `config/openai-config.example.php` et remplacer le placeholder par la cle
+uniquement sur l'hebergement. Ce fichier retourne un tableau PHP : il ne
+genere aucun texte et ne fait aucun appel API par lui-meme.
+Permissions recommandees : dossier `0700`, fichier `0600`, avec le meme
+proprietaire que le processus PHP. Ne pas utiliser `0777`.
+
+Le serveur lit `private/openai-config.php` dans le parent de la racine du site
+uniquement si OPENAI_API_KEY n'est pas configuree. Les chemins resolus dans
+la racine publique (y compris via un lien symbolique) sont refuses.
+Si le domaine utilise un sous-dossier ou une autre racine, placer le dossier
+prive dans le parent de cette racine, hors de tout dossier expose sur le web.
+Ne pas appliquer cette disposition si ce parent est lui-meme public.
+Les restrictions PHP `open_basedir` peuvent necessiter l'aide du support LWS.
+
+Supprimer l'ancien script public `openai-texte.php` : il n'est plus necessaire.
+Si sa cle a ete exposee ou partagee, la revoquer et en creer une nouvelle.
+Deployer la nouvelle version de `dist/` avant d'essayer la generation d'une ville.
+Ne jamais transferer le fichier prive dans `dist/`, Git ou les sauvegardes publiques.
 
 ## Titres et descriptions des pages mariage
 

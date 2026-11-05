@@ -1,10 +1,14 @@
 import { useEffect, useState } from 'react'
-import { useParams, Link } from 'react-router-dom'
+import { useParams, Link as RouterLink } from 'react-router-dom'
 import { makePageTypeStorage, getCityPagesConfig } from '../../utils/cityPageStorage'
 import { getCityBySlug, getNearbyCities, haversineKm } from '../../data/idf-cities'
 import { PAGE_TYPES } from '../../data/pageTypes'
 import { getBlogArticles } from '../../utils/blogStorage'
 import WizardForm from '../Wizard/WizardForm'
+
+function Link(props) {
+  return <RouterLink {...props} reloadDocument />
+}
 
 // ── Paradise 77 location (5 avenue Fridingen, 77100 Nanteuil-lès-Meaux) ──────
 const PARADISE_LAT = 48.9617
@@ -1039,7 +1043,7 @@ function SectionBlogArticles({ articles }) {
   )
 }
 
-function SectionDevis({ city, businessName }) {
+function SectionDevis({ city, businessName, published = false }) {
   return (
     <section id="devis" style={{ marginBottom: '56px' }}>
       <div style={{ background: 'linear-gradient(135deg, var(--dark), var(--navy))', borderRadius: '16px', padding: 'clamp(28px,5vw,48px)', color: 'white' }}>
@@ -1056,6 +1060,14 @@ function SectionDevis({ city, businessName }) {
           </p>
         </div>
         <WizardForm inline={true} />
+        {published && (
+          <noscript>
+            <p style={{ padding: '16px', textAlign: 'center' }}>
+              Pour envoyer votre demande de devis, activez JavaScript ou contactez-nous sur{' '}
+              <a href="https://wa.me/33782821582">WhatsApp</a>.
+            </p>
+          </noscript>
+        )}
       </div>
     </section>
   )
@@ -1074,7 +1086,6 @@ export default function CityPage({ pageType }) {
 
   // Use the page-type-scoped storage
   const storage = makePageTypeStorage(pageType?.id || 'mariage')
-  const basePath = pageType?.basePath || '/locationsalledemariage'
 
   useEffect(() => {
     setLoading(true)
@@ -1132,6 +1143,12 @@ export default function CityPage({ pageType }) {
     )
   }
 
+  return <CityPageContent {...{ citySlug, pageType, page, gallery, config, allTypePages, blogArticles }} />
+}
+
+export function CityPageContent({ citySlug, pageType, page, gallery, config, allTypePages, blogArticles, published = false }) {
+  const city = getCityBySlug(citySlug)
+  const basePath = pageType?.basePath || '/locationsalledemariage'
   const businessName      = config?.businessName || 'Le Paradise 77'
   const instagramUsername = config?.instagramUsername || ''
   const tiktokUsername    = config?.tiktokUsername || ''
@@ -1161,7 +1178,7 @@ export default function CityPage({ pageType }) {
 
   const devisInsertIndex = getDevisInsertIndex(seed, orderedSections.length)
   const sectionsWithDevis = [...orderedSections]
-  sectionsWithDevis.splice(devisInsertIndex, 0, <SectionDevis key="devis" city={city} businessName={businessName} />)
+  sectionsWithDevis.splice(devisInsertIndex, 0, <SectionDevis key="devis" city={city} businessName={businessName} published={published} />)
 
   return (
     <div style={{ minHeight: '100vh', background: 'var(--cream)' }}>
@@ -1223,7 +1240,7 @@ export default function CityPage({ pageType }) {
 
         {/* Micro-data footer */}
         <div style={{ marginTop: '40px', paddingTop: '20px', borderTop: '1px solid var(--border)', fontSize: '11px', color: '#bbb', textAlign: 'center' }}>
-          Page mise à jour le {new Date(page.generatedAt).toLocaleDateString('fr-FR')} • {businessName} • {city.name}, {city.deptName}
+          Page mise à jour le {new Date(page.generatedAt).toLocaleDateString('fr-FR', { timeZone: 'Europe/Paris' })} • {businessName} • {city.name}, {city.deptName}
         </div>
       </div>
 

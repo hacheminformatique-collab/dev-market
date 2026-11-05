@@ -30,8 +30,7 @@ const TABS = [
   { id: 'menus',      icon: '🍽️', label: 'Menus' },
   { id: 'gateaux',    icon: '🎂', label: 'Gâteaux' },
   { id: 'prestations',icon: '🎵', label: 'Prestations' },
-  // ── City page types (one tab per type) ────────────────────────────────────
-  ...PAGE_TYPES.map((pt) => ({ id: pt.dashboardId, icon: pt.icon, label: pt.label })),
+  ...PAGE_TYPES.filter((pt) => pt.id === 'mariage').map((pt) => ({ id: pt.dashboardId, icon: pt.icon, label: pt.label })),
   { id: 'blog',       icon: '📝', label: 'Blog' },
   { id: 'backup',     icon: '💾', label: 'Back-up' },
   { id: 'infos',      icon: '⚙️', label: 'Mes Infos' },
@@ -79,7 +78,7 @@ export default function Dashboard() {
       case 'backup':      return <BackupTab key={refreshKey} />
       default: {
         // City page type tabs
-        const pt = PAGE_TYPES.find((p) => p.dashboardId === activeTab)
+        const pt = PAGE_TYPES.find((p) => p.id === 'mariage' && p.dashboardId === activeTab)
         if (pt) return <PagesClientTab key={pt.id} pageType={pt} />
         return null
       }

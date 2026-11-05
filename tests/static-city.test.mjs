@@ -7,9 +7,12 @@ import { join, resolve } from 'node:path'
 import { createServer as createTcpServer } from 'node:net'
 import { spawn } from 'node:child_process'
 import { once } from 'node:events'
+import { renderToStaticMarkup } from 'react-dom/server'
 
 const root = resolve(import.meta.dirname, '..')
-let vite, publication, directory, site, origin, template
+let vite, publication, directory, site, origin, template, shellTemplate
+let buildSeoData, PAGE_TYPES_BY_ID, getPublishedWeddingSlugs, isPublicPath, generateCityContent
+let WeddingDirectory
 const processes = []
 const pin = 'publication-test-pin'
 const fixture = {
@@ -20,7 +23,7 @@ const fixture = {
   config: { businessName: 'Salle de test & mariage', githubToken: 'DO-NOT-PUBLISH-TOKEN', instagramPosts: [], tiktokPosts: [] },
   gallery: [],
   allTypePages: {
-    mariage: { meaux: { content: 'INTERNAL-OTHER-CONTENT' }, 'nanteuil-les-meaux': { content: 'INTERNAL-OTHER-CONTENT' } },
+    mariage: { meaux: { content: 'INTERNAL-OTHER-CONTENT' }, 'nanteuil-les-meaux': { content: 'INTERNAL-OTHER-CONTENT' }, bobigny: { content: 'ONLY-GENERATED-NOT-PUBLISHED' } },
     anniversaire: { 'nanteuil-les-meaux': { content: 'LEGACY-OTHER-CONTENT' } },
   },
   blogArticles: {
@@ -63,7 +66,13 @@ async function ready(url, output) {
 before(async () => {
   vite = await createServer({ root, server: { middlewareMode: true } })
   publication = await vite.ssrLoadModule('/src/utils/staticCityPublication.jsx')
+  ;({ buildSeoData } = await vite.ssrLoadModule('/src/utils/seoData.js'))
+  ;({ PAGE_TYPES_BY_ID } = await vite.ssrLoadModule('/src/data/pageTypes.js'))
+  ;({ getPublishedWeddingSlugs, isPublicPath } = await vite.ssrLoadModule('/src/utils/weddingPublication.js'))
+  ;({ generateCityContent } = await vite.ssrLoadModule('/src/utils/cityPageStorage.js'))
+  ;({ default: WeddingDirectory } = await vite.ssrLoadModule('/src/components/WeddingDirectory.jsx'))
   template = await readFile(join(root, 'dist/static-city.html'), 'utf8')
+  shellTemplate = await readFile(join(root, 'dist/index.html'), 'utf8')
   directory = await mkdtemp(join(tmpdir(), 'dev-market-static-test-'))
   await chmod(directory, 0o755)
   site = join(directory, 'site')
@@ -137,7 +146,7 @@ test('the snapshot includes public data only', () => {
 test('HTML has content, self-canonical, SEO and quote links before JavaScript', () => {
   const snapshot = publication.makeCitySnapshot({ slug: 'meaux', ...fixture })
   const html = publication.renderCityDocument({ template, snapshot, settings: fixture.settings, origin })
-  assert.match(html, /<h1[^>]*>Salle de mariage/)
+  assert.match(html, /<h1[^>]*>Location salle de mariage près de Meaux/)
   assert.match(html, /Texte unique \$&amp; et &lt;script&gt;/)
   assert.ok(html.includes(`<link rel="canonical" href="${origin}/locationsalledemariage/meaux"`))
   assert.match(html, /name="robots" content="index, follow/)
@@ -157,7 +166,22 @@ test('HTML has content, self-canonical, SEO and quote links before JavaScript', 
   const data = html.match(/<script id="city-page-data" type="application\/json">([\s\S]*?)<\/script>/)[1]
   assert.deepEqual(JSON.parse(data), JSON.parse(JSON.stringify(snapshot)))
   assert.ok(!data.includes('<script>'))
-  assert.doesNotThrow(() => JSON.parse(html.match(/<script id="seo-json-ld" type="application\/ld\+json">([\s\S]*?)<\/script>/)[1]))
+  const seo = JSON.parse(html.match(/<script id="seo-json-ld" type="application\/ld\+json">([\s\S]*?)<\/script>/)[1])
+  const venue = seo['@graph'].find((entry) => Array.isArray(entry['@type']) && entry['@type'].includes('EventVenue'))
+  assert.equal(venue.address.addressLocality, 'Nanteuil-lès-Meaux')
+  assert.equal(venue.address.postalCode, '77100')
+  assert.ok(seo['@graph'].some((entry) => entry['@type'] === 'Service' && entry.areaServed.name === 'Meaux'))
+  assert.match(html, /<details[^>]*>.*?<summary/s)
+  assert.match(html, /Le tarif de location de/)
+  assert.match(html, /à vol d’oiseau/)
+  assert.ok(!html.includes('key=${'))
+  const directory = html.match(/<section class="wedding-directory"[\s\S]*?<\/section>/)[0]
+  assert.match(directory, /Seine-et-Marne \(77\)/)
+  assert.ok(directory.includes('href="/locationsalledemariage/meaux" title="Location salle de mariage Meaux">Location salle de mariage Meaux</a>'))
+  assert.ok(directory.includes('Location salle de mariage Nanteuil-lès-Meaux'))
+  assert.ok(!directory.includes('locationsalleanniversaire'))
+  assert.ok(!directory.includes('/bobigny'))
+  assert.ok(!/\balt=/.test(directory))
   assert.throws(() => publication.renderCityDocument({ template: '<div id="root"></div>', snapshot, settings: fixture.settings, origin }), /modèle statique/)
 })
 
@@ -196,8 +220,18 @@ test('publishes physical files at extensionless URLs and republishes safely', as
     assert.ok(sitemap.includes('/locationsalleanniversaire/nanteuil-les-meaux'))
     assert.ok(sitemap.includes('/blog/exemple'))
     assert.ok(!sitemap.includes('/blog/brouillon'))
+    assert.ok(!sitemap.includes('/devis'))
+    assert.ok(!sitemap.includes('/locationsalledemariage/bobigny'))
     assert.ok((await (await fetch('/robots.txt')).text()).includes(`Sitemap: ${origin}/sitemap.xml`))
     assert.equal((await fetch('/storage-data/paradise_settings.json')).status, 403)
+    const directory = await (await fetch('/wedding-directory.html')).text()
+    const home = await (await fetch('/')).text()
+    assert.ok(home.includes(directory), 'The directory must be in the initial homepage HTML')
+    assert.ok(home.includes('id="public-wedding-directory"'))
+    assert.match(home, /<title>Location salle de mariage à Nanteuil-lès-Meaux/)
+    assert.ok(home.includes(`rel="canonical" href="${origin}/"`))
+    assert.equal((home.match(/id="public-wedding-directory"/g) || []).length, 1)
+    assert.deepEqual(await getPublishedWeddingSlugs(), ['meaux', 'nanteuil-les-meaux'])
     // Changing the source JSON must not change a published page until republication.
     await writeFile(join(site, 'storage-data/paradise_city_pages.json'), JSON.stringify({
       meaux: { content: 'SOURCE-CHANGED-NOT-YET-PUBLISHED', generatedAt: '2026-01-12T12:00:00Z' },
@@ -209,6 +243,82 @@ test('publishes physical files at extensionless URLs and republishes safely', as
     assert.match(await (await fetch('/locationsalledemariage/nanteuil-les-meaux')).text(), /Une salle pour votre mariage/)
     assert.match(await (await fetch('/devis')).text(), /id="root"/)
     assert.match(await (await fetch('/locationsalleanniversaire/nanteuil-les-meaux')).text(), /id="root"/)
+    const updatedHome = await (await fetch('/')).text()
+    assert.equal((updatedHome.match(/id="public-wedding-directory"/g) || []).length, 1)
+    assert.equal((updatedHome.match(/rel="canonical"/g) || []).length, 1)
+  } finally {
+    globalThis.fetch = nativeFetch
+  }
+})
+
+test('publication registry returns no links before publication and rejects invalid content', async () => {
+  const nativeFetch = globalThis.fetch
+  try {
+    globalThis.fetch = async () => new Response('', { status: 404 })
+    assert.deepEqual(await getPublishedWeddingSlugs(), [])
+    globalThis.fetch = async () => new Response('<html></html>')
+    await assert.rejects(getPublishedWeddingSlugs(), /invalide/)
+    globalThis.fetch = async () => new Response('["ville-inconnue"]', { headers: { 'Content-Type': 'application/json' } })
+    await assert.rejects(getPublishedWeddingSlugs(), /invalide/)
+  } finally {
+    globalThis.fetch = nativeFetch
+  }
+})
+
+test('directory covers all IDF departments with exact text, title, order and unique URLs', () => {
+  const slugs = ['meaux', 'torcy', 'mitry-mory', 'paris-1er', 'versailles', 'evry', 'nanterre', 'bobigny', 'creteil', 'argenteuil', 'meaux', 'ville-inconnue']
+  const html = renderToStaticMarkup(WeddingDirectory({ slugs }))
+  for (const department of ['75', '77', '78', '91', '92', '93', '94', '95']) {
+    assert.ok(html.includes(`(${department})`), department)
+  }
+  const links = [...html.matchAll(/<a href="\/locationsalledemariage\/([^"]+)" title="([^"]+)">([^<]+)<\/a>/g)]
+  assert.equal(links.length, new Set(slugs).size - 1)
+  assert.equal(new Set(links.map((link) => link[1])).size, links.length)
+  for (const link of links) {
+    assert.equal(link[2], link[3])
+    assert.ok(link[2].startsWith('Location salle de mariage '))
+  }
+  assert.ok(html.indexOf('Location salle de mariage Meaux') < html.indexOf('Location salle de mariage Mitry-Mory'))
+  assert.ok(html.indexOf('Location salle de mariage Mitry-Mory') < html.indexOf('Location salle de mariage Torcy'))
+  assert.ok(!html.includes('ville-inconnue'))
+  assert.ok(!html.includes('alt='))
+  assert.equal(renderToStaticMarkup(WeddingDirectory({ slugs: [] })), '')
+})
+
+test('SEO uses unique local titles without moving the venue or indexing private pages', () => {
+  const settings = { nom: 'Le Paradise', siteUrl: origin }
+  const meaux = buildSeoData('/locationsalledemariage/meaux', settings, fixture.pages, PAGE_TYPES_BY_ID.mariage, null, null, origin)
+  const nanteuil = buildSeoData('/locationsalledemariage/nanteuil-les-meaux', settings, fixture.pages, PAGE_TYPES_BY_ID.mariage, null, null, origin)
+  assert.notEqual(meaux.title, nanteuil.title)
+  assert.notEqual(meaux.description, nanteuil.description)
+  assert.match(meaux.title, /Location salle de mariage près de Meaux/)
+  assert.match(meaux.description, /Nanteuil-lès-Meaux/)
+  assert.ok(meaux.imageUrl.endsWith('/media/hero-paradise.jpg'))
+  for (const path of ['/', '/blog', '/blog/exemple', '/devis', '/mentions-legales', '/conditions-generales', '/politique-confidentialite', '/locationsalledemariage/meaux', '/locationsalledereception/meaux']) {
+    assert.equal(isPublicPath(path), true, path)
+    assert.doesNotThrow(() => buildSeoData(path, settings, fixture.pages, null, null, null, origin))
+  }
+  for (const path of ['/admin', '/dashboard', '/espace-client/exemple', '/espace-staff/exemple', '/not-found']) {
+    assert.equal(isPublicPath(path), false, path)
+    assert.match(buildSeoData(path, settings, {}, null, null, null, origin).robots, /noindex/)
+  }
+})
+
+test('AI instructions forbid keyword quotas, fictitious venues and invented testimonials', async () => {
+  const nativeFetch = globalThis.fetch
+  let prompt = ''
+  try {
+    globalThis.fetch = async (_url, options) => {
+      prompt = JSON.parse(options.body).messages[0].content
+      return new Response(JSON.stringify({ choices: [{ message: { content: '## Préparer votre réception\nContenu utile.' } }] }))
+    }
+    await generateCityContent('Meaux', 'Seine-et-Marne', '', 'Le Paradise', 'salle', 'test-only-token', 'location salle de mariage')
+    assert.match(prompt, /5 avenue Fridingen/)
+    assert.match(prompt, /pas d'une salle ou d'une agence située/)
+    assert.match(prompt, /N'invente jamais d'avis, de témoignages/)
+    assert.match(prompt, /sans bourrage de mots-clés/)
+    assert.ok(!prompt.includes('AU MOINS 30'))
+    assert.ok(!prompt.includes('AU MINIMUM 1500'))
   } finally {
     globalThis.fetch = nativeFetch
   }
@@ -221,14 +331,25 @@ test('publication reports API failures, incorrect routing and canonical domain m
     await assert.rejects(publication.publishWeddingPages({ ...options, settings: { ...fixture.settings, siteUrl: 'https://wrong.example' } }), /domaine/)
     globalThis.fetch = async (url) => url === '/static-city.html'
       ? new Response(template)
-      : new Response(JSON.stringify({ error: 'Droits insuffisants' }), { status: 500, headers: { 'Content-Type': 'application/json' } })
+      : url === '/'
+        ? new Response(shellTemplate)
+        : new Response(JSON.stringify({ error: 'Droits insuffisants' }), { status: 500, headers: { 'Content-Type': 'application/json' } })
     await assert.rejects(publication.publishWeddingPages(options), /Droits insuffisants/)
     globalThis.fetch = async (url) => url === '/static-city.html'
       ? new Response(template)
-      : url === '/api/static-publish.php'
-        ? new Response('{"ok":true}', { headers: { 'Content-Type': 'application/json' } })
-        : new Response('<div id="root"></div>')
+      : url === '/'
+        ? new Response(shellTemplate)
+        : url === '/api/static-publish.php'
+          ? new Response('{"ok":true}', { headers: { 'Content-Type': 'application/json' } })
+          : new Response('<div id="root"></div>')
     await assert.rejects(publication.publishWeddingPages(options), /ne sert pas le HTML publié/)
+    let writes = 0
+    globalThis.fetch = async (url) => {
+      if (url === '/api/static-publish.php') writes++
+      return new Response(url === '/static-city.html' ? template : '<html>ancien modèle</html>')
+    }
+    await assert.rejects(publication.publishWeddingPages(options), /index.html est incompatible/)
+    assert.equal(writes, 0, 'An incompatible index must be rejected before any page is written')
   } finally {
     globalThis.fetch = nativeFetch
   }

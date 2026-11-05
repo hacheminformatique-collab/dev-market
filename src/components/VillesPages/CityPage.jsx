@@ -6,6 +6,8 @@ import { PAGE_TYPES } from '../../data/pageTypes'
 import { getBlogArticles } from '../../utils/blogStorage'
 import WizardForm from '../Wizard/WizardForm'
 import VideoHero from '../VideoHero'
+import WeddingDirectory from '../WeddingDirectory'
+import { getPublishedWeddingSlugs } from '../../utils/weddingPublication'
 
 function Link(props) {
   return <RouterLink {...props} reloadDocument />
@@ -122,12 +124,12 @@ function Section({ id, title, children, style }) {
 function CityMap({ city, apiKey }) {
   if (!city) return null
   const src = apiKey
-    ? `https://www.google.com/maps/embed/v1/place?key=${encodeURIComponent(apiKey)}&q=${encodeURIComponent(city.name + ', France')}&zoom=14`
-    : `https://www.google.com/maps?q=${encodeURIComponent(city.name + ', France')}&output=embed`
+    ? `https://www.google.com/maps/embed/v1/place?key=${encodeURIComponent(apiKey)}&q=${encodeURIComponent('Le Paradise, 5 avenue Fridingen, 77100 Nanteuil-lès-Meaux, France')}&zoom=14`
+    : `https://www.google.com/maps?q=${PARADISE_LAT},${PARADISE_LNG}&output=embed`
   return (
     <div style={{ borderRadius: '12px', overflow: 'hidden', border: '2px solid var(--gold)', boxShadow: 'var(--shadow-md)' }}>
       <iframe
-        title={`Carte de ${city.name}`}
+        title={`Le Paradise à Nanteuil-lès-Meaux — accès depuis ${city.name}`}
         src={src}
         width="100%"
         height="400"
@@ -156,14 +158,14 @@ function GalleryGrid({ photos }) {
             onMouseEnter={(e) => { e.currentTarget.style.borderColor = 'var(--gold)'; e.currentTarget.style.transform = 'scale(1.02)' }}
             onMouseLeave={(e) => { e.currentTarget.style.borderColor = 'transparent'; e.currentTarget.style.transform = 'scale(1)' }}
           >
-            <img src={src} alt={`Galerie photo ${i + 1}`} loading="lazy" decoding="async" style={{ width: '100%', height: '160px', objectFit: 'cover', display: 'block' }} />
+            <img src={src} alt={`Salle de mariage Le Paradise à Nanteuil-lès-Meaux — photo ${i + 1}`} loading="lazy" decoding="async" style={{ width: '100%', height: '160px', objectFit: 'cover', display: 'block' }} />
           </button>
         ))}
       </div>
       {lightbox !== null && (
         <div onClick={() => setLightbox(null)} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.88)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: '20px' }}>
           <button onClick={(e) => { e.stopPropagation(); setLightbox((l) => (l > 0 ? l - 1 : photos.length - 1)) }} style={{ position: 'fixed', left: '20px', background: 'rgba(255,255,255,0.15)', border: 'none', color: 'white', fontSize: '28px', cursor: 'pointer', borderRadius: '50%', width: '48px', height: '48px' }}>&#x2039;</button>
-          <img src={photos[lightbox]} alt={`Galerie photo ${lightbox + 1}`} style={{ maxWidth: '90vw', maxHeight: '85vh', borderRadius: '8px', objectFit: 'contain' }} onClick={(e) => e.stopPropagation()} />
+          <img src={photos[lightbox]} alt={`Salle de mariage Le Paradise à Nanteuil-lès-Meaux — photo ${lightbox + 1}`} style={{ maxWidth: '90vw', maxHeight: '85vh', borderRadius: '8px', objectFit: 'contain' }} onClick={(e) => e.stopPropagation()} />
           <button onClick={(e) => { e.stopPropagation(); setLightbox((l) => (l < photos.length - 1 ? l + 1 : 0)) }} style={{ position: 'fixed', right: '20px', background: 'rgba(255,255,255,0.15)', border: 'none', color: 'white', fontSize: '28px', cursor: 'pointer', borderRadius: '50%', width: '48px', height: '48px' }}>&#x203a;</button>
           <button onClick={() => setLightbox(null)} style={{ position: 'fixed', top: '16px', right: '16px', background: 'rgba(255,255,255,0.15)', border: 'none', color: 'white', fontSize: '20px', cursor: 'pointer', borderRadius: '50%', width: '40px', height: '40px' }}>&#x2715;</button>
         </div>
@@ -383,7 +385,7 @@ function WhatsAppButton() {
 
 function SectionIntro({ city, businessName, page }) {
   return (
-    <Section id="intro" title={`${businessName} à ${city.name} — Présentation`}>
+    <Section id="intro" title={`${businessName} — votre réception depuis ${city.name}`}>
       <div style={{ fontSize: '15px', color: 'var(--text)', lineHeight: 1.8 }}>
         {renderContent(page.content)}
       </div>
@@ -817,7 +819,6 @@ function SectionConseils({ city }) {
 // ── 9. Section FAQ ─────────────────────────────────────────────────────────────
 
 function SectionFAQ({ city, businessName }) {
-  const [open, setOpen] = useState(null)
   const v = cityVariant(city.name)
 
   const baseFaqs = [
@@ -895,20 +896,14 @@ function SectionFAQ({ city, businessName }) {
       </p>
       <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
         {allFaqs.map((faq, i) => (
-          <div key={i} style={{ border: '1px solid var(--border)', borderRadius: '10px', overflow: 'hidden', background: 'white' }}>
-            <button
-              onClick={() => setOpen(open === i ? null : i)}
-              style={{ width: '100%', textAlign: 'left', padding: '16px 20px', background: 'none', border: 'none', cursor: 'pointer', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '12px' }}
-            >
+          <details key={i} style={{ border: '1px solid var(--border)', borderRadius: '10px', overflow: 'hidden', background: 'white' }}>
+            <summary style={{ textAlign: 'left', padding: '16px 20px', cursor: 'pointer' }}>
               <span style={{ fontSize: '15px', fontWeight: '600', color: 'var(--dark)', lineHeight: 1.4 }}>{faq.q}</span>
-              <span style={{ flexShrink: 0, color: 'var(--gold)', fontSize: '20px', lineHeight: 1 }}>{open === i ? '−' : '+'}</span>
-            </button>
-            {open === i && (
-              <div style={{ padding: '0 20px 16px', fontSize: '14px', lineHeight: 1.8, color: 'var(--text)', borderTop: '1px solid var(--border)' }}>
-                <div style={{ paddingTop: '12px' }}>{faq.a}</div>
-              </div>
-            )}
-          </div>
+            </summary>
+            <div style={{ padding: '16px 20px', fontSize: '14px', lineHeight: 1.8, color: 'var(--text)', borderTop: '1px solid var(--border)' }}>
+              {faq.a}
+            </div>
+          </details>
         ))}
       </div>
     </Section>
@@ -954,6 +949,7 @@ function NearbyLinks({ citySlug, allTypePages, city, businessName, currentBasePa
                 <Link
                   key={tl.id}
                   to={`${tl.basePath}/${c.slug}`}
+                  title={tl.id === 'mariage' ? `Location salle de mariage ${c.name}` : `${tl.label.replace(/^Pages /, '')} ${c.name}`}
                   style={{
                     display: 'inline-flex', alignItems: 'center', gap: '5px',
                     padding: '6px 14px',
@@ -969,7 +965,7 @@ function NearbyLinks({ citySlug, allTypePages, city, businessName, currentBasePa
                     e.currentTarget.style.color = tl.basePath === currentBasePath ? 'white' : 'var(--dark)'
                   }}
                 >
-                  {tl.icon} {tl.label.replace(/^Pages /, '')}
+                  {tl.id === 'mariage' ? `Location salle de mariage ${c.name}` : `${tl.icon} ${tl.label.replace(/^Pages /, '')}`}
                 </Link>
               ))}
             </div>
@@ -1084,12 +1080,14 @@ export default function CityPage({ pageType }) {
   const [allTypePages, setAllTypePages] = useState({})
   const [loading, setLoading]       = useState(true)
   const [blogArticles, setBlogArticles] = useState([])
+  const [loadError, setLoadError] = useState('')
 
   // Use the page-type-scoped storage
   const storage = makePageTypeStorage(pageType?.id || 'mariage')
 
   useEffect(() => {
     setLoading(true)
+    setLoadError('')
     // Load current type pages + gallery + config + ALL other type pages in parallel
     const allTypeStorages = PAGE_TYPES.map((pt) => makePageTypeStorage(pt.id))
     Promise.all([
@@ -1098,6 +1096,7 @@ export default function CityPage({ pageType }) {
       getCityPagesConfig(),
       getBlogArticles(),
       ...allTypeStorages.map((s) => s.getPages()),
+      getPublishedWeddingSlugs(),
     ]).then(([pages, gal, cfg, blogArticlesMap, ...typePagesArr]) => {
       setPage(pages?.[citySlug] || null)
       setGallery(gal || [])
@@ -1116,14 +1115,24 @@ export default function CityPage({ pageType }) {
       // Build a map: { [typeId]: pagesMap }
       const typeMap = {}
       PAGE_TYPES.forEach((pt, i) => {
-        typeMap[pt.id] = typePagesArr[i] || {}
+        typeMap[pt.id] = pt.id === 'mariage'
+          ? Object.fromEntries(typePagesArr[PAGE_TYPES.length].map((slug) => [slug, true]))
+          : typePagesArr[i] || {}
       })
       setAllTypePages(typeMap)
+      setLoading(false)
+    }).catch((error) => {
+      console.error('[CityPage] Chargement des liens publiés impossible :', error)
+      setLoadError(error.message)
       setLoading(false)
     })
   }, [citySlug, pageType?.id]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const city = getCityBySlug(citySlug)
+
+  if (loadError) {
+    return <p role="alert" style={{ padding: '40px' }}>Chargement de la page impossible : {loadError}</p>
+  }
 
   if (loading) {
     return (
@@ -1202,10 +1211,12 @@ export function CityPageContent({ citySlug, pageType, page, gallery, config, all
           {city.deptCode} — {city.deptName}
         </div>
         <h1 style={{ fontFamily: 'var(--font-heading)', fontSize: 'clamp(2rem, 5vw, 3.5rem)', fontWeight: '700', color: 'white', marginBottom: '12px', letterSpacing: '0.03em' }}>
-          Salle de mariage et réception — {businessName} à {city.name}
+          {pageType?.id === 'mariage'
+            ? `Location salle de mariage ${citySlug === 'nanteuil-les-meaux' ? 'à' : 'près de'} ${city.name} — ${businessName}`
+            : `${pageType?.label.replace(/^Pages /, '') || 'Salle de réception'} près de ${city.name} — ${businessName}`}
         </h1>
         <p style={{ fontSize: '1.1rem', color: 'rgba(255,255,255,0.7)', maxWidth: '680px', margin: '0 auto 8px' }}>
-          Le Paradise 77 — votre salle de mariage de prestige pour tous vos mariages et réceptions
+          {businessName} — une salle située à Nanteuil-lès-Meaux, en Seine-et-Marne
         </p>
         <p style={{ fontSize: '0.95rem', color: 'rgba(255,255,255,0.55)', maxWidth: '600px', margin: '0 auto 24px' }}>
           Salle de mariage et réception accessible depuis {city.name} ({city.deptName})
@@ -1223,12 +1234,31 @@ export function CityPageContent({ citySlug, pageType, page, gallery, config, all
       {/* ── Content ── */}
       <div style={{ maxWidth: '960px', margin: '0 auto', padding: 'clamp(32px,5vw,64px) clamp(16px,5vw,40px)' }}>
 
+        <nav aria-label="Fil d’Ariane" style={{ marginBottom: '24px', fontSize: '14px' }}>
+          <Link to="/">Accueil</Link> › <span>{city.deptName}</span> › <span aria-current="page">{city.name}</span>
+        </nav>
+        {pageType?.id === 'mariage' && <Section id="acces-local" title={`Organiser votre mariage depuis ${city.name}`}>
+          <p>
+            Vous recherchez une location de salle de mariage pour vos invités de {city.name} ({city.deptName}) ?
+            Notre établissement est situé au 5 avenue Fridingen, 77100 Nanteuil-lès-Meaux
+            {citySlug !== 'nanteuil-les-meaux' && `, et non à ${city.name}`}.
+            La distance entre le centre de {city.name} et la salle est d’environ {getTravelInfo(city).km} km
+            à vol d’oiseau ; elle ne représente pas un trajet routier ni une durée garantie.
+          </p>
+          <p style={{ marginTop: '12px' }}>
+            <a href={`https://www.google.com/maps/dir/?api=1&origin=${encodeURIComponent(`${city.name}, ${city.deptName}, France`)}&destination=${PARADISE_LAT},${PARADISE_LNG}`}
+              target="_blank" rel="noreferrer noopener" title={`Itinéraire depuis ${city.name} vers Le Paradise à Nanteuil-lès-Meaux`}>
+              Consulter l’itinéraire depuis {city.name}
+            </a>. Pour connaître les disponibilités, les prestations et le tarif correspondant à votre projet,
+            <Link to="/devis"> demandez un devis personnalisé</Link>.
+          </p>
+        </Section>}
         {sectionsWithDevis}
 
         {/* 11. Carte / Map */}
         <Section id="carte" title={`📍 ${businessName} — Accès depuis ${city.name}`}>
           <p style={{ fontSize: '14px', color: 'var(--text-light)', marginBottom: '16px' }}>
-            5 avenue Fridingen, 77100 Nanteuil-lès-Meaux — à environ {getTravelInfo(city).driveMin} minutes depuis {city.name}
+            5 avenue Fridingen, 77100 Nanteuil-lès-Meaux — consultez l’itinéraire depuis {city.name} pour une estimation du trajet selon le trafic.
           </p>
           <CityMap city={city} apiKey={config?.googleMapsApiKey} />
         </Section>
@@ -1245,6 +1275,7 @@ export function CityPageContent({ citySlug, pageType, page, gallery, config, all
         </div>
       </div>
 
+      {published && <WeddingDirectory slugs={Object.keys(allTypePages.mariage || {})} businessName={businessName} />}
       <WhatsAppButton />
     </div>
   )

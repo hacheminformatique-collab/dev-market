@@ -80,6 +80,9 @@ DirectoryIndex index.html
     # Serve PHP files in api/ directly — do not rewrite them to index.html
     RewriteRule ^api/ - [L]
 
+    # A missing publication manifest must return 404, not the SPA shell.
+    RewriteRule ^(?:wedding-pages\.json|wedding-directory\.html)$ - [L]
+
     # Keep the existing extensionless canonical URLs for published city files.
     RewriteCond %{THE_REQUEST} \s/+locationsalledemariage/([a-z0-9-]+)(?:\.html|/)(?:[?\s]) [NC]
     RewriteRule ^locationsalledemariage/([a-z0-9-]+)(?:\.html|/)$ /locationsalledemariage/$1 [R=301,L]

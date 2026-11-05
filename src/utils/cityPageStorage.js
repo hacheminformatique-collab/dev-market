@@ -240,42 +240,39 @@ export async function generateCityContent(cityName, deptName, keywords, business
   if (githubToken) {
     const prompt = `Tu es un expert en rédaction SEO pour des salles de réception en France.
 Génère un contenu SEO très riche, UNIQUE et ORIGINAL pour la page web de la ville de "${cityName}" (${deptName}).
-L'établissement s'appelle "${businessName}" — une salle de réception de prestige en Seine-et-Marne (77).
+L'établissement s'appelle "${businessName}" et se trouve au 5 avenue Fridingen, 77100 Nanteuil-lès-Meaux, en Seine-et-Marne (77).
+Il s'agit d'un établissement unique, pas d'une salle ou d'une agence située à "${cityName}".
+La page s'adresse aux habitants de "${cityName}" qui organisent leur réception à Nanteuil-lès-Meaux.
 
 Le mot-clé principal de cette page est : "${primaryKw}"
 
 RÈGLES ABSOLUES ANTI-CONTENU-DUPLIQUÉ :
 - Le contenu doit être ENTIÈREMENT ORIGINAL et adapté SPÉCIFIQUEMENT à "${cityName}" — ne jamais réutiliser le même texte que pour une autre ville
-- Mentionne des caractéristiques géographiques, culturelles ou pratiques propres à "${cityName}" (situation dans ${deptName}, accès, ambiance locale, etc.)
+- Utilise uniquement des informations locales vérifiables. Si un trajet, un lieu ou une information n'est pas connu, invite à vérifier l'itinéraire ou à contacter l'établissement.
+- N'invente jamais d'avis, de témoignages, de prix, de capacités, de partenaires ou de temps de trajet.
 - Varie les formulations, les angles d'approche, les anecdotes et les arguments d'une ville à l'autre
 - INTERDIT : phrases génériques copiées-collées d'une ville à l'autre
 
 INSTRUCTIONS DE RÉDACTION :
-- Le texte DOIT faire AU MINIMUM 1500 mots
-- Le mot-clé principal "${primaryKw}" DOIT apparaître AU MOINS 30 fois dans l'ensemble du texte
-- "le Paradise 77" et "${eventLabel}" doivent également être répétés de nombreuses fois
-- Intègre ces termes dans les titres (H2 et H3) également, pas seulement dans le corps du texte
+- Privilégie un texte utile et concis : pas de longueur minimale ni de quota de répétitions.
+- Utilise "${primaryKw}" naturellement et sans bourrage de mots-clés.
+- Utilise le nom exact "${businessName}" et évite de répéter mécaniquement la ville.
+- Décris une location de salle près de "${cityName}" ou accessible depuis cette ville, jamais un établissement fictif à cette adresse.
 - Utilise le format markdown : ## pour les titres H2 et ### pour les sous-titres H3
 - Commence DIRECTEMENT par un titre ## (sans introduction ni meta-commentary)
-- Structure le contenu en au moins 10 sections distinctes avec des titres H2 et des sous-titres H3
+- Structure le contenu en sections utiles avec des titres H2 et, si nécessaire, des sous-titres H3.
 - Intègre naturellement les mots clés supplémentaires : ${keywords || 'mariage, anniversaire, baptême, soirée privée'}
-- Chaque section doit contenir au moins 4 à 6 phrases avec les mots clés obligatoires répétés
+- Chaque section doit apporter une information concrète ou aider le visiteur à préparer son projet.
 - Le texte doit être naturel, convaincant, chaleureux et favorable au référencement (SEO)
 - Chaque page doit raconter une histoire légèrement différente : angle "romanesque" pour une ville, angle "pratique/logistique" pour une autre, angle "tradition locale" pour une autre, etc.
 
-Structure recommandée (librement réinterprétée pour chaque ville) :
-## ${primaryKw.charAt(0).toUpperCase() + primaryKw.slice(1)} à ${cityName} — le Paradise 77
-### Votre salle de ${eventLabel} de prestige près de ${cityName}
-## Organiser votre ${eventLabel} à ${cityName} avec le Paradise 77
-### La salle idéale pour votre ${eventLabel} à ${cityName}
-## Le Paradise 77 : salle incontournable pour ${primaryKw} près de ${cityName}
-## Nos offres pour ${primaryKw} à ${cityName}
-## Pourquoi choisir le Paradise 77 pour votre ${eventLabel} près de ${cityName}
-## Capacité et prestations de notre salle
-## Traiteur et services pour votre ${eventLabel} à ${cityName}
-## Témoignages — ${eventLabel}s organisés depuis ${cityName}
-## Réserver votre salle pour ${eventLabel} à ${cityName}
-## Le Paradise 77 : votre partenaire ${eventLabel} en ${deptName}`
+Structure recommandée (à adapter sans dupliquer les formulations) :
+## ${primaryKw.charAt(0).toUpperCase() + primaryKw.slice(1)} près de ${cityName} — ${businessName}
+## Préparer une réception à Nanteuil-lès-Meaux depuis ${cityName}
+## Vérifier l'accès et organiser le déplacement des invités
+## Définir vos besoins pour les prestations et la restauration
+## Demander les disponibilités et un devis personnalisé
+## Préparer une visite et les questions à poser`
 
     const fetchCompletion = () => fetch('https://models.inference.ai.azure.com/chat/completions', {
       method: 'POST',

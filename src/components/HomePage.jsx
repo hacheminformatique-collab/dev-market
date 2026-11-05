@@ -75,7 +75,7 @@ export default function HomePage() {
           fontFamily: 'var(--font-body)',
           fontWeight: '700',
         }}>
-          Salle de réception
+          Location salle de mariage à Nanteuil-lès-Meaux
         </p>
 
         <h1 style={{
@@ -89,7 +89,13 @@ export default function HomePage() {
           marginBottom: '8px',
         }}>
           {nomSalle}
+          <span style={{ display: 'block', fontSize: 'clamp(1.2rem, 3vw, 1.8rem)', letterSpacing: '0.03em', lineHeight: 1.4, marginTop: '16px' }}>
+            Location salle de mariage à Nanteuil-lès-Meaux
+          </span>
         </h1>
+        <p style={{ color: 'rgba(255,255,255,0.85)', marginTop: '16px', lineHeight: 1.6 }}>
+          Votre salle de mariage à Nanteuil-lès-Meaux (77), accessible depuis les communes d’Île-de-France.
+        </p>
 
         {/* Gold ornament */}
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '14px', margin: '18px 0 36px' }}>

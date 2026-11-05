@@ -5,6 +5,7 @@ import SyncIndicator from './components/SyncIndicator'
 import SeoManager from './components/SeoManager'
 import { initStorage } from './utils/storage'
 import { PAGE_TYPES_BY_ID } from './data/pageTypes'
+import PublicWeddingDirectory from './components/PublicWeddingDirectory'
 
 const AdminLogin = lazy(() => import('./components/AdminLogin'))
 const Dashboard = lazy(() => import('./components/Dashboard/Dashboard'))
@@ -60,6 +61,7 @@ function App() {
   return (
     <BrowserRouter>
       <SeoManager />
+      <PublicWeddingDirectory />
       <Suspense fallback={(
         <div style={{
           minHeight: '100vh',

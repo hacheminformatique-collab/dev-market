@@ -1,5 +1,51 @@
 # React + Vite
 
+## Annuaire public et SEO local
+
+Après publication, chaque page publique propose une **Zone de location de salle
+de mariage**, classée par département puis par nom de commune, en colonnes
+adaptées au mobile. Les liens utilisent le texte et l'attribut `title`
+`Location salle de mariage <ville>`. Les liens textuels n'ont pas d'attribut
+`alt` : cet attribut concerne les images, dont les descriptions identifient
+la salle réelle à Nanteuil-lès-Meaux.
+
+Seules les pages mariage publiées sont incluses. Le bouton de publication
+vérifie les URL, puis écrit `wedding-directory.html`, `wedding-pages.json` et
+insère l'annuaire dans `index.html`. Les liens sont donc présents dans le HTML
+initial, sans dépendre de JavaScript. Le modèle React des pages villes publiées
+contient le même annuaire. Les espaces privés et l'administration ne l'affichent
+pas. La génération SEO depuis Mes Infos filtre également les pages mariage
+sur le registre de publication ; le devis, marqué `noindex`, n'est pas dans
+le sitemap.
+
+La publication actualise aussi les métadonnées de l'accueil dans `index.html`.
+Les pages villes ont des titres et descriptions ciblés, un fil d'Ariane, des
+données `LocalBusiness` / `EventVenue` et `Service`, avec l'adresse réelle
+(5 avenue Fridingen, 77100 Nanteuil-lès-Meaux), et une image de la salle plutôt
+que le favicon. La carte pointe vers la salle, pas vers une implantation
+fictive dans la ville recherchée. Les informations locales distinguent les
+distances à vol d'oiseau des itinéraires routiers. Les FAQ utilisent
+`details` / `summary` : leurs réponses sont dans le HTML même sans JavaScript.
+
+Les nouvelles générations IA n'imposent aucun quota de mots-clés ni de longueur
+et interdisent les avis, prix, partenaires et trajets inventés. Les textes déjà
+sauvegardés ne sont pas réécrits automatiquement : relisez-les et corrigez les
+informations non vérifiées avant de republier. La salle reste située à
+Nanteuil-lès-Meaux, même lorsque la page s'adresse aux habitants d'une autre ville.
+
+**Déployer tout `dist/`, puis republier les pages mariage.** Le compte PHP doit
+pouvoir remplacer `index.html` en plus des fichiers de publication précédents.
+Conserver `wedding-directory.html`, `wedding-pages.json`, les contenus et les
+anciens assets lors des mises à jour ; republier après un déploiement remplaçant
+`index.html` ou après restauration pour réinsérer l'annuaire et actualiser le HTML.
+Si le modèle `index.html` est ancien, la publication est refusée avec un message
+explicite. Aucune page départementale supplémentaire ni ancienne URL n'est
+créée/supprimée par ce changement : les départements organisent l'annuaire.
+
+Ces améliorations facilitent l'exploration et la pertinence locale, mais ne
+garantissent pas un top 3. Mesurer les impressions, clics, positions et pages
+indexées dans Search Console après déploiement.
+
 ## Bandeau vidéo des pages publiques
 
 Le bandeau utilise la même vidéo sur l'accueil, les pages villes de tous les

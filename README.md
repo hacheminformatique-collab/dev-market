@@ -1,5 +1,35 @@
 # React + Vite
 
+## Titres et descriptions des pages mariage
+
+Les métadonnées des pages villes mariage suivent ces modèles :
+
+- Titre : `Le Paradise 0184196949 | Salle de mariage Meaux 77100`
+- Description : `Vous recherchez une salle de mariage à Meaux 77 ? Découvrez notre salle de réception a proximité de seine et marne, idéale pour célébrer votre mariage. Contactez-nous pour réserver une salle de mariage et obtenir un devis personnalisé à Meaux !`
+
+Les noms de villes dans ces métadonnées sont sans accents ni ponctuation :
+`Nanteuil-lès-Meaux` devient `Nanteuil les Meaux`. Les noms des départements
+sont également normalisés, en minuscules. Le nom et le téléphone du titre sont
+ceux du modèle demandé, indépendamment du nom configuré pour les autres contenus.
+Les H1 visibles, URL, textes sauvegardés et adresses structurées restent inchangés.
+Déployer puis **republier toutes les pages mariage statiques**, y compris après
+restauration d'une sauvegarde, pour actualiser leurs métadonnées.
+
+`src/data/wedding-postcodes.json` contient les codes postaux par département
+et slug, sans requête externe au chargement. Source : base officielle La Poste
+(Licence Ouverte), distribuée par Etalab dans
+`sources/codes-postaux.json`, version
+`9814e676cd05e23d4d8dddffdfc1df1f5cadb291` du 2 mars 2026.
+Les anciens noms et communes déléguées sont rapprochés à l'aide des champs
+postaux du fichier `20230823-communes-departement-region.csv` du dépôt
+`mohamed-badaoui/communes-de-france-base-des-codes-postaux`, version
+`56b411009c5af32f10c000cdf82ccb50ca6c7de0`, également issu de La Poste.
+Les codes historiques retenus sont encore présents dans la base 2026 pour
+le département concerné. Les arrondissements parisiens utilisent leurs codes
+75001 à 75020. Pour plusieurs codes valides, un seul est affiché : le premier
+dans l'ordre numérique, sans prétendre qu'il s'agit du code principal.
+Les URL homonymes conservent la première commune résolue par le site.
+
 ## Annuaire public et SEO local
 
 Après publication, chaque page publique propose une **Zone de location de salle

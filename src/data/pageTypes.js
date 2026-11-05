@@ -19,8 +19,8 @@ export const PAGE_TYPES = [
     label: 'Pages salle de mariage',
     icon: '💍',
     mainKeyword: 'location salle de mariage',
-    seoCityTitle: 'Salle de mariage à {{city}} — {{business}}',
-    seoCityDesc: '{{business}} accompagne vos mariages et réceptions à {{city}} ({{dept}}). Découvrez nos prestations et demandez un devis gratuit.',
+    seoCityTitle: 'Location salle de mariage près de {{city}} — {{business}}',
+    seoCityDesc: 'Vous cherchez une location de salle de mariage depuis {{city}} ({{dept}}) ? Découvrez {{business}} à Nanteuil-lès-Meaux : prestations et devis personnalisé.',
   },
   {
     id: 'reception',

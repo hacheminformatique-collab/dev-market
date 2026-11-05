@@ -1,0 +1,57 @@
+.wedding-directory {
+  background: #f8f5f0;
+  color: #242424;
+  padding: clamp(28px, 5vw, 64px) clamp(16px, 5vw, 80px);
+  border-top: 1px solid #ddd6c8;
+  text-align: left;
+}
+
+.wedding-directory h2,
+.wedding-directory h3 {
+  font-family: var(--font-heading);
+  color: #1a1a2e;
+  margin-bottom: 16px;
+}
+
+.wedding-directory > p {
+  max-width: 900px;
+  line-height: 1.7;
+  margin-bottom: 28px;
+}
+
+.wedding-directory-departments {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 240px), 1fr));
+  gap: 28px;
+  align-items: start;
+}
+
+.wedding-directory ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.wedding-directory li {
+  margin-bottom: 8px;
+}
+
+.wedding-directory a {
+  display: inline-block;
+  padding: 4px 0;
+  color: #3e3522;
+  font-size: 13px;
+  line-height: 1.6;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  overflow-wrap: anywhere;
+}
+
+.wedding-directory a:focus-visible {
+  outline: 3px solid #9a792e;
+  outline-offset: 3px;
+}
+
+#public-wedding-directory[hidden] {
+  display: none;
+}

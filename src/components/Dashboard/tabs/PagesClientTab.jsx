@@ -283,7 +283,7 @@ export default function PagesClientTab({ pageType }) {
         onProgress: setPublishProgress,
       })
       setPages(allTypePages.mariage)
-      setPublishMessage(`✅ ${count} page${count > 1 ? 's' : ''} HTML publiée${count > 1 ? 's' : ''} et accessible${count > 1 ? 's' : ''} aux URL actuelles. Sitemap et robots.txt actualisés.`)
+      setPublishMessage(`✅ ${count} page${count > 1 ? 's' : ''} HTML publiée${count > 1 ? 's' : ''} et accessible${count > 1 ? 's' : ''} aux URL actuelles. Annuaire par département, sitemap et robots.txt actualisés.`)
     } catch (error) {
       setPublishError(`❌ ${error.message} Les fichiers déjà écrits sont conservés ; corrigez le problème puis relancez la publication.`)
     } finally {
@@ -628,6 +628,7 @@ export default function PagesClientTab({ pageType }) {
                   </button>
                   <p style={{ fontSize: '13px', color: 'var(--text-light)', marginTop: '12px', lineHeight: 1.6 }}>
                     Crée un fichier HTML complet par page mariage sur le serveur, avec sa canonical et son contenu lisible sans JavaScript.
+                    Actualise aussi la zone de location par département sur les pages publiques, avec uniquement les pages publiées.
                     Les adresses et les fonctionnalités sont conservées. Enregistrez votre configuration avant de publier.
                     Après toute modification du contenu, de la galerie ou des réglages, republiez pour actualiser les fichiers.
                     Gardez cet onglet ouvert jusqu’à la fin.

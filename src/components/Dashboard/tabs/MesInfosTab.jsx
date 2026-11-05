@@ -4,6 +4,7 @@ import { makePageTypeStorage } from '../../../utils/cityPageStorage'
 import { buildSitemapXml, buildRobotsTxt, downloadTextFile } from '../../../utils/seoFiles'
 import { PAGE_TYPES } from '../../../data/pageTypes'
 import { getBlogArticles } from '../../../utils/blogStorage'
+import { getPublishedWeddingSlugs } from '../../../utils/weddingPublication'
 
 function resizeImageToDataUrl(file, maxW, maxH) {
   return new Promise((resolve, reject) => {
@@ -130,8 +131,11 @@ export default function MesInfosTab() {
       await Promise.all(PAGE_TYPES.map(async (pt) => {
         const pages = await makePageTypeStorage(pt.id).getPages()
         allTypePages[pt.id] = pages || {}
-        totalPages += Object.keys(pages || {}).length
       }))
+      const published = new Set(await getPublishedWeddingSlugs())
+      allTypePages.mariage = Object.fromEntries(Object.entries(allTypePages.mariage || {})
+        .filter(([slug]) => published.has(slug)))
+      totalPages = Object.values(allTypePages).reduce((count, pages) => count + Object.keys(pages).length, 0)
       const sitemapXml = buildSitemapXml({ baseUrl: data.siteUrl, allTypePages, blogArticles: await getBlogArticles() })
       const robotsTxt = buildRobotsTxt(data.siteUrl)
 

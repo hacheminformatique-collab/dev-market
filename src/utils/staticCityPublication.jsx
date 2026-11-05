@@ -1,10 +1,11 @@
-import { renderToString } from 'react-dom/server'
+import { renderToString, renderToStaticMarkup } from 'react-dom/server'
 import { MemoryRouter } from 'react-router-dom'
 import { CityPageContent } from '../components/VillesPages/CityPage'
 import { buildSeoData } from './seoData'
 import { PAGE_TYPES, PAGE_TYPES_BY_ID } from '../data/pageTypes'
 import { getCityBySlug } from '../data/idf-cities'
 import { buildSitemapXml, buildRobotsTxt } from './seoFiles'
+import WeddingDirectory from '../components/WeddingDirectory'
 
 function escapeHtml(value) {
   return String(value).replaceAll('&', '&amp;').replaceAll('<', '&lt;')
@@ -39,7 +40,7 @@ export function makeCitySnapshot({ slug, pages, config, gallery, allTypePages, b
     gallery,
     allTypePages: Object.fromEntries(PAGE_TYPES.map((pt) => [
       pt.id,
-      Object.fromEntries(Object.keys(allTypePages[pt.id] || {}).map((citySlug) => [citySlug, true])),
+      Object.fromEntries(Object.keys(pt.id === 'mariage' ? pages : allTypePages[pt.id] || {}).map((citySlug) => [citySlug, true])),
     ])),
     blogArticles: Object.values(blogArticles)
       .filter((article) => article.status === 'published')
@@ -50,20 +51,9 @@ export function makeCitySnapshot({ slug, pages, config, gallery, allTypePages, b
   }
 }
 
-export function renderCityDocument({ template, snapshot, settings, origin }) {
-  if (!template.includes('<!-- CITY_SEO -->') || !template.includes('<!-- CITY_DATA -->')
-    || !template.includes('<div id="root"></div>')
-    || !/src="\/assets\/[^"]+\.js"/.test(template) || template.includes('/src/')) {
-    throw new Error('Le modèle statique compilé est absent ou invalide. Déployez le dossier dist complet après npm run build.')
-  }
-  const path = `${snapshot.pageType.basePath}/${snapshot.citySlug}`
-  const seo = buildSeoData(path, {
-    nom: snapshot.config.businessName || settings.nom,
-    siteUrl: origin,
-    whatsapp: settings.whatsapp,
-  }, { [snapshot.citySlug]: snapshot.page }, snapshot.pageType, null, null, origin)
+export function renderSeoHead(seo) {
   const meta = (name, content, attr = 'name') => `<meta ${attr}="${name}" content="${escapeHtml(content)}" />`
-  const head = [
+  return [
     `<title>${escapeHtml(seo.title)}</title>`,
     meta('description', seo.description),
     meta('keywords', seo.keywords),
@@ -78,6 +68,22 @@ export function renderCityDocument({ template, snapshot, settings, origin }) {
     meta('twitter:card', 'summary_large_image'),
     `<script id="seo-json-ld" type="application/ld+json">${scriptJson(seo.jsonLd)}</script>`,
   ].join('\n')
+}
+
+export function renderCityDocument({ template, snapshot, settings, origin }) {
+  if (!template.includes('<!-- CITY_SEO -->') || !template.includes('<!-- CITY_DATA -->')
+    || !template.includes('<div id="root"></div>')
+    || !/src="\/assets\/[^"]+\.js"/.test(template) || template.includes('/src/')) {
+    throw new Error('Le modèle statique compilé est absent ou invalide. Déployez le dossier dist complet après npm run build.')
+  }
+  const path = `${snapshot.pageType.basePath}/${snapshot.citySlug}`
+  const seo = buildSeoData(path, {
+    nom: snapshot.config.businessName || settings.nom,
+    siteUrl: origin,
+    whatsapp: settings.whatsapp,
+    legalInfo: settings.legalInfo,
+  }, { [snapshot.citySlug]: snapshot.page }, snapshot.pageType, null, null, origin)
+  const head = renderSeoHead(seo)
   const body = renderToString(
     <MemoryRouter initialEntries={[path]}>
       <CityPageContent {...snapshot} published />
@@ -117,6 +123,13 @@ export async function publishWeddingPages({ pages, config, gallery, allTypePages
     if (!res.ok || !data.ok) throw new Error(data.error || `Publication refusée (HTTP ${res.status}).`)
   }
 
+  const shell = await fetch('/', { cache: 'no-store' })
+  const shellHtml = await shell.text()
+  if (!shell.ok || !shellHtml.includes('<!-- WEDDING_DIRECTORY_START -->')
+    || !shellHtml.includes('<!-- WEDDING_DIRECTORY_END -->')
+    || !shellHtml.includes('<!-- HOME_SEO_START -->') || !shellHtml.includes('<!-- HOME_SEO_END -->')) {
+    throw new Error('Le modèle index.html est incompatible avec l’annuaire. Déployez le dossier dist complet avant de publier.')
+  }
   // Validate all inputs before writing the first file.
   for (const slug of slugs) makeCitySnapshot({ slug, pages, config, gallery, allTypePages, blogArticles })
   for (let i = 0; i < slugs.length; i++) {
@@ -131,13 +144,19 @@ export async function publishWeddingPages({ pages, config, gallery, allTypePages
     }
     onProgress({ done: i + 1, total: slugs.length, current: '' })
   }
-  onProgress({ done: slugs.length, total: slugs.length, current: 'Mise à jour du sitemap et de robots.txt' })
+  onProgress({ done: slugs.length, total: slugs.length, current: 'Publication de l’annuaire, du sitemap et de robots.txt' })
   const sitemap = buildSitemapXml({ baseUrl: origin, allTypePages: { ...allTypePages, mariage: pages }, blogArticles })
   const robots = buildRobotsTxt(origin)
-  await write({ action: 'seo', sitemap, robots })
-  for (const [path, content] of [['/sitemap.xml', sitemap], ['/robots.txt', robots]]) {
+  const directory = renderToStaticMarkup(<WeddingDirectory slugs={slugs} businessName={config.businessName || settings.nom} />)
+  const homeSeo = renderSeoHead(buildSeoData('/', { ...settings, siteUrl: origin }, {}, null, null, null, origin))
+  await write({ action: 'seo', sitemap, robots, directory, slugs, homeSeo })
+  for (const [path, content] of [['/sitemap.xml', sitemap], ['/robots.txt', robots], ['/wedding-directory.html', directory], ['/wedding-pages.json', JSON.stringify(slugs)]]) {
     const check = await fetch(path, { cache: 'no-store' })
     if (!check.ok || await check.text() !== content) throw new Error(`Le fichier ${path} a été écrit mais n'est pas accessible à son URL.`)
+  }
+  const home = await fetch('/', { cache: 'no-store' })
+  if (!home.ok || !(await home.text()).includes(directory)) {
+    throw new Error('L’annuaire a été publié mais n’est pas présent dans le HTML initial de l’accueil. Vérifiez le déploiement de index.html.')
   }
   onProgress({ done: slugs.length, total: slugs.length, current: '' })
   return slugs.length

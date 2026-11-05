@@ -1,4 +1,5 @@
 import { PAGE_TYPES } from '../data/pageTypes'
+import { getCityBySlug } from '../data/idf-cities'
 
 function normalizeBaseUrl(rawUrl) {
   const input = (rawUrl || '').trim() || window.location.origin
@@ -29,14 +30,13 @@ export function buildSitemapXml({ baseUrl, cityPages = {}, allTypePages = {}, bl
 
   const rows = [
     { path: '/', changefreq: 'weekly', priority: '1.0', lastmod: today },
-    { path: '/devis', changefreq: 'weekly', priority: '0.8', lastmod: today },
     { path: '/blog', changefreq: 'daily', priority: '0.8', lastmod: today },
   ]
 
   // Helper to add pages for a given basePath
   function addPageRows(basePath, pages) {
     Object.entries(pages || {}).forEach(([slug, page]) => {
-      if (!slug || !page?.content) return
+      if (!getCityBySlug(slug) || !page?.content) return
       const generatedAt = page?.generatedAt ? new Date(page.generatedAt) : null
       const validDate = generatedAt && !Number.isNaN(generatedAt.getTime())
       rows.push({

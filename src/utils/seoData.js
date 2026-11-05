@@ -15,7 +15,7 @@ export function buildSeoData(pathname, settings, cityPages, detectedPageType, bl
   const businessName = settings?.nom?.trim() || 'Le Paradise 77'
   const baseUrl = normalizeSiteUrl(settings?.siteUrl, origin)
   const canonical = new URL(pathname, baseUrl).toString()
-  const imageUrl = new URL('/favicon.svg', baseUrl).toString()
+  const imageUrl = new URL('/media/hero-paradise.jpg', baseUrl).toString()
 
   // Detect city slug from any known page-type base path
   let citySlug = ''
@@ -46,12 +46,22 @@ export function buildSeoData(pathname, settings, cityPages, detectedPageType, bl
           inLanguage: 'fr-FR',
         },
         {
-          '@type': 'LocalBusiness',
+          '@type': ['LocalBusiness', 'EventVenue'],
+          '@id': new URL('/#venue', baseUrl).toString(),
           name: businessName,
           url: baseUrl,
           image: imageUrl,
-          telephone: settings?.whatsapp || undefined,
-          addressCountry: 'FR',
+          telephone: settings?.legalInfo?.telephone?.trim() || '+33782821582',
+          email: settings?.legalInfo?.email?.trim() || undefined,
+          address: {
+            '@type': 'PostalAddress',
+            streetAddress: '5 avenue Fridingen',
+            postalCode: '77100',
+            addressLocality: 'Nanteuil-lès-Meaux',
+            addressRegion: 'Seine-et-Marne',
+            addressCountry: 'FR',
+          },
+          geo: { '@type': 'GeoCoordinates', latitude: 48.9617, longitude: 2.8985 },
         },
       ],
     },
@@ -60,8 +70,8 @@ export function buildSeoData(pathname, settings, cityPages, detectedPageType, bl
   if (pathname === '/') {
     return {
       ...base,
-      title: `${businessName} — Salle de réception, mariage et événements`,
-      description: `Réservez ${businessName} pour vos mariages, réceptions et événements privés en Seine-et-Marne. Devis gratuit et rapide en ligne.`,
+      title: `Location salle de mariage à Nanteuil-lès-Meaux (77) — ${businessName}`,
+      description: `Découvrez ${businessName}, salle de mariage à Nanteuil-lès-Meaux en Seine-et-Marne, accessible depuis l’Île-de-France. Photos, prestations et devis personnalisé.`,
       keywords: `${base.keywords}, événement privé, salle de fête`,
     }
   }
@@ -95,7 +105,10 @@ export function buildSeoData(pathname, settings, cityPages, detectedPageType, bl
   if (detectedPageType && citySlug) {
     const city = getCityBySlug(citySlug)
     if (city && hasGeneratedCityPage) {
-      const title = (detectedPageType.seoCityTitle || 'Page ville — {{business}}')
+      const titleTemplate = detectedPageType.id === 'mariage' && citySlug === 'nanteuil-les-meaux'
+        ? 'Location salle de mariage à {{city}} — {{business}}'
+        : detectedPageType.seoCityTitle || 'Page ville — {{business}}'
+      const title = titleTemplate
         .replace('{{city}}', city.name)
         .replace('{{dept}}', city.deptName)
         .replace('{{business}}', businessName)
@@ -113,6 +126,14 @@ export function buildSeoData(pathname, settings, cityPages, detectedPageType, bl
           '@graph': [
             ...base.jsonLd['@graph'],
             {
+              '@type': 'Service',
+              name: `${detectedPageType.mainKeyword} pour les habitants de ${city.name}`,
+              serviceType: detectedPageType.mainKeyword,
+              areaServed: { '@type': 'City', name: city.name },
+              provider: { '@id': new URL('/#venue', baseUrl).toString() },
+              url: canonical,
+            },
+            {
               '@type': 'BreadcrumbList',
               itemListElement: [
                 {
@@ -124,7 +145,7 @@ export function buildSeoData(pathname, settings, cityPages, detectedPageType, bl
                 {
                   '@type': 'ListItem',
                   position: 2,
-                  name: city.name,
+                  name: `${detectedPageType.mainKeyword} ${city.name}`,
                   item: canonical,
                 },
               ],

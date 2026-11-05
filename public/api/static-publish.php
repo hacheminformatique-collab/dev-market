@@ -74,6 +74,48 @@ if (($data['action'] ?? '') === 'page') {
         || !is_string($robots) || strpos($robots, 'User-agent:') !== 0) {
         failPublication(400, 'Sitemap ou robots.txt invalide.');
     }
+    $directory = $data['directory'] ?? null;
+    $slugs = $data['slugs'] ?? null;
+    $homeSeo = $data['homeSeo'] ?? null;
+    $indexFile = $root . '/index.html';
+    $index = is_readable($indexFile) ? file_get_contents($indexFile) : false;
+    if (!is_string($directory) || strpos($directory, '<section class="wedding-directory"') !== 0
+        || !is_array($slugs) || count($slugs) === 0 || !is_string($homeSeo)
+        || strpos($homeSeo, '<title>') !== 0 || strpos($homeSeo, 'rel="canonical"') === false) {
+        failPublication(400, 'Annuaire ou liste des pages publiées invalide.');
+    }
+    foreach ($slugs as $slug) {
+        if (!is_string($slug) || !preg_match('/^[a-z0-9]+(?:-[a-z0-9]+)*$/D', $slug)
+            || !is_file($root . '/locationsalledemariage/' . $slug . '.html')) {
+            failPublication(400, 'L’annuaire contient une page qui n’a pas été publiée.');
+        }
+    }
+    preg_match_all('~href="/locationsalledemariage/([a-z0-9-]+)"~', $directory, $links);
+    $linkedSlugs = $links[1];
+    $publishedSlugs = array_values(array_unique($slugs));
+    sort($linkedSlugs);
+    sort($publishedSlugs);
+    if ($linkedSlugs !== $publishedSlugs) {
+        failPublication(400, 'Les liens de l’annuaire ne correspondent pas aux pages publiées.');
+    }
+    $start = '<!-- WEDDING_DIRECTORY_START -->';
+    $end = '<!-- WEDDING_DIRECTORY_END -->';
+    $seoStart = '<!-- HOME_SEO_START -->';
+    $seoEnd = '<!-- HOME_SEO_END -->';
+    if ($index === false || substr_count($index, $start) !== 1 || substr_count($index, $end) !== 1
+        || strpos($index, $end) < strpos($index, $start)
+        || substr_count($index, $seoStart) !== 1 || substr_count($index, $seoEnd) !== 1
+        || strpos($index, $seoEnd) < strpos($index, $seoStart)) {
+        failPublication(500, 'Modèle index.html incompatible. Déployez le dossier dist complet avant de republier.');
+    }
+    $index = substr($index, 0, strpos($index, $start)) . $start
+        . "\n<div id=\"public-wedding-directory\">" . $directory . "</div>\n"
+        . substr($index, strpos($index, $end));
+    $index = substr($index, 0, strpos($index, $seoStart)) . $seoStart . "\n" . $homeSeo . "\n"
+        . substr($index, strpos($index, $seoEnd));
+    writePublication($root . '/wedding-directory.html', $directory);
+    writePublication($root . '/wedding-pages.json', json_encode(array_values(array_unique($slugs))));
+    writePublication($indexFile, $index);
     writePublication($root . '/sitemap.xml', $sitemap);
     writePublication($root . '/robots.txt', $robots);
 } else {

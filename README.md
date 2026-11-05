@@ -1,5 +1,34 @@
 # React + Vite
 
+## Bandeau vidéo des pages publiques
+
+Le bandeau utilise la même vidéo sur l'accueil, les pages villes de tous les
+types, la liste et les articles du blog, le devis et les trois pages légales.
+L'administration, les espaces client/staff et le formulaire de devis intégré
+dans une page ville ne reçoivent pas de bandeau supplémentaire.
+
+Les fichiers partagés sont `public/media/hero-paradise.mp4` et
+`public/media/hero-paradise.jpg`, copiés dans `dist/media/` à la compilation.
+La vidéo fournie est réencodée en H.264, 960 x 540, 25 images/seconde, sans son
+et sans modification de sa durée (environ 50 secondes), avec les métadonnées
+MP4 en tête pour permettre la lecture progressive. Elle pèse environ 4,2 Mo
+contre 7,7 Mo pour l'original ; l'image d'attente pèse environ 116 Ko.
+
+L'image est affichée immédiatement, y compris sans JavaScript. La vidéo est
+muette, en boucle, adaptée au mobile et chargée seulement après un délai de
+800 ms, lorsque le bandeau est visible. La lecture automatique est désactivée
+si l'utilisateur préfère réduire les animations ou active l'économie de
+données. Le bouton permet une lecture volontaire ou une pause ; la lecture
+s'arrête lorsque le bandeau sort de l'écran ou que l'onglet est masqué. En cas
+d'échec, l'image reste visible et un message explicite est affiché.
+
+Déployer tout `dist/`, notamment `media/`. Les sauvegardes de contenus
+antérieures restent compatibles : elles utilisent le modèle actuel après
+restauration. **Republier les pages mariage statiques après le déploiement ou
+une restauration** pour remplacer leur HTML par celui incluant le bandeau.
+Les anciens fichiers HTML ne sont pas modifiés automatiquement ; restaurer
+un ancien fichier HTML complet rétablira son ancien aspect.
+
 ## Publication des pages mariage
 
 L'administration ne propose plus que l'onglet **Pages salle de mariage**.

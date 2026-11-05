@@ -324,6 +324,8 @@ export default function PagesClientTab({ pageType }) {
       const snapshot = backup.snapshot || {}
       await storage.savePages(snapshot)
       setPages(snapshot)
+      setPublishError('')
+      setPublishMessage('ℹ️ Sauvegarde restaurée. Cliquez sur « Publier les pages en HTML statique » pour actualiser les fichiers publics et leur bandeau vidéo.')
       const bkps = await storage.getBackups()
       setBackups(bkps || [])
     } finally {

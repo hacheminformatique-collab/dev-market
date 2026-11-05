@@ -8,6 +8,7 @@ import Step5Gateau from './steps/Step5Gateau'
 import Step6Options from './steps/Step6Options'
 import Step7Summary from './steps/Step7Summary'
 import CartFloat from './CartFloat'
+import VideoHero from '../VideoHero'
 
 const STEP_LABELS = ['Coordonnées', 'Événement', 'Formule', 'Menu', 'Gâteau', 'Options', 'Récapitulatif']
 
@@ -99,18 +100,20 @@ export default function WizardForm({ inline = false }) {
   return (
     <div style={{ minHeight: '100vh', background: '#f8f5f0', paddingBottom: '100px' }}>
       {/* Header */}
-      <div style={{ background: '#1a1a2e', padding: '16px 24px', display: 'flex', alignItems: 'center', gap: '12px' }}>
-        <button
-          onClick={() => navigate('/')}
-          style={{ background: 'none', border: 'none', color: '#aaa', cursor: 'pointer', fontSize: '20px' }}
-        >
-          ←
-        </button>
-        <div>
-          <div style={{ color: '#c9a84c', fontWeight: '800', fontSize: '18px' }}>LE PARADISE</div>
-          <div style={{ color: '#aaa', fontSize: '12px' }}>Demande de devis</div>
+      <VideoHero>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '12px', maxWidth: '720px', margin: '0 auto' }}>
+          <button
+            onClick={() => navigate('/')}
+            style={{ background: 'none', border: 'none', color: '#aaa', cursor: 'pointer', fontSize: '20px' }}
+          >
+            ←
+          </button>
+          <div>
+            <div style={{ color: '#c9a84c', fontWeight: '800', fontSize: '18px' }}>LE PARADISE</div>
+            <h1 style={{ color: 'white', fontSize: 'clamp(1.5rem,4vw,2rem)' }}>Demande de devis</h1>
+          </div>
         </div>
-      </div>
+      </VideoHero>
 
       {/* Progress bar */}
       <div style={{ background: 'white', padding: '20px 24px', borderBottom: '1px solid #eee' }}>

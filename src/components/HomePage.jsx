@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { getSettings, getStaff } from '../utils/storage'
+import VideoHero from './VideoHero'
 
 export default function HomePage() {
   const navigate = useNavigate()
@@ -35,16 +36,18 @@ export default function HomePage() {
   }
 
   return (
-    <div style={{
+    <div style={{ minHeight: '100vh', background: '#14142a', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+    <VideoHero as="div" className="video-hero-home" style={{
       minHeight: '100vh',
       background: 'linear-gradient(160deg, #14142a 0%, #1c1c3a 55%, #10101e 100%)',
       display: 'flex',
       flexDirection: 'column',
       alignItems: 'center',
       justifyContent: 'center',
-      padding: 'clamp(20px, 4vw, 40px) 16px',
+      padding: 'clamp(20px, 4vw, 40px) 16px 80px',
       position: 'relative',
       overflow: 'hidden',
+      width: '100%',
     }}>
 
       {/* Subtle background pattern */}
@@ -210,6 +213,9 @@ export default function HomePage() {
           </button>
         </div>
 
+      </div>
+    </VideoHero>
+    <div style={{ textAlign: 'center', color: 'white', maxWidth: '620px', width: '100%', padding: '0 16px' }}>
         {/* Presentation section */}
         <div style={{ marginTop: 'clamp(40px, 6vw, 80px)', textAlign: 'center' }}>
           <p style={{

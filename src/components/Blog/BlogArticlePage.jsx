@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import { getBlogArticles } from '../../utils/blogStorage'
 import { getSettings } from '../../utils/storage'
+import VideoHero from '../VideoHero'
 
 // ── Markdown renderer (same style as CityPage.jsx) ────────────────────────────
 
@@ -251,6 +252,13 @@ export default function BlogArticlePage() {
         <Link to="/devis" className="btn btn-primary" style={{ fontSize: '13px' }}>Demander un devis</Link>
       </header>
 
+      <VideoHero style={{ textAlign: 'center' }}>
+        <p style={{ color: 'var(--gold)', marginBottom: '12px' }}>{article.theme}</p>
+        <h1 style={{ fontFamily: 'var(--font-heading)', fontSize: 'clamp(1.8rem,4vw,2.4rem)', color: 'white', lineHeight: 1.25 }}>
+          {article.title}
+        </h1>
+      </VideoHero>
+
       {/* ── Breadcrumb ────────────────────────────────────────────────────── */}
       <div style={{ background: 'white', borderBottom: '1px solid var(--border)', padding: '10px clamp(16px,5vw,80px)' }}>
         <nav style={{ fontSize: '12px', color: 'var(--text-light)', display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
@@ -286,15 +294,6 @@ export default function BlogArticlePage() {
           }}>
             {article.theme}
           </div>
-
-          {/* Title */}
-          <h1 style={{
-            fontFamily: 'var(--font-heading)', fontSize: 'clamp(1.8rem,4vw,2.4rem)',
-            fontWeight: '700', color: 'var(--dark)', lineHeight: 1.25,
-            marginBottom: '16px',
-          }}>
-            {article.title}
-          </h1>
 
           {/* Meta row */}
           <div style={{ display: 'flex', alignItems: 'center', gap: '16px', marginBottom: '28px', fontSize: '13px', color: 'var(--text-light)', borderBottom: '1px solid var(--border)', paddingBottom: '20px', flexWrap: 'wrap' }}>

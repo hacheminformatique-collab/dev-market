@@ -257,7 +257,7 @@ export default function BackupTab() {
       }
       const totalCity = countPages(preview.cityPages)
       const totalBlog = Object.keys(preview.blogArticles || {}).length
-      setStatus({ type: 'success', msg: `Restauration réussie — ${totalCity} pages villes + ${totalBlog} articles blog restaurés depuis le backup du ${preview.exportedAt?.slice(0, 10) || '?'}.` })
+      setStatus({ type: 'success', msg: `Restauration réussie — ${totalCity} pages villes + ${totalBlog} articles blog restaurés depuis le backup du ${preview.exportedAt?.slice(0, 10) || '?'}. Pour mettre à jour les fichiers HTML publics avec le bandeau vidéo actuel, republiez depuis Pages salle de mariage.` })
       setPreview(null)
     } catch (e) {
       setStatus({ type: 'error', msg: `Erreur lors de la restauration : ${e.message}` })

@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom'
 import { getPublishedArticles } from '../../utils/blogStorage'
 import { BLOG_CLUSTERS } from '../../data/blogTopics'
 import { getSettings } from '../../utils/storage'
+import VideoHero from '../VideoHero'
 
 const PAGE_SIZE = 12
 
@@ -170,10 +171,9 @@ export default function BlogListPage() {
       </header>
 
       {/* ── Hero ───────────────────────────────────────────────────────────── */}
-      <div style={{
+      <VideoHero style={{
         background: 'linear-gradient(135deg, var(--dark) 0%, var(--navy) 100%)',
         color: 'white',
-        padding: 'clamp(40px,6vw,70px) clamp(16px,5vw,80px)',
         textAlign: 'center',
       }}>
         <nav style={{ fontSize: '12px', color: 'rgba(255,255,255,0.5)', marginBottom: '16px' }}>
@@ -210,7 +210,7 @@ export default function BlogListPage() {
             🔍
           </span>
         </div>
-      </div>
+      </VideoHero>
 
       {/* ── Theme filter tabs ───────────────────────────────────────────────── */}
       <div style={{

@@ -5,6 +5,7 @@ import { getCityBySlug, getNearbyCities, haversineKm } from '../../data/idf-citi
 import { PAGE_TYPES } from '../../data/pageTypes'
 import { getBlogArticles } from '../../utils/blogStorage'
 import WizardForm from '../Wizard/WizardForm'
+import VideoHero from '../VideoHero'
 
 function Link(props) {
   return <RouterLink {...props} reloadDocument />
@@ -1196,7 +1197,7 @@ export function CityPageContent({ citySlug, pageType, page, gallery, config, all
       </header>
 
       {/* ── Hero ── */}
-      <div style={{ background: 'linear-gradient(135deg, var(--dark) 0%, var(--navy) 100%)', color: 'white', padding: 'clamp(40px,8vw,80px) clamp(16px,5vw,80px)', textAlign: 'center' }}>
+      <VideoHero style={{ textAlign: 'center' }}>
         <div style={{ display: 'inline-block', background: 'var(--gold)', color: 'white', padding: '4px 16px', borderRadius: '20px', fontSize: '12px', fontWeight: '700', letterSpacing: '0.1em', textTransform: 'uppercase', marginBottom: '16px' }}>
           {city.deptCode} — {city.deptName}
         </div>
@@ -1217,7 +1218,7 @@ export function CityPageContent({ citySlug, pageType, page, gallery, config, all
             📍 Nous trouver
           </a>
         </div>
-      </div>
+      </VideoHero>
 
       {/* ── Content ── */}
       <div style={{ maxWidth: '960px', margin: '0 auto', padding: 'clamp(32px,5vw,64px) clamp(16px,5vw,40px)' }}>

@@ -145,6 +145,14 @@ test('HTML has content, self-canonical, SEO and quote links before JavaScript', 
   assert.match(html, /href="\/devis"/)
   assert.match(html, /id="devis"/)
   assert.match(html, /Coordonnées/)
+  assert.equal((html.match(/<video\b/g) || []).length, 1)
+  const video = html.match(/<video\b[^>]*>/)[0]
+  assert.match(video, /poster="\/media\/hero-paradise.jpg"/)
+  assert.match(video, /preload="none"/)
+  assert.match(video, /muted/)
+  assert.match(video, /playsInline|playsinline/)
+  assert.ok(!/\ssrc=/.test(video))
+  assert.match(html, /Lire la vidéo/)
   assert.match(html, /href="\/blog\/exemple"/)
   const data = html.match(/<script id="city-page-data" type="application\/json">([\s\S]*?)<\/script>/)[1]
   assert.deepEqual(JSON.parse(data), JSON.parse(JSON.stringify(snapshot)))
@@ -223,5 +231,27 @@ test('publication reports API failures, incorrect routing and canonical domain m
     await assert.rejects(publication.publishWeddingPages(options), /ne sert pas le HTML publié/)
   } finally {
     globalThis.fetch = nativeFetch
+  }
+})
+
+test('video and poster are deployed once with fast-start MP4 and bounded sizes', async () => {
+  const video = await readFile(join(root, 'dist/media/hero-paradise.mp4'))
+  const poster = await readFile(join(root, 'dist/media/hero-paradise.jpg'))
+  assert.ok(video.length < 5 * 1024 * 1024, 'Video must remain below 5 MiB')
+  assert.ok(poster.length < 200 * 1024, 'Poster must remain below 200 KiB')
+  assert.equal(poster.readUInt16BE(0), 0xffd8)
+  const boxes = []
+  for (let offset = 0; offset + 8 <= video.length;) {
+    const size = video.readUInt32BE(offset)
+    assert.ok(size >= 8)
+    boxes.push(video.toString('ascii', offset + 4, offset + 8))
+    offset += size
+  }
+  assert.ok(boxes.includes('moov') && boxes.includes('mdat'))
+  assert.ok(boxes.indexOf('moov') < boxes.indexOf('mdat'), 'MP4 metadata must precede media for streaming')
+  for (const [path, content] of [['hero-paradise.mp4', video], ['hero-paradise.jpg', poster]]) {
+    const response = await fetch(`${origin}/media/${path}`)
+    assert.equal(response.status, 200)
+    assert.deepEqual(Buffer.from(await response.arrayBuffer()), content)
   }
 })

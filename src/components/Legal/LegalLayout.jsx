@@ -1,4 +1,5 @@
 import { useNavigate } from 'react-router-dom'
+import VideoHero from '../VideoHero'
 
 export default function LegalLayout({ title, children }) {
   const navigate = useNavigate()
@@ -7,8 +8,8 @@ export default function LegalLayout({ title, children }) {
       minHeight: '100vh',
       background: 'linear-gradient(160deg, #14142a 0%, #1c1c3a 55%, #10101e 100%)',
       color: 'white',
-      padding: 'clamp(20px, 4vw, 60px) 16px',
     }}>
+      <VideoHero>
       <div style={{ maxWidth: '760px', margin: '0 auto' }}>
         <button
           onClick={() => navigate('/')}
@@ -33,7 +34,9 @@ export default function LegalLayout({ title, children }) {
           {title}
         </h1>
 
-        <div style={{ width: '60px', height: '2px', background: 'rgba(184,151,74,0.5)', marginBottom: '36px' }} />
+      </div>
+      </VideoHero>
+      <div style={{ maxWidth: '760px', margin: '0 auto', padding: '36px 16px' }}>
 
         <div style={{
           fontSize: '15px',

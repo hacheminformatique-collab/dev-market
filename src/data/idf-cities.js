@@ -7,6 +7,8 @@
  * Distance-based backlinks (5 km radius) use the Haversine formula.
  */
 
+import weddingPostcodes from './wedding-postcodes.json'
+
 export const DEPARTMENTS = [
   // ── Île-de-France ──────────────────────────────────────────────────────────
   {
@@ -5926,7 +5928,12 @@ export const DEPARTMENTS = [
 
 /** Flat list of every city across all departments */
 export const ALL_CITIES = DEPARTMENTS.flatMap((dept) =>
-  dept.cities.map((city) => ({ ...city, deptCode: dept.code, deptName: dept.name }))
+  dept.cities.map((city) => ({
+    ...city,
+    deptCode: dept.code,
+    deptName: dept.name,
+    postalCode: weddingPostcodes[dept.code]?.[city.slug],
+  }))
 )
 
 /**

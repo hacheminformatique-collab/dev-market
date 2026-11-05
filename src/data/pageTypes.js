@@ -8,8 +8,8 @@
  *   label       – human-readable tab label (Dashboard)
  *   icon        – emoji icon shown in the Dashboard tab
  *   mainKeyword – primary SEO keyword injected into AI prompt / fallback template
- *   seoCityTitle – template for <title> on a city page  ({{city}} and {{business}} are replaced)
- *   seoCityDesc  – template for meta description        ({{city}}, {{dept}}, {{business}})
+ *   seoCityTitle – template for <title> ({{city}}, {{postalCode}}, {{business}})
+ *   seoCityDesc  – template for meta description ({{city}}, {{dept}}, {{deptCode}}, {{business}})
  */
 export const PAGE_TYPES = [
   {
@@ -19,8 +19,8 @@ export const PAGE_TYPES = [
     label: 'Pages salle de mariage',
     icon: '💍',
     mainKeyword: 'location salle de mariage',
-    seoCityTitle: 'Location salle de mariage près de {{city}} — {{business}}',
-    seoCityDesc: 'Vous cherchez une location de salle de mariage depuis {{city}} ({{dept}}) ? Découvrez {{business}} à Nanteuil-lès-Meaux : prestations et devis personnalisé.',
+    seoCityTitle: 'Le Paradise 0184196949 | Salle de mariage {{city}} {{postalCode}}',
+    seoCityDesc: 'Vous recherchez une salle de mariage à {{city}} {{deptCode}} ? Découvrez notre salle de réception a proximité de {{dept}}, idéale pour célébrer votre mariage. Contactez-nous pour réserver une salle de mariage et obtenir un devis personnalisé à {{city}} !',
   },
   {
     id: 'reception',

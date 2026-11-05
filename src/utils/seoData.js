@@ -1,5 +1,12 @@
 import { getCityBySlug } from '../data/idf-cities'
 
+function plainLocationName(name) {
+  return name.normalize('NFD').replace(/\p{M}/gu, '')
+    .replaceAll('œ', 'oe').replaceAll('Œ', 'OE')
+    .replaceAll('æ', 'ae').replaceAll('Æ', 'AE')
+    .replace(/[^a-zA-Z0-9]+/g, ' ').trim()
+}
+
 function normalizeSiteUrl(rawUrl, fallback = window.location.origin) {
   const input = (rawUrl || '').trim()
   if (!input) return fallback
@@ -105,17 +112,20 @@ export function buildSeoData(pathname, settings, cityPages, detectedPageType, bl
   if (detectedPageType && citySlug) {
     const city = getCityBySlug(citySlug)
     if (city && hasGeneratedCityPage) {
-      const titleTemplate = detectedPageType.id === 'mariage' && citySlug === 'nanteuil-les-meaux'
-        ? 'Location salle de mariage à {{city}} — {{business}}'
-        : detectedPageType.seoCityTitle || 'Page ville — {{business}}'
-      const title = titleTemplate
-        .replace('{{city}}', city.name)
-        .replace('{{dept}}', city.deptName)
-        .replace('{{business}}', businessName)
-      const description = (detectedPageType.seoCityDesc || '')
-        .replace('{{city}}', city.name)
-        .replace('{{dept}}', city.deptName)
-        .replace('{{business}}', businessName)
+      const isWedding = detectedPageType.id === 'mariage'
+      if (isWedding && !/^\d{5}$/.test(city.postalCode || '')) {
+        throw new Error(`Code postal manquant pour ${city.name} (${city.deptCode}).`)
+      }
+      const values = {
+        city: isWedding ? plainLocationName(city.name) : city.name,
+        dept: isWedding ? plainLocationName(city.deptName).toLowerCase() : city.deptName,
+        deptCode: city.deptCode,
+        postalCode: city.postalCode,
+        business: businessName,
+      }
+      const fillTemplate = (template) => template.replace(/\{\{(city|dept|deptCode|postalCode|business)\}\}/g, (_match, key) => values[key])
+      const title = fillTemplate(detectedPageType.seoCityTitle || 'Page ville — {{business}}')
+      const description = fillTemplate(detectedPageType.seoCityDesc || '')
       return {
         ...base,
         title,

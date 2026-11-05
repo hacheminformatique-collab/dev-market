@@ -13,6 +13,7 @@ const root = resolve(import.meta.dirname, '..')
 let vite, publication, directory, site, origin, template, shellTemplate
 let buildSeoData, PAGE_TYPES_BY_ID, getPublishedWeddingSlugs, isPublicPath, generateCityContent
 let WeddingDirectory
+let ALL_CITIES, getCityBySlug
 const processes = []
 const pin = 'publication-test-pin'
 const fixture = {
@@ -68,6 +69,7 @@ before(async () => {
   publication = await vite.ssrLoadModule('/src/utils/staticCityPublication.jsx')
   ;({ buildSeoData } = await vite.ssrLoadModule('/src/utils/seoData.js'))
   ;({ PAGE_TYPES_BY_ID } = await vite.ssrLoadModule('/src/data/pageTypes.js'))
+  ;({ ALL_CITIES, getCityBySlug } = await vite.ssrLoadModule('/src/data/idf-cities.js'))
   ;({ getPublishedWeddingSlugs, isPublicPath } = await vite.ssrLoadModule('/src/utils/weddingPublication.js'))
   ;({ generateCityContent } = await vite.ssrLoadModule('/src/utils/cityPageStorage.js'))
   ;({ default: WeddingDirectory } = await vite.ssrLoadModule('/src/components/WeddingDirectory.jsx'))
@@ -147,6 +149,11 @@ test('HTML has content, self-canonical, SEO and quote links before JavaScript', 
   const snapshot = publication.makeCitySnapshot({ slug: 'meaux', ...fixture })
   const html = publication.renderCityDocument({ template, snapshot, settings: fixture.settings, origin })
   assert.match(html, /<h1[^>]*>Location salle de mariage près de Meaux/)
+  assert.ok(html.includes('<title>Le Paradise 0184196949 | Salle de mariage Meaux 77100</title>'))
+  const expectedDescription = 'Vous recherchez une salle de mariage à Meaux 77 ? Découvrez notre salle de réception a proximité de seine et marne, idéale pour célébrer votre mariage. Contactez-nous pour réserver une salle de mariage et obtenir un devis personnalisé à Meaux !'
+  assert.ok(html.includes(`<meta name="description" content="${expectedDescription}" />`))
+  assert.ok(html.includes(`<meta property="og:description" content="${expectedDescription}" />`))
+  assert.ok(html.includes('<meta property="og:title" content="Le Paradise 0184196949 | Salle de mariage Meaux 77100" />'))
   assert.match(html, /Texte unique \$&amp; et &lt;script&gt;/)
   assert.ok(html.includes(`<link rel="canonical" href="${origin}/locationsalledemariage/meaux"`))
   assert.match(html, /name="robots" content="index, follow/)
@@ -291,8 +298,9 @@ test('SEO uses unique local titles without moving the venue or indexing private 
   const nanteuil = buildSeoData('/locationsalledemariage/nanteuil-les-meaux', settings, fixture.pages, PAGE_TYPES_BY_ID.mariage, null, null, origin)
   assert.notEqual(meaux.title, nanteuil.title)
   assert.notEqual(meaux.description, nanteuil.description)
-  assert.match(meaux.title, /Location salle de mariage près de Meaux/)
-  assert.match(meaux.description, /Nanteuil-lès-Meaux/)
+  assert.equal(meaux.title, 'Le Paradise 0184196949 | Salle de mariage Meaux 77100')
+  assert.equal(meaux.description, 'Vous recherchez une salle de mariage à Meaux 77 ? Découvrez notre salle de réception a proximité de seine et marne, idéale pour célébrer votre mariage. Contactez-nous pour réserver une salle de mariage et obtenir un devis personnalisé à Meaux !')
+  assert.equal(nanteuil.title, 'Le Paradise 0184196949 | Salle de mariage Nanteuil les Meaux 77100')
   assert.ok(meaux.imageUrl.endsWith('/media/hero-paradise.jpg'))
   for (const path of ['/', '/blog', '/blog/exemple', '/devis', '/mentions-legales', '/conditions-generales', '/politique-confidentialite', '/locationsalledemariage/meaux', '/locationsalledereception/meaux']) {
     assert.equal(isPublicPath(path), true, path)
@@ -302,6 +310,36 @@ test('SEO uses unique local titles without moving the venue or indexing private 
     assert.equal(isPublicPath(path), false, path)
     assert.match(buildSeoData(path, settings, {}, null, null, null, origin).robots, /noindex/)
   }
+})
+
+test('all wedding cities have a real postal code and punctuation-free metadata names', () => {
+  for (const city of ALL_CITIES) {
+    assert.match(city.postalCode, /^\d{5}$/, `${city.deptCode}/${city.slug}`)
+    // Homonymous URLs keep the existing first-match city resolution.
+    const resolved = getCityBySlug(city.slug)
+    const pages = { [city.slug]: { content: 'Ancien contenu restauré.', seoTitle: 'Ancien titre', seoDescription: 'Ancienne description' } }
+    const seo = buildSeoData(`/locationsalledemariage/${city.slug}`, fixture.settings, pages, PAGE_TYPES_BY_ID.mariage, null, null, origin)
+    assert.match(seo.title, /^Le Paradise 0184196949 \| Salle de mariage [A-Za-z0-9 ]+ \d{5}$/)
+    assert.ok(seo.title.endsWith(` ${resolved.postalCode}`))
+    assert.equal((seo.description.match(/Vous recherchez/g) || []).length, 1)
+    assert.ok(!seo.description.includes('{{'))
+    assert.equal(seo.canonical, `${origin}/locationsalledemariage/${city.slug}`)
+  }
+  for (const [slug, name, postcode, department] of [
+    ['paris-1er', 'Paris 1er', '75001', 'paris'],
+    ['versailles', 'Versailles', '78000', 'yvelines'],
+    ['evry', 'Evry', '91000', 'essonne'],
+    ['boulogne-billancourt', 'Boulogne Billancourt', '92100', 'hauts de seine'],
+    ['epinay-sur-seine', 'Epinay sur Seine', '93800', 'seine saint denis'],
+    ['hay-les-roses', 'Hay les Roses', '94240', 'val de marne'],
+    ['cergy', 'Cergy', '95000', 'val d oise'],
+  ]) {
+    const seo = buildSeoData(`/locationsalledemariage/${slug}`, fixture.settings, { [slug]: { content: 'Contenu' } }, PAGE_TYPES_BY_ID.mariage, null, null, origin)
+    assert.equal(seo.title, `Le Paradise 0184196949 | Salle de mariage ${name} ${postcode}`)
+    assert.ok(seo.description.includes(`proximité de ${department},`))
+  }
+  const reception = buildSeoData('/locationsalledereception/nanteuil-les-meaux', fixture.settings, fixture.pages, PAGE_TYPES_BY_ID.reception, null, null, origin)
+  assert.equal(reception.title, `Salle de réception à Nanteuil-lès-Meaux — ${fixture.settings.nom}`)
 })
 
 test('AI instructions forbid keyword quotas, fictitious venues and invented testimonials', async () => {

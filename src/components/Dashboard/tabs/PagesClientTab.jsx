@@ -5,6 +5,9 @@ import {
   DailyQuotaError,
 } from '../../../utils/cityPageStorage'
 import { DEPARTMENTS, ALL_CITIES } from '../../../data/idf-cities'
+import { PAGE_TYPES } from '../../../data/pageTypes'
+import { getSettings } from '../../../utils/storage'
+import { getBlogArticles } from '../../../utils/blogStorage'
 
 // ── Small helpers ──────────────────────────────────────────────────────────
 
@@ -61,6 +64,10 @@ export default function PagesClientTab({ pageType }) {
   const [genDone, setGenDone]       = useState(false)
   const [genError, setGenError]     = useState('')
   const [genWarn, setGenWarn]       = useState('')
+  const [publishing, setPublishing] = useState(false)
+  const [publishProgress, setPublishProgress] = useState({ done: 0, total: 0, current: '' })
+  const [publishMessage, setPublishMessage] = useState('')
+  const [publishError, setPublishError] = useState('')
   const [selDepts, setSelDepts]     = useState({})   // { deptCode: 'all' | Set<slug> }
   const [focusDept, setFocusDept]   = useState(null)
   const [citySearch, setCitySearch] = useState('')
@@ -78,6 +85,8 @@ export default function PagesClientTab({ pageType }) {
     setGenDone(false)
     setGenError('')
     setGenWarn('')
+    setPublishMessage('')
+    setPublishError('')
   }, [pageType.id])
 
   // Load everything on mount / when page type changes
@@ -196,6 +205,7 @@ export default function PagesClientTab({ pageType }) {
     setGenDone(false)
     setGenError('')
     setGenWarn('')
+    setPublishMessage('')
     setGenProgress({ done: 0, total: selectedSlugs.length, current: '' })
 
     // 1. Backup existing pages
@@ -246,6 +256,39 @@ export default function PagesClientTab({ pageType }) {
     // Refresh backups list
     const bkps = await storage.getBackups()
     setBackups(bkps)
+  }
+
+  async function handlePublish() {
+    setPublishing(true)
+    setPublishMessage('')
+    setPublishError('')
+    setPublishProgress({ done: 0, total: Object.keys(pages).length, current: 'Préparation des pages' })
+    try {
+      const [savedConfig, savedGallery, blogArticles, ...typePages] = await Promise.all([
+        storage.getConfig(),
+        storage.getGallery(),
+        getBlogArticles(),
+        ...PAGE_TYPES.map((pt) => makePageTypeStorage(pt.id).getPages()),
+      ])
+      const allTypePages = Object.fromEntries(PAGE_TYPES.map((pt, i) => [pt.id, typePages[i]]))
+      const { publishWeddingPages } = await import('../../../utils/staticCityPublication')
+      const count = await publishWeddingPages({
+        pages: allTypePages.mariage,
+        config: savedConfig,
+        gallery: savedGallery,
+        allTypePages,
+        blogArticles,
+        settings: getSettings(),
+        origin: window.location.origin,
+        onProgress: setPublishProgress,
+      })
+      setPages(allTypePages.mariage)
+      setPublishMessage(`✅ ${count} page${count > 1 ? 's' : ''} HTML publiée${count > 1 ? 's' : ''} et accessible${count > 1 ? 's' : ''} aux URL actuelles. Sitemap et robots.txt actualisés.`)
+    } catch (error) {
+      setPublishError(`❌ ${error.message} Les fichiers déjà écrits sont conservés ; corrigez le problème puis relancez la publication.`)
+    } finally {
+      setPublishing(false)
+    }
   }
 
   // ── Gallery helpers ───────────────────────────────────────────────────────
@@ -498,6 +541,7 @@ export default function PagesClientTab({ pageType }) {
             <div style={{ display: 'flex', alignItems: 'center', gap: '16px', flexWrap: 'wrap' }}>
               <button
                 className="btn btn-primary"
+                disabled={publishing}
                 onClick={handleGenerate}
                 style={{ fontSize: '14px', padding: '12px 28px' }}
               >
@@ -570,6 +614,38 @@ export default function PagesClientTab({ pageType }) {
           {generatedCount > 0 && (
             <div style={{ marginTop: '24px' }}>
               <Label>Pages générées ({generatedCount})</Label>
+              {pageType.id === 'mariage' && (
+                <div style={{ margin: '12px 0 20px', padding: '16px', background: 'white', border: '1px solid var(--border)', borderRadius: '8px' }}>
+                  <button
+                    type="button"
+                    className="btn btn-primary"
+                    disabled={publishing || generating || saving || restoringIdx !== null}
+                    onClick={handlePublish}
+                  >
+                    {publishing ? '⏳ Publication en cours…' : '📄 Publier les pages en HTML statique'}
+                  </button>
+                  <p style={{ fontSize: '13px', color: 'var(--text-light)', marginTop: '12px', lineHeight: 1.6 }}>
+                    Crée un fichier HTML complet par page mariage sur le serveur, avec sa canonical et son contenu lisible sans JavaScript.
+                    Les adresses et les fonctionnalités sont conservées. Enregistrez votre configuration avant de publier.
+                    Après toute modification du contenu, de la galerie ou des réglages, republiez pour actualiser les fichiers.
+                    Gardez cet onglet ouvert jusqu’à la fin.
+                  </p>
+                  <div aria-live="polite" style={{ fontSize: '13px', marginTop: '8px' }}>
+                    {publishing && (
+                      <>
+                        <progress value={publishProgress.done} max={publishProgress.total || 1} style={{ width: '100%' }} />
+                        <p>{publishProgress.done}/{publishProgress.total} pages vérifiées — {publishProgress.current}</p>
+                      </>
+                    )}
+                    {publishMessage && <p style={{ color: 'var(--success)' }}>{publishMessage}</p>}
+                    {publishError && (
+                      <p role="alert" style={{ color: 'var(--danger)' }}>
+                        {publishError} {publishProgress.done}/{publishProgress.total} pages vérifiées pendant cette publication.
+                      </p>
+                    )}
+                  </div>
+                </div>
+              )}
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', marginTop: '8px' }}>
                 {Object.entries(pages).map(([slug, _page]) => {
                   const city = ALL_CITIES.find((c) => c.slug === slug)
@@ -661,7 +737,7 @@ export default function PagesClientTab({ pageType }) {
           <button
             className="btn btn-primary"
             onClick={handleSaveConfig}
-            disabled={saving}
+            disabled={saving || publishing}
           >
             {saving ? '⏳ Enregistrement…' : '💾 Enregistrer la configuration'}
           </button>
@@ -789,7 +865,7 @@ export default function PagesClientTab({ pageType }) {
           <button
             className="btn btn-primary"
             onClick={handleSaveConfig}
-            disabled={saving}
+            disabled={saving || publishing}
           >
             {saving ? '⏳ Enregistrement…' : '💾 Enregistrer'}
           </button>
@@ -826,7 +902,7 @@ export default function PagesClientTab({ pageType }) {
                     <button
                       className="btn btn-outline btn-sm"
                       onClick={() => handleRestoreBackup(i)}
-                      disabled={restoringIdx !== null}
+                      disabled={restoringIdx !== null || publishing}
                       style={{ minWidth: '110px', justifyContent: 'center' }}
                     >
                       {restoringIdx === i ? '⏳ Restauration…' : '↩ Restaurer'}

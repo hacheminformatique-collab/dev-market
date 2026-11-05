@@ -1,8 +1,7 @@
 import { PAGE_TYPES } from '../data/pageTypes'
 
 function normalizeBaseUrl(rawUrl) {
-  const fallback = window.location.origin
-  const input = (rawUrl || '').trim() || fallback
+  const input = (rawUrl || '').trim() || window.location.origin
   const withProtocol = /^https?:\/\//i.test(input) ? input : `https://${input}`
   const url = new URL(withProtocol)
   return url.origin

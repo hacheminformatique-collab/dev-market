@@ -1,5 +1,36 @@
 # React + Vite
 
+## Generation IA des pages villes avec OpenAI
+
+La generation des pages villes utilise OpenAI `gpt-4o-mini`, via
+`public/api/openai-generate.php`. L'ancien token GitHub n'est plus utilise
+pour ces pages ; les anciennes configurations restent compatibles.
+Les informations publiques de la salle et les consignes sont envoyees a OpenAI.
+La generation du blog et son automatisation ne sont pas migrees par ce changement.
+
+1. Creer un projet API sur `platform.openai.com`, activer sa facturation et
+   definir ses limites. L'abonnement ChatGPT ne comprend pas les appels API.
+2. Configurer **OPENAI_API_KEY dans l'environnement du processus PHP** depuis
+   le panneau d'hebergement ou avec son support. Ne jamais mettre la cle dans
+   React, une variable `VITE_*`, le stockage du site, une sauvegarde ou Git.
+   Verifier que PHP recoit bien la variable (PHP-FPM peut filtrer l'environnement).
+3. Activer PHP cURL et les connexions HTTPS sortantes vers `api.openai.com`.
+   Autoriser au moins 130 secondes pour une requete PHP sur le serveur et le proxy.
+4. Deployer tout `dist/`, notamment `api/openai-generate.php`, puis enregistrer
+   Mes Infos avec le PIN administrateur dans le stockage serveur.
+5. Dans Pages salle de mariage, selectionner **une seule ville** et lancer la
+   generation. Verifier le texte et la consommation avant un lot plus important.
+   Publier ensuite les pages avec le bouton HTML statique.
+
+Chaque appel est authentifie avec le PIN enregistre sur le serveur, limite a
+4096 tokens de sortie et serialise pour eviter des appels payants concurrents.
+Le PIN existant est le mecanisme d'administration du site : utiliser un PIN
+robuste et HTTPS. En cas d'erreur, les pages precedentes restent sauvegardees.
+Il n'y a ni relance automatique payante ni remplacement silencieux par un
+modele de texte local. Une interruption reseau peut survenir apres facturation :
+verifier l'usage OpenAI avant de relancer. Les erreurs distinguent configuration
+manquante, cle invalide, quota, acces reseau et reponse vide/tronquee.
+
 ## Titres et descriptions des pages mariage
 
 Les métadonnées des pages villes mariage suivent ces modèles :

@@ -2,7 +2,6 @@ import { useState, useEffect } from 'react'
 import {
   makePageTypeStorage,
   generateCityContent,
-  DailyQuotaError,
 } from '../../../utils/cityPageStorage'
 import { DEPARTMENTS, ALL_CITIES } from '../../../data/idf-cities'
 import { PAGE_TYPES } from '../../../data/pageTypes'
@@ -195,9 +194,9 @@ export default function PagesClientTab({ pageType }) {
   async function handleGenerate() {
     if (selectedSlugs.length === 0) return
 
-    // Block generation and show red error if no GitHub token is configured
-    if (!config.githubToken?.trim()) {
-      setGenError('❌ Token GitHub non configuré. Rendez-vous dans l\'onglet ⚙️ Configuration pour l\'ajouter afin d\'activer la génération par IA.')
+    const adminPin = getSettings().pin
+    if (!adminPin) {
+      setGenError('❌ PIN administrateur absent. Reconnectez-vous avant de générer.')
       return
     }
 
@@ -228,9 +227,8 @@ export default function PagesClientTab({ pageType }) {
           config.keywords,
           config.businessName,
           config.businessType,
-          config.githubToken,
+          adminPin,
           pageType.mainKeyword,
-          (statusMsg) => setGenProgress((prev) => ({ ...prev, current: statusMsg })),
         )
         updated[slug] = { content, generatedAt: new Date().toISOString() }
         // Save and publish immediately so the page is never lost on interruption
@@ -238,14 +236,8 @@ export default function PagesClientTab({ pageType }) {
         setPages({ ...updated })
       } catch (e) {
         setGenerating(false)
-        if (e instanceof DailyQuotaError) {
-          // Graceful stop: pages already saved above; show informational warning
-          const done = i
-          setGenProgress({ done, total: selectedSlugs.length, current: '' })
-          setGenWarn(`⏳ Quota journalier API atteint (150 pages/jour). ${done} page${done > 1 ? 's' : ''} générée${done > 1 ? 's' : ''} et sauvegardée${done > 1 ? 's' : ''}. ${e.message} Relancez la génération demain pour les pages restantes.`)
-        } else {
-          setGenError(`❌ Erreur IA pour "${city.name}" : ${e.message}. Vérifiez votre token GitHub dans ⚙️ Configuration.`)
-        }
+        setGenProgress({ done: i, total: selectedSlugs.length, current: '' })
+        setGenError(`❌ Erreur IA pour "${city.name}" : ${e.message} Les pages précédentes restent sauvegardées.`)
         return
       }
     }
@@ -723,18 +715,14 @@ export default function PagesClientTab({ pageType }) {
             </div>
           </Field>
 
-          <Field label="Token GitHub (génération IA — optionnel)">
-            <input
-              type="password"
-              style={inputStyle}
-              value={config.githubToken}
-              onChange={(e) => updateConfig({ githubToken: e.target.value })}
-              placeholder="ghp_…"
-            />
-            <div style={{ fontSize: '11px', color: '#aaa', marginTop: '4px' }}>
-              Si renseigné, le contenu de chaque page sera généré par IA via GitHub Models (GPT-4o mini).
-              Sans token, un texte template sera utilisé.
-            </div>
+          <Field label="Génération IA — OpenAI">
+            <p style={{ fontSize: '13px', color: '#555' }}>
+              La génération utilise OpenAI (gpt-4o-mini). Configurez OPENAI_API_KEY
+              uniquement dans l’environnement PHP de votre hébergement, jamais ici.
+              La facturation API est distincte de l’abonnement ChatGPT.
+              Les informations publiques de la salle et les consignes sont transmises à OpenAI.
+              Commencez par une seule ville pour vérifier le résultat et le coût.
+            </p>
           </Field>
 
           <button

@@ -123,7 +123,7 @@ ProxyPass /api/ http://127.0.0.1:${phpPort}/api/
 
 after(async () => {
   for (const child of processes) {
-    if (child.exitCode === null) {
+    if (child.exitCode === null && child.signalCode === null) {
       const exited = once(child, 'exit')
       child.kill('SIGTERM')
       await exited
@@ -202,6 +202,100 @@ test('PHP rejects unauthenticated writes, traversal and malformed HTML', async (
   assert.equal((await post({ action: 'page', slug: 'meaux', html: '<html>bad</html>' })).status, 400)
   assert.equal((await post({ action: 'seo', sitemap: 'bad', robots: 'bad' })).status, 400)
   assert.equal((await post({ action: 'page', slug: 'meaux', html: 'x'.repeat(15 * 1024 * 1024) })).status, 413)
+})
+
+test('OpenAI PHP authenticates, protects the key and handles provider failures without retries', async () => {
+  const port = await freePort()
+  const baseUrl = `http://127.0.0.1:${port}`
+  const responseFile = join(directory, 'openai-response.json')
+  const callsFile = join(directory, 'openai-calls.json')
+  const shim = join(directory, 'openai-test-preload.php')
+  await writeFile(shim, `<?php
+namespace Paradise\\AI;
+const CURLOPT_POST = 1, CURLOPT_RETURNTRANSFER = 2, CURLOPT_CONNECTTIMEOUT = 3, CURLOPT_TIMEOUT = 4, CURLOPT_HTTPHEADER = 5, CURLOPT_POSTFIELDS = 6, CURLINFO_HTTP_CODE = 7;
+$fixture = json_decode(file_get_contents('${responseFile}'), true);
+putenv('OPENAI_API_KEY=' . ($fixture['key'] ?? 'test-only-provider-key'));
+function curl_init($url) { $GLOBALS['test_url'] = $url; return true; }
+function curl_setopt_array($curl, $options) { $GLOBALS['test_options'] = $options; }
+function curl_exec($curl) {
+    file_put_contents('${callsFile}', json_encode(['url' => $GLOBALS['test_url'], 'options' => $GLOBALS['test_options']]));
+    return $GLOBALS['fixture']['networkError'] ?? false ? false : json_encode($GLOBALS['fixture']['body']);
+}
+function curl_getinfo($curl, $option) { return $GLOBALS['fixture']['status']; }
+function curl_errno($curl) { return 28; }
+function curl_close($curl) {}
+`)
+  const setResponse = (body, status = 200, extras = {}) => writeFile(responseFile, JSON.stringify({ body, status, ...extras }))
+  await setResponse({ choices: [{ message: { content: '## Mariage\nTexte original' }, finish_reason: 'stop' }] })
+  const output = start('php', ['-n', '-d', `auto_prepend_file=${shim}`, '-S', `127.0.0.1:${port}`, '-t', site])
+  await ready(`${baseUrl}/static-city.html`, output)
+  const post = (payload = { prompt: 'Consignes publiques pour Meaux' }, adminPin = pin) => fetch(`${baseUrl}/api/openai-generate.php`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Admin-Pin': adminPin }, body: JSON.stringify(payload),
+  })
+  assert.equal((await fetch(`${baseUrl}/api/openai-generate.php`)).status, 405)
+  assert.equal((await post(undefined, 'wrong')).status, 403)
+  assert.equal((await post({ prompt: '' })).status, 400)
+  assert.equal((await post({ prompt: 'x'.repeat(33000) })).status, 413)
+  const lockPath = join(site, 'storage-data/.openai-generation.lock')
+  const holder = spawn('php', ['-r', `$lock = fopen('${lockPath}', 'c'); flock($lock, LOCK_EX); echo 'locked'; sleep(10);`], { stdio: ['ignore', 'pipe', 'ignore'] })
+  processes.push(holder)
+  await once(holder.stdout, 'data')
+  assert.equal((await post()).status, 409)
+  holder.kill('SIGTERM')
+  await once(holder, 'exit')
+  let result = await post()
+  assert.equal(result.status, 200)
+  assert.deepEqual(await result.json(), { content: '## Mariage\nTexte original' })
+  const call = JSON.parse(await readFile(callsFile, 'utf8'))
+  assert.equal(call.url, 'https://api.openai.com/v1/chat/completions')
+  const request = JSON.parse(call.options['6'])
+  assert.equal(request.model, 'gpt-4o-mini')
+  assert.equal(request.max_completion_tokens, 4096)
+  assert.equal(request.messages[0].content, 'Consignes publiques pour Meaux')
+  for (const [status, body, message] of [
+    [401, { error: { message: 'secret-provider-details' } }, /Clé OpenAI invalide/],
+    [429, { error: { code: 'insufficient_quota' } }, /Crédit ou quota/],
+    [429, { error: { code: 'rate_limit_exceeded' } }, /Limite de requêtes/],
+    [500, {}, /HTTP 500/],
+    [200, { choices: [{ message: { content: 'partial' }, finish_reason: 'length' }] }, /tronqué/],
+    [200, { choices: [] }, /vide ou invalide/],
+  ]) {
+    await setResponse(body, status)
+    result = await post()
+    assert.ok(!result.ok)
+    const text = await result.text()
+    assert.match(text, message)
+    assert.ok(!text.includes('secret-provider-details'))
+    assert.ok(!text.includes('test-only-provider-key'))
+  }
+  await setResponse({}, 0, { networkError: true })
+  result = await post()
+  assert.equal(result.status, 502)
+  assert.match((await result.json()).error, /aucune relance automatique/)
+  await setResponse({}, 200, { key: '' })
+  result = await post()
+  assert.equal(result.status, 503)
+  assert.match((await result.json()).error, /OPENAI_API_KEY/)
+})
+
+test('OpenAI client surfaces network, API and deployment errors and never uses a local fallback', async () => {
+  const nativeFetch = globalThis.fetch
+  const generate = (adminPin = pin) => generateCityContent('Meaux', 'Seine-et-Marne', '', 'Le Paradise', 'salle', adminPin, 'location salle de mariage')
+  let calls = 0
+  try {
+    globalThis.fetch = async () => { calls++; throw new TypeError('Failed to fetch') }
+    await assert.rejects(generate(), /Connexion au serveur/)
+    assert.equal(calls, 1)
+    globalThis.fetch = async () => new Response('<html>SPA</html>', { headers: { 'Content-Type': 'text/html' } })
+    await assert.rejects(generate(), /déploiement/)
+    globalThis.fetch = async () => new Response(JSON.stringify({ error: 'Crédit OpenAI épuisé' }), { status: 429, headers: { 'Content-Type': 'application/json' } })
+    await assert.rejects(generate(), /Crédit OpenAI épuisé/)
+    globalThis.fetch = async () => new Response(JSON.stringify({ content: '' }), { headers: { 'Content-Type': 'application/json' } })
+    await assert.rejects(generate(), /vide/)
+    await assert.rejects(generate(''), /PIN administrateur absent/)
+  } finally {
+    globalThis.fetch = nativeFetch
+  }
 })
 
 test('publishes physical files at extensionless URLs and republishes safely', async () => {
@@ -346,11 +440,14 @@ test('AI instructions forbid keyword quotas, fictitious venues and invented test
   const nativeFetch = globalThis.fetch
   let prompt = ''
   try {
-    globalThis.fetch = async (_url, options) => {
-      prompt = JSON.parse(options.body).messages[0].content
-      return new Response(JSON.stringify({ choices: [{ message: { content: '## Préparer votre réception\nContenu utile.' } }] }))
+    globalThis.fetch = async (url, options) => {
+      assert.equal(url, '/api/openai-generate.php')
+      assert.equal(options.headers['X-Admin-Pin'], 'test-only-pin')
+      prompt = JSON.parse(options.body).prompt
+      assert.ok(!options.body.includes('test-only-pin'))
+      return new Response(JSON.stringify({ content: '## Préparer votre réception\nContenu utile.' }), { headers: { 'Content-Type': 'application/json' } })
     }
-    await generateCityContent('Meaux', 'Seine-et-Marne', '', 'Le Paradise', 'salle', 'test-only-token', 'location salle de mariage')
+    await generateCityContent('Meaux', 'Seine-et-Marne', '', 'Le Paradise', 'salle', 'test-only-pin', 'location salle de mariage')
     assert.match(prompt, /5 avenue Fridingen/)
     assert.match(prompt, /pas d'une salle ou d'une agence située/)
     assert.match(prompt, /N'invente jamais d'avis, de témoignages/)

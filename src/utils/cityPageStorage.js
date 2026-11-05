@@ -62,7 +62,7 @@ export const DEFAULT_CONFIG = {
   instagramPosts: [],   // array of post URLs to embed
   tiktokUsername: '',
   tiktokPosts: [],      // array of post URLs to embed
-  githubToken: '',      // used for AI content generation via GitHub Models API
+  githubToken: '',      // retained for compatibility with old configurations
 }
 
 export async function getCityPagesConfig() {
@@ -204,40 +204,13 @@ function _cleanAIText(raw) {
 }
 
 /**
- * Error thrown when the GitHub Models API daily request quota is exhausted
- * (typically 150 requests / 24 h).  The caller should stop generation and
- * display an informational message rather than an error.
+ * Generates city content through the PIN-protected PHP OpenAI endpoint.
+ * The provider key is configured only in the PHP environment.
  */
-export class DailyQuotaError extends Error {
-  /** @param {number} retryAfterSeconds */
-  constructor(retryAfterSeconds) {
-    const hours = Math.ceil(retryAfterSeconds / 3600)
-    super(`Quota journalier API atteint. Quota disponible dans ~${hours}h.`)
-    this.name = 'DailyQuotaError'
-    this.retryAfterSeconds = retryAfterSeconds
-  }
-}
-
-/**
- * Generates rich SEO content for a city using GitHub Models API
- * (https://models.inference.ai.azure.com).
- *
- * Uses gpt-4o with high temperature so every city receives unique,
- * non-duplicate content (important for Google SEO).
- *
- * Falls back to a varied local template when the API is unavailable or the
- * token is not configured.
- *
- * @param {Function} [onStatus] - Optional callback(message) invoked to report
- *   status updates (e.g. quota wait). Useful to surface progress in the UI.
- */
-export async function generateCityContent(cityName, deptName, keywords, businessName, businessType, githubToken, mainKeyword, onStatus) {
+export async function generateCityContent(cityName, deptName, keywords, businessName, businessType, adminPin, mainKeyword) {
   // Resolve the primary keyword for this page type (default: location salle de mariage)
   const primaryKw = mainKeyword || 'location salle de mariage'
-  // Derive a short event label from the keyword for use in prompts/templates
-  const eventLabel = primaryKw.replace(/^location (de )?salle (de |pour )?/i, '').trim() || 'mariage'
-
-  if (githubToken) {
+  if (adminPin) {
     const prompt = `Tu es un expert en rédaction SEO pour des salles de réception en France.
 Génère un contenu SEO très riche, UNIQUE et ORIGINAL pour la page web de la ville de "${cityName}" (${deptName}).
 L'établissement s'appelle "${businessName}" et se trouve au 5 avenue Fridingen, 77100 Nanteuil-lès-Meaux, en Seine-et-Marne (77).
@@ -274,71 +247,34 @@ Structure recommandée (à adapter sans dupliquer les formulations) :
 ## Demander les disponibilités et un devis personnalisé
 ## Préparer une visite et les questions à poser`
 
-    const fetchCompletion = () => fetch('https://models.inference.ai.azure.com/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Authorization': 'Bearer ' + githubToken,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        model: 'gpt-4o-mini',
-        messages: [{ role: 'user', content: prompt }],
-        max_tokens: 4096,
-        temperature: 1.0,
-      }),
-    })
-
-    const parseOkResponse = async (r) => {
-      const json = await r.json()
-      const text = json.choices?.[0]?.message?.content?.trim()
-      if (text) return _cleanAIText(text)
-      throw new Error('Réponse IA vide reçue de GitHub Models.')
+    let res
+    try {
+      res = await fetch('/api/openai-generate.php', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-Admin-Pin': adminPin },
+        body: JSON.stringify({ prompt }),
+      })
+    } catch (error) {
+      throw new Error('Connexion au serveur de génération impossible. Vérifiez votre connexion et le déploiement PHP. Aucune relance automatique.', { cause: error })
     }
-
-    const buildErrMsg = async (r) => {
-      let msg = `GitHub Models API — erreur ${r.status}`
-      try {
-        const errJson = await r.json()
-        if (errJson?.error?.message) msg += ` : ${errJson.error.message}`
-      } catch { /* ignore parse errors */ }
-      return msg
+    if (!res.headers.get('content-type')?.includes('application/json')) {
+      throw new Error(`Réponse du serveur invalide (HTTP ${res.status}). Vérifiez le déploiement de api/openai-generate.php.`)
     }
-
-    let res = await fetchCompletion()
-    if (res.ok) return await parseOkResponse(res)
-
-    // On 429 (quota exceeded): inspect the wait time to determine the quota type.
-    if (res.status === 429) {
-      let retryAfter = 0
-      try {
-        const errJson = await res.clone().json()
-        const msg = errJson?.error?.message || ''
-        // The API embeds "wait X seconds" in the error message
-        const match = msg.match(/wait\s+(\d+)\s+second/i)
-        if (match) retryAfter = parseInt(match[1], 10)
-      } catch { /* ignore */ }
-
-      // Daily quota (>2 min wait): stop immediately — no point retrying
-      if (retryAfter > 120) {
-        throw new DailyQuotaError(retryAfter)
-      }
-
-      // Per-minute quota (short wait): notify UI, wait, then retry once
-      const waitMs = retryAfter > 0 ? retryAfter * 1000 : 65_000
-      const waitSec = Math.round(waitMs / 1000)
-      if (onStatus) onStatus(`⏳ Quota API atteint — reprise automatique dans ${waitSec}s…`)
-      await new Promise((resolve) => setTimeout(resolve, waitMs))
-      if (onStatus) onStatus(cityName)
-      res = await fetchCompletion()
-      if (res.ok) return await parseOkResponse(res)
-      // If it fails again, fall through to the generic error below
-    }
-
-    // Other non-ok responses (or 429 retry still failed): extract details and throw
-    throw new Error(await buildErrMsg(res))
+    const json = await res.json()
+    if (!res.ok) throw new Error(json.error || `Génération OpenAI refusée (HTTP ${res.status}).`)
+    const text = typeof json.content === 'string' ? json.content.trim() : ''
+    if (!text) throw new Error('Réponse OpenAI vide reçue du serveur.')
+    const cleaned = _cleanAIText(text)
+    if (!cleaned) throw new Error('Réponse OpenAI vide après nettoyage.')
+    return cleaned
   }
+  throw new Error('PIN administrateur absent. Reconnectez-vous avant de générer.')
+}
 
-  // ── Local template fallback ──────────────────────────────────────────────
+export function generateLocalCityContent(cityName, deptName, keywords, businessName, businessType, mainKeyword) {
+  const primaryKw = mainKeyword || 'location salle de mariage'
+  const eventLabel = primaryKw.replace(/^location (de )?salle (de |pour )?/i, '').trim() || 'mariage'
+  // ── Legacy local template (never used as an AI failure fallback) ──────────
   // Pick one of several structural variants based on a simple city-name hash
   // so different cities don't all receive the exact same wording.
   const kws = keywords ? keywords.split(',').map((k) => k.trim()).filter(Boolean) : []

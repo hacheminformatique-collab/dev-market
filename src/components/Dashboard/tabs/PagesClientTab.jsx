@@ -718,7 +718,8 @@ export default function PagesClientTab({ pageType }) {
           <Field label="Génération IA — OpenAI">
             <p style={{ fontSize: '13px', color: '#555' }}>
               La génération utilise OpenAI (gpt-4o-mini). Configurez OPENAI_API_KEY
-              uniquement dans l’environnement PHP de votre hébergement, jamais ici.
+              dans l’environnement PHP ou utilisez private/openai-config.php
+              hors de public_html, jamais ici.
               La facturation API est distincte de l’abonnement ChatGPT.
               Les informations publiques de la salle et les consignes sont transmises à OpenAI.
               Commencez par une seule ville pour vérifier le résultat et le coût.

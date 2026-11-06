@@ -1,11 +1,12 @@
 import { useState, useEffect, lazy, Suspense } from 'react'
-import { BrowserRouter, Routes, Route, Navigate, useParams } from 'react-router-dom'
+import { BrowserRouter, Routes, Route, Navigate, useParams, useLocation } from 'react-router-dom'
 import HomePage from './components/HomePage'
 import SyncIndicator from './components/SyncIndicator'
 import SeoManager from './components/SeoManager'
 import { initStorage } from './utils/storage'
 import { PAGE_TYPES_BY_ID } from './data/pageTypes'
 import PublicWeddingDirectory from './components/PublicWeddingDirectory'
+import { storageProfile } from './utils/storageProfiles'
 
 const AdminLogin = lazy(() => import('./components/AdminLogin'))
 const Dashboard = lazy(() => import('./components/Dashboard/Dashboard'))
@@ -18,6 +19,7 @@ const BlogArticlePage = lazy(() => import('./components/Blog/BlogArticlePage'))
 const MentionsLegales = lazy(() => import('./components/Legal/MentionsLegales'))
 const CGU = lazy(() => import('./components/Legal/CGU'))
 const PolitiqueConfidentialite = lazy(() => import('./components/Legal/PolitiqueConfidentialite'))
+const SpaceAccess = lazy(() => import('./components/SpaceAccess'))
 
 // Redirect /villes/:citySlug → /locationsalledemariage/:citySlug (backward compat)
 function LegacyVillesRedirect() {
@@ -32,14 +34,26 @@ function ProtectedDashboard() {
   return <Dashboard />
 }
 
-function App() {
-  const [ready, setReady] = useState(false)
+function AppContent() {
+  const { pathname } = useLocation()
+  const [readyPath, setReadyPath] = useState('')
+  const [error, setError] = useState('')
+  const profile = storageProfile(pathname)
+  const waitsForStorage = pathname !== '/devis' && (!profile || profile.names.some((name) => name !== 'settings'))
 
   useEffect(() => {
-    initStorage().then(() => setReady(true))
-  }, [])
+    let cancelled = false
+    initStorage(storageProfile(pathname)).then(() => {
+      if (!cancelled) { setError(''); setReadyPath(pathname) }
+    }).catch((err) => {
+      console.error('[Storage]', err)
+      if (!cancelled) setError(err.message)
+    })
+    return () => { cancelled = true }
+  }, [pathname])
 
-  if (!ready) {
+  if (error) return <p role="alert">Chargement impossible : {error}</p>
+  if (readyPath !== pathname && waitsForStorage) {
     return (
       <div style={{
         minHeight: '100vh',
@@ -59,8 +73,8 @@ function App() {
   }
 
   return (
-    <BrowserRouter>
-      <SeoManager />
+    <>
+      <SeoManager settingsVersion={readyPath} />
       <PublicWeddingDirectory />
       <Suspense fallback={(
         <div style={{
@@ -84,6 +98,8 @@ function App() {
           <Route path="/admin" element={<AdminLogin />} />
           <Route path="/dashboard" element={<ProtectedDashboard />} />
           <Route path="/devis" element={<WizardForm />} />
+          <Route path="/espace-client" element={<SpaceAccess kind="client" />} />
+          <Route path="/espace-staff" element={<SpaceAccess kind="staff" />} />
           <Route path="/espace-client/:devisId" element={<EspaceClient />} />
           <Route path="/espace-staff/:staffId" element={<EspaceStaff />} />
           {/* Legacy /villes/ redirect to mariage pages */}
@@ -105,8 +121,12 @@ function App() {
         </Routes>
       </Suspense>
       <SyncIndicator />
-    </BrowserRouter>
+    </>
   )
+}
+
+function App() {
+  return <BrowserRouter><AppContent /></BrowserRouter>
 }
 
 export default App

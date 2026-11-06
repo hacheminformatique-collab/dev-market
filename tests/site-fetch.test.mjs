@@ -29,7 +29,7 @@ function fixture() {
 test('two tabs and mixed publication/storage calls stay below two starts in any second without bursts', async () => {
   const { shared, starts } = fixture()
   const tabs = [createSiteFetch(shared), createSiteFetch(shared)]
-  await Promise.all(Array.from({ length: 1100 }, (_value, i) => tabs[i % 2](`/api/item-${i}`, { method: i % 3 ? 'GET' : 'POST' })))
+  await Promise.all(Array.from({ length: 1100 }, (_value, i) => tabs[i % 2](`/api/item-${i}`, { method: i % 3 ? 'GET' : 'POST', paced: true })))
   assert.equal(starts.length, 1100)
   for (let i = 1; i < starts.length; i++) assert.ok(starts[i].time - starts[i - 1].time >= 650)
   for (let i = 2; i < starts.length; i++) assert.ok(starts[i].time - starts[i - 2].time > 1000)
@@ -63,7 +63,7 @@ test('509 and 429 suspend queued calls across tabs with no automatic retry', asy
     }
     const a = createSiteFetch(shared)
     const b = createSiteFetch(shared)
-    const results = await Promise.allSettled([a('/api/a'), b('/api/b'), a('/api/c')])
+    const results = await Promise.allSettled([a('/api/a', { paced: true }), b('/api/b', { paced: true }), a('/api/c', { paced: true })])
     assert.equal(starts.length, 1)
     for (const result of results) assert.ok(result.reason instanceof HostingLimitError)
     advance(60001)
@@ -71,6 +71,55 @@ test('509 and 429 suspend queued calls across tabs with no automatic retry', asy
     const c = createSiteFetch(shared)
     assert.equal((await c('/api/recovered')).status, 200)
     assert.equal(starts.length, 2)
+  }
+})
+
+test('public reads dispatch immediately without waiting for a pending batch or reserving its slots', async () => {
+  const { shared, starts } = fixture()
+  let finishBatch
+  const original = shared.transport
+  shared.transport = async (url, options) => {
+    const response = await original(url)
+    assert.equal(options?.paced, undefined)
+    if (url === '/api/batch') await new Promise((resolve) => { finishBatch = resolve })
+    return response
+  }
+  const fetch = createSiteFetch(shared)
+  const batch = fetch('/api/batch', { method: 'POST' })
+  while (!finishBatch) await Promise.resolve()
+  const startTime = starts[0].time
+  await Promise.all(['/api/news.php', '/wedding-pages.json', '/api/storage.php?key=paradise_settings'].map((url) => fetch(url)))
+  assert.equal(starts.length, 4)
+  assert.ok(starts.every((start) => start.time === startTime))
+  finishBatch()
+  await batch
+})
+
+test('public storage loads settings alone without writing defaults or initializing private keys', async () => {
+  const vite = await createServer({ root: new URL('../', import.meta.url).pathname, server: { middlewareMode: true } })
+  const originalFetch = globalThis.fetch
+  const originalStorage = globalThis.localStorage
+  const calls = []
+  globalThis.localStorage = { getItem: () => null, setItem() {} }
+  globalThis.fetch = async (url, options) => {
+    calls.push({ url, options })
+    return new Response('null', { headers: { 'Content-Type': 'application/json' } })
+  }
+  try {
+    const storage = await vite.ssrLoadModule('/src/utils/storage.js')
+    const { storageProfile } = await vite.ssrLoadModule('/src/utils/storageProfiles.js')
+    await Promise.all([storage.initStorage(storageProfile('/')), storage.initStorage(storageProfile('/blog'))])
+    assert.equal(calls.length, 1)
+    assert.match(calls[0].url, /key=paradise_settings$/)
+    assert.equal(calls[0].options.paced, false)
+    assert.equal(storageProfile('/dashboard'), undefined)
+    await storage.initStorage()
+    assert.equal(calls.filter((call) => call.options?.method !== 'POST').length, 16)
+  } finally {
+    globalThis.fetch = originalFetch
+    if (originalStorage === undefined) delete globalThis.localStorage
+    else globalThis.localStorage = originalStorage
+    await vite.close()
   }
 })
 
@@ -83,6 +132,23 @@ test('external requests bypass hosting limiter; cancelled calls are not dispatch
   controller.abort()
   await assert.rejects(fetch('/api/cancelled', { signal: controller.signal }), /abort/i)
   assert.equal(starts.length, 1)
+})
+
+test('a quote-specific notification limit is reported without suspending the whole site', async () => {
+  const { shared, starts } = fixture()
+  const original = shared.transport
+  shared.transport = async (url) => {
+    const response = await original(url)
+    return url === '/api/notify.php'
+      ? new Response('{"error":"Limite de notifications atteinte"}', { status: 429, headers: { 'X-RateLimit-Scope': 'quote-followup', 'Content-Type': 'application/json' } })
+      : response
+  }
+  const fetch = createSiteFetch(shared)
+  const response = await fetch('/api/notify.php', { method: 'POST', body: '{}' })
+  assert.equal(response.status, 429)
+  assert.match((await response.json()).error, /Limite/)
+  assert.equal((await fetch('/wedding-pages.json')).status, 200)
+  assert.equal(starts.length, 2)
 })
 
 test('storage initialization and refresh cycles coalesce and a server outage never writes defaults', async () => {

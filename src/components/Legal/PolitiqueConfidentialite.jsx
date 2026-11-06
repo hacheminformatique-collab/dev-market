@@ -34,6 +34,9 @@ export default function PolitiqueConfidentialite() {
         <li>Répondre à vos demandes d&apos;information ;</li>
         <li>Respecter nos obligations légales et réglementaires.</li>
       </ul>
+      <p>
+        Les informations des étapes que vous validez dans le formulaire de devis sont transmises même si le devis reste incomplet, afin de traiter votre demande et, si nécessaire, de vous recontacter pour vous aider à la poursuivre.
+      </p>
 
       <h2 style={h2}>4. Base légale</h2>
       <p>

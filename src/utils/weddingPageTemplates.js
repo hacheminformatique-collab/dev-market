@@ -1,6 +1,8 @@
 import { getCityBySlug } from '../data/idf-cities'
 import { WEDDING_REVIEWS } from '../data/weddingReviews'
 import sourceModels from '../data/weddingSourceModels.json'
+import { normalizeCityName } from './cityNames'
+import { normalizeWeddingDisplayText } from './weddingDisplayText'
 
 export const WEDDING_TEMPLATE_VERSION = 2
 export const WEDDING_SOURCE_MODELS = sourceModels
@@ -37,8 +39,8 @@ export function generateWeddingPage({ slug, businessName = 'Le Paradise', seed, 
   const selectedModel = sourceModels[Math.floor(random() * sourceModels.length)]
   const model = familyId ? sourceModels.find((item) => item.id === familyId) : selectedModel
   if (!model) throw new Error(`Modèle inconnu : ${familyId}`)
-  const content = model.sections.map((section) => section.content
-    .replace(/xxxx|yyyy|\$\{businessName\}/g, (marker) => marker === 'xxxx' ? city.name : marker === 'yyyy' ? city.deptName : 'Le Paradise 77')).join('\n\n')
+  const content = normalizeWeddingDisplayText(model.sections.map((section) => section.content
+    .replace(/xxxx|yyyy|\$\{businessName\}/g, (marker) => marker === 'xxxx' ? normalizeCityName(city.name) : marker === 'yyyy' ? city.deptName : 'Le Paradise 77')).join('\n\n'), city)
   const reviewIds = shuffle(WEDDING_REVIEWS, random).slice(0, 2).map((review) => review.id)
   return {
     content,

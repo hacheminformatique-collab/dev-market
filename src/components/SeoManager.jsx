@@ -37,7 +37,7 @@ function upsertJsonLd(value) {
   tag.textContent = JSON.stringify(value)
 }
 
-export default function SeoManager() {
+export default function SeoManager({ settingsVersion }) {
   const location = useLocation()
   const [cityPages, setCityPages] = useState({})
   const [blogArticle, setBlogArticle] = useState(null)
@@ -104,7 +104,7 @@ export default function SeoManager() {
     upsertMeta('name', 'twitter:image', seo.imageUrl)
     upsertLink('canonical', seo.canonical)
     if (seo.jsonLd) upsertJsonLd(seo.jsonLd)
-  }, [cityPages, location.pathname, detectedPageType, blogArticle, blogConfig]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [cityPages, location.pathname, detectedPageType, blogArticle, blogConfig, settingsVersion]) // eslint-disable-line react-hooks/exhaustive-deps
 
   return null
 }

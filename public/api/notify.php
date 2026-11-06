@@ -6,6 +6,7 @@
  */
 
 header('Content-Type: application/json; charset=utf-8');
+require_once __DIR__ . '/quote_followup.php';
 
 function notify_log($logFile, $message)
 {
@@ -140,11 +141,13 @@ if (json_last_error() !== JSON_ERROR_NONE) {
     exit;
 }
 
+$notificationType = isset($data['notificationType']) ? (string) $data['notificationType'] : 'devis_signe';
+
 // ── Log to file ───────────────────────────────────────────────────────────────
 $logDir  = realpath(__DIR__ . '/..') . '/storage-data';
 $logFile = $logDir . '/notify.log';
 
-if (is_dir($logDir)) {
+if (is_dir($logDir) && $notificationType !== 'quote_followup') {
     $line = date('Y-m-d H:i:s') . ' ' . json_encode($data, JSON_UNESCAPED_UNICODE) . PHP_EOL;
     file_put_contents($logFile, $line, FILE_APPEND | LOCK_EX);
 }
@@ -223,6 +226,119 @@ function send_with_fallback($to, $subject, $message, $headers, $smtpConfig, $fro
     $smtpSent = smtp_send_mail($smtpConfig, $fromEmail, $fromName, $to, $subject, $message, $replyTo);
     if (!$smtpSent) notify_log($logFile, 'mail() failed and SMTP fallback failed');
     return ['sent' => $smtpSent, 'via' => $smtpSent ? 'smtp' : 'none'];
+}
+
+if ($notificationType === 'quote_followup') {
+    if (strlen($body) > 20000) {
+        http_response_code(413);
+        echo json_encode(['ok' => false, 'error' => 'Le récapitulatif est trop volumineux.']);
+        exit;
+    }
+
+    $followup = quote_followup_validate($data);
+    if ($followup === false) {
+        http_response_code(400);
+        echo json_encode(['ok' => false, 'error' => 'Les informations transmises sont incomplètes ou invalides.']);
+        exit;
+    }
+    if (!$ownerEmail) {
+        http_response_code(503);
+        echo json_encode(['ok' => false, 'error' => 'Le service de suivi est momentanément indisponible.']);
+        exit;
+    }
+
+    $followupDir = $logDir . '/quote-followups';
+    if (!is_dir($followupDir) && !@mkdir($followupDir, 0750, true) && !is_dir($followupDir)) {
+        http_response_code(503);
+        echo json_encode(['ok' => false, 'error' => 'Le service de suivi est momentanément indisponible.']);
+        exit;
+    }
+    $protectFile = $followupDir . '/.htaccess';
+    if (!is_file($protectFile)) @file_put_contents($protectFile, "Require all denied\n", LOCK_EX);
+
+    $summaryJson = json_encode($followup['summary'], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+    $dedupeKey = hash('sha256', $followup['flowId'] . ':' . $followup['stage'] . ':' . $summaryJson);
+    $recordFile = $followupDir . '/' . $dedupeKey . '.json';
+    $recordHandle = @fopen($recordFile, 'c+');
+    if (!$recordHandle || !flock($recordHandle, LOCK_EX)) {
+        if ($recordHandle) fclose($recordHandle);
+        http_response_code(503);
+        echo json_encode(['ok' => false, 'error' => 'Le service de suivi est momentanément indisponible.']);
+        exit;
+    }
+    rewind($recordHandle);
+    $record = json_decode(stream_get_contents($recordHandle), true);
+    if (!is_array($record)) $record = ['sent' => false];
+    if (!empty($record['sent'])) {
+        flock($recordHandle, LOCK_UN);
+        fclose($recordHandle);
+        echo json_encode(['ok' => true, 'duplicate' => true]);
+        exit;
+    }
+
+    $remoteAddress = isset($_SERVER['REMOTE_ADDR']) ? (string) $_SERVER['REMOTE_ADDR'] : 'unknown';
+    $rateFile = $followupDir . '/rate-' . hash('sha256', $remoteAddress) . '.json';
+    if (!quote_followup_rate_allowed($rateFile)) {
+        flock($recordHandle, LOCK_UN);
+        fclose($recordHandle);
+        http_response_code(429);
+        header('X-RateLimit-Scope: quote-followup');
+        header('Retry-After: ' . quote_followup_retry_after($rateFile));
+        echo json_encode(['ok' => false, 'error' => 'Trop de demandes ont été envoyées. Veuillez réessayer plus tard.']);
+        exit;
+    }
+
+    $stageNames = [1 => 'Coordonnées', 2 => 'Événement', 3 => 'Formule', 4 => 'Menu', 5 => 'Gâteau', 6 => 'Options'];
+    $stageName = $stageNames[$followup['stage']];
+    $summaryText = quote_followup_summary_text($followup['summary']);
+    $adminMessage = "Nouvelle demande de devis — étape validée : {$stageName}\n\n"
+        . $summaryText . "\n\nLe devis est incomplet ou en cours de préparation.";
+    $record['sent'] = !empty($record['sent']);
+    $record['updatedAt'] = time();
+    rewind($recordHandle);
+    ftruncate($recordHandle, 0);
+    fwrite($recordHandle, json_encode($record));
+    fflush($recordHandle);
+
+    if (!$record['sent']) {
+        $followupHeaders = "MIME-Version: 1.0\r\n";
+        $followupHeaders .= "Content-Type: text/plain; charset=UTF-8\r\n";
+        $followupHeaders .= "From: {$fromName} <{$fromEmail}>\r\n";
+        $followupHeaders .= "Reply-To: {$followup['summary']['email']}\r\n";
+        $mailResult = send_with_fallback(
+            $ownerEmail,
+            'Suivi de demande de devis — ' . $stageName,
+            $adminMessage,
+            $followupHeaders,
+            $smtpConfig,
+            $fromEmail,
+            $fromName,
+            $followup['summary']['email'],
+            $logFile
+        );
+        if ($mailResult['sent']) {
+            $record['sent'] = true;
+            $record['updatedAt'] = time();
+            rewind($recordHandle);
+            ftruncate($recordHandle, 0);
+            fwrite($recordHandle, json_encode($record));
+            fflush($recordHandle);
+        }
+    } else {
+        $mailResult = ['sent' => true, 'via' => 'duplicate'];
+    }
+
+    flock($recordHandle, LOCK_UN);
+    fclose($recordHandle);
+    if (!$record['sent']) {
+        http_response_code(503);
+        echo json_encode(['ok' => false, 'error' => 'L’envoi du récapitulatif a échoué. Veuillez réessayer.']);
+        exit;
+    }
+
+    notify_log($logFile, 'Quote follow-up sent for validated section ' . $stageName);
+    echo json_encode(['ok' => true, 'duplicate' => false]);
+    exit;
 }
 
 $adminSent = false;

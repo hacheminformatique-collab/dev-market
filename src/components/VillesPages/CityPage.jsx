@@ -11,6 +11,11 @@ import WeddingDirectory from '../WeddingDirectory'
 import { getPublishedWeddingSlugs } from '../../utils/weddingPublication'
 import { WEDDING_REVIEWS, WEDDING_REVIEW_SOURCE } from '../../data/weddingReviews'
 import { validateWeddingTemplate } from '../../utils/weddingPageTemplates'
+import { normalizeCityName } from '../../utils/cityNames'
+import { resolveWeddingSourceLayout } from '../../utils/weddingSourceLayout'
+import WeddingSourceSections from './WeddingSourceSections'
+import PublicHeader from '../PublicHeader'
+import { normalizeWeddingDisplayText } from '../../utils/weddingDisplayText'
 
 function Link(props) {
   return <RouterLink {...props} reloadDocument />
@@ -24,17 +29,6 @@ const PARADISE_LNG = 2.8985
 
 function cityVariant(name, n = 3) {
   return name.split('').reduce((acc, c) => acc + c.charCodeAt(0), 0) % n
-}
-
-function stableHash(input) {
-  return input.split('').reduce((acc, c, i) => (acc + c.charCodeAt(0) * (i + 1)) % 1000003, 0)
-}
-
-function getDevisInsertIndex(seed, sectionsCount) {
-  if (sectionsCount <= 2) return 1
-  const min = 1
-  const max = sectionsCount - 1
-  return min + (stableHash(seed) % (max - min + 1))
 }
 
 function getTravelInfo(city) {
@@ -132,7 +126,7 @@ function CityMap({ city, apiKey }) {
   return (
     <div style={{ borderRadius: '12px', overflow: 'hidden', border: '2px solid var(--gold)', boxShadow: 'var(--shadow-md)' }}>
       <iframe
-        title={`Le Paradise à Nanteuil-lès-Meaux — accès depuis ${city.name}`}
+        title={`Le Paradise à Nanteuil les Meaux — accès depuis ${city.name}`}
         src={src}
         width="100%"
         height="400"
@@ -161,14 +155,14 @@ function GalleryGrid({ photos }) {
             onMouseEnter={(e) => { e.currentTarget.style.borderColor = 'var(--gold)'; e.currentTarget.style.transform = 'scale(1.02)' }}
             onMouseLeave={(e) => { e.currentTarget.style.borderColor = 'transparent'; e.currentTarget.style.transform = 'scale(1)' }}
           >
-            <img src={src} alt={`Salle de mariage Le Paradise à Nanteuil-lès-Meaux — photo ${i + 1}`} loading="lazy" decoding="async" style={{ width: '100%', height: '160px', objectFit: 'cover', display: 'block' }} />
+            <img src={src} alt={`Salle de mariage Le Paradise à Nanteuil les Meaux — photo ${i + 1}`} loading="lazy" decoding="async" style={{ width: '100%', height: '160px', objectFit: 'cover', display: 'block' }} />
           </button>
         ))}
       </div>
       {lightbox !== null && (
         <div onClick={() => setLightbox(null)} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.88)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: '20px' }}>
           <button onClick={(e) => { e.stopPropagation(); setLightbox((l) => (l > 0 ? l - 1 : photos.length - 1)) }} style={{ position: 'fixed', left: '20px', background: 'rgba(255,255,255,0.15)', border: 'none', color: 'white', fontSize: '28px', cursor: 'pointer', borderRadius: '50%', width: '48px', height: '48px' }}>&#x2039;</button>
-          <img src={photos[lightbox]} alt={`Salle de mariage Le Paradise à Nanteuil-lès-Meaux — photo ${lightbox + 1}`} style={{ maxWidth: '90vw', maxHeight: '85vh', borderRadius: '8px', objectFit: 'contain' }} onClick={(e) => e.stopPropagation()} />
+          <img src={photos[lightbox]} alt={`Salle de mariage Le Paradise à Nanteuil les Meaux — photo ${lightbox + 1}`} style={{ maxWidth: '90vw', maxHeight: '85vh', borderRadius: '8px', objectFit: 'contain' }} onClick={(e) => e.stopPropagation()} />
           <button onClick={(e) => { e.stopPropagation(); setLightbox((l) => (l < photos.length - 1 ? l + 1 : 0)) }} style={{ position: 'fixed', right: '20px', background: 'rgba(255,255,255,0.15)', border: 'none', color: 'white', fontSize: '28px', cursor: 'pointer', borderRadius: '50%', width: '48px', height: '48px' }}>&#x203a;</button>
           <button onClick={() => setLightbox(null)} style={{ position: 'fixed', top: '16px', right: '16px', background: 'rgba(255,255,255,0.15)', border: 'none', color: 'white', fontSize: '20px', cursor: 'pointer', borderRadius: '50%', width: '40px', height: '40px' }}>&#x2715;</button>
         </div>
@@ -386,7 +380,7 @@ function WhatsAppButton() {
 
 // ── 1. Section Introduction / Présentation de la salle ────────────────────────
 
-function SectionIntro({ city, businessName, page }) {
+function SectionReviews({ page }) {
   let reviews = []
   let reviewError = ''
   if (page.template !== undefined) {
@@ -399,9 +393,7 @@ function SectionIntro({ city, businessName, page }) {
     }
   }
   return (
-    <Section id="intro" title={page.template?.version === 2 ? undefined : `${businessName} — votre réception depuis ${city.name}`}>
-      <div style={{ fontSize: '15px', color: 'var(--text)', lineHeight: 1.8 }}>
-        {renderContent(page.content)}
+    <>
         {reviewError && <p role="alert">{reviewError}</p>}
         {reviews.length > 0 && (
           <section aria-labelledby="google-reviews-heading" style={{ marginTop: '32px' }}>
@@ -416,6 +408,16 @@ function SectionIntro({ city, businessName, page }) {
             <a href={WEDDING_REVIEW_SOURCE} target="_blank" rel="noopener noreferrer">Consulter la fiche Google de Le Paradise</a>
           </section>
         )}
+    </>
+  )
+}
+
+function SectionIntro({ city, businessName, page }) {
+  return (
+    <Section id="intro" title={page.template?.version === 2 ? undefined : `${businessName} — votre réception depuis ${city.name}`}>
+      <div style={{ fontSize: '15px', color: 'var(--text)', lineHeight: 1.8 }}>
+        {renderContent(normalizeWeddingDisplayText(page.content, getCityBySlug(city.slug)))}
+        <SectionReviews page={page} />
       </div>
     </Section>
   )
@@ -846,9 +848,7 @@ function SectionConseils({ city }) {
 
 // ── 9. Section FAQ ─────────────────────────────────────────────────────────────
 
-function SectionFAQ({ city, businessName }) {
-  const v = cityVariant(city.name)
-
+export function getWeddingFaqs({ city, businessName }) {
   const baseFaqs = [
     {
       q: `Combien coûte une salle de mariage près de ${city.name} ?`,
@@ -915,7 +915,13 @@ function SectionFAQ({ city, businessName }) {
     ],
   ]
 
-  const allFaqs = [...baseFaqs, ...extraFaqs[v]]
+  return [...baseFaqs, ...extraFaqs.flat()]
+}
+
+function SectionFAQ({ city, businessName }) {
+  const faqs = getWeddingFaqs({ city, businessName })
+  const v = cityVariant(city.name)
+  const allFaqs = [...faqs.slice(0, 12), ...faqs.slice(12 + v * 2, 14 + v * 2)]
 
   return (
     <Section id="faq" title={`FAQ — Toutes vos questions sur ${businessName} depuis ${city.name}`}>
@@ -970,14 +976,14 @@ function NearbyLinks({ citySlug, allTypePages, city, businessName, currentBasePa
         {nearbyCitiesWithLinks.map(({ city: c, typeLinks }) => (
           <div key={c.slug} style={{ background: 'white', border: '1px solid var(--border)', borderRadius: '12px', padding: '16px 20px', boxShadow: 'var(--shadow-sm)' }}>
             <div style={{ fontFamily: 'var(--font-heading)', fontWeight: '700', fontSize: '15px', color: 'var(--dark)', marginBottom: '10px' }}>
-              📍 {c.name}
+              📍 {normalizeCityName(c.name)}
             </div>
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
               {typeLinks.map((tl) => (
                 <Link
                   key={tl.id}
                   to={`${tl.basePath}/${c.slug}`}
-                  title={tl.id === 'mariage' ? `Location salle de mariage ${c.name}` : `${tl.label.replace(/^Pages /, '')} ${c.name}`}
+                  title={tl.id === 'mariage' ? `Location salle de mariage ${normalizeCityName(c.name)}` : `${tl.label.replace(/^Pages /, '')} ${normalizeCityName(c.name)}`}
                   style={{
                     display: 'inline-flex', alignItems: 'center', gap: '5px',
                     padding: '6px 14px',
@@ -993,7 +999,7 @@ function NearbyLinks({ citySlug, allTypePages, city, businessName, currentBasePa
                     e.currentTarget.style.color = tl.basePath === currentBasePath ? 'white' : 'var(--dark)'
                   }}
                 >
-                  {tl.id === 'mariage' ? `Location salle de mariage ${c.name}` : `${tl.icon} ${tl.label.replace(/^Pages /, '')}`}
+                  {tl.id === 'mariage' ? `Location salle de mariage ${normalizeCityName(c.name)}` : `${tl.icon} ${tl.label.replace(/^Pages /, '')}`}
                 </Link>
               ))}
             </div>
@@ -1116,8 +1122,8 @@ export default function CityPage({ pageType }) {
   useEffect(() => {
     setLoading(true)
     setLoadError('')
-    // Load current type pages + gallery + config + ALL other type pages in parallel
-    const allTypeStorages = PAGE_TYPES.map((pt) => makePageTypeStorage(pt.id))
+    const weddingOnly = !pageType?.id || pageType.id === 'mariage'
+    const allTypeStorages = weddingOnly ? [] : PAGE_TYPES.map((pt) => makePageTypeStorage(pt.id))
     Promise.all([
       storage.getPages(),
       storage.getGallery(),
@@ -1142,10 +1148,10 @@ export default function CityPage({ pageType }) {
       setBlogArticles(relevant)
       // Build a map: { [typeId]: pagesMap }
       const typeMap = {}
-      PAGE_TYPES.forEach((pt, i) => {
-        typeMap[pt.id] = pt.id === 'mariage'
-          ? Object.fromEntries(typePagesArr[PAGE_TYPES.length].map((slug) => [slug, true]))
-          : typePagesArr[i] || {}
+      const publishedSlugs = typePagesArr[allTypeStorages.length]
+      typeMap.mariage = Object.fromEntries(publishedSlugs.map((slug) => [slug, true]))
+      if (!weddingOnly) PAGE_TYPES.forEach((pt, i) => {
+        if (pt.id !== 'mariage') typeMap[pt.id] = typePagesArr[i] || {}
       })
       setAllTypePages(typeMap)
       setLoading(false)
@@ -1185,16 +1191,39 @@ export default function CityPage({ pageType }) {
 }
 
 export function CityPageContent({ citySlug, pageType, page, gallery, config, allTypePages, blogArticles, published = false }) {
-  const city = getCityBySlug(citySlug)
+  const sourceCity = getCityBySlug(citySlug)
+  const city = { ...sourceCity, name: normalizeCityName(sourceCity.name) }
   const basePath = pageType?.basePath || '/locationsalledemariage'
   const businessName      = config?.businessName || 'Le Paradise 77'
   const instagramUsername = config?.instagramUsername || ''
   const tiktokUsername    = config?.tiktokUsername || ''
   const instagramPosts    = config?.instagramPosts || []
   const tiktokPosts       = config?.tiktokPosts || []
-  const seed              = `${citySlug}-${pageType?.id || 'mariage'}`
+  let sourceLayout = null
+  let sourceError = ''
+  if (page.template?.version === 2) {
+    try {
+      sourceLayout = resolveWeddingSourceLayout(page, sourceCity)
+    } catch (error) {
+      if (published) throw error
+      sourceError = error.message
+    }
+  }
 
-  const orderedSections = [
+  const liveGallery = <SectionGalerie
+    key="galerie"
+    gallery={gallery}
+    instagramUsername={instagramUsername}
+    instagramPosts={instagramPosts}
+    tiktokUsername={tiktokUsername}
+    tiktokPosts={tiktokPosts}
+  />
+  const orderedSections = sourceLayout ? [
+    <WeddingSourceSections key="source" layout={sourceLayout} city={sourceCity}
+      knownFaqs={getWeddingFaqs({ city, businessName: 'Le Paradise' })} businessName="Le Paradise"
+      afterIntro={<SectionReviews key="reviews" page={page} />} gallery={liveGallery} />,
+    <SectionBlogArticles key="blog-articles" articles={blogArticles} />,
+  ] : [
     <SectionIntro key="intro" city={city} businessName={businessName} page={page} />,
     ...(page.template?.version === 2 ? [] : [
       <SectionWhyChoose key="why-choose" city={city} businessName={businessName} />,
@@ -1202,14 +1231,7 @@ export function CityPageContent({ citySlug, pageType, page, gallery, config, all
       <SectionReservation key="reservation" city={city} businessName={businessName} />,
       <SectionCapacite key="capacite" city={city} businessName={businessName} />,
     ]),
-    <SectionGalerie
-      key="galerie"
-      gallery={gallery}
-      instagramUsername={instagramUsername}
-      instagramPosts={instagramPosts}
-      tiktokUsername={tiktokUsername}
-      tiktokPosts={tiktokPosts}
-    />,
+    liveGallery,
     ...(page.template?.version === 2 ? [] : [
       <SectionLieux key="lieux" city={city} businessName={businessName} />,
       <SectionConseils key="conseils" city={city} />,
@@ -1218,24 +1240,11 @@ export function CityPageContent({ citySlug, pageType, page, gallery, config, all
     <SectionBlogArticles key="blog-articles" articles={blogArticles} />,
   ]
 
-  const devisInsertIndex = getDevisInsertIndex(seed, orderedSections.length)
-  const sectionsWithDevis = [...orderedSections]
-  sectionsWithDevis.splice(devisInsertIndex, 0, <SectionDevis key="devis" city={city} businessName={businessName} published={published} />)
-
   return (
     <div style={{ minHeight: '100vh', background: 'var(--cream)' }}>
 
       {/* ── Header ── */}
-      <header style={{ background: 'var(--dark)', color: 'white', padding: '0 clamp(16px,5vw,80px)', height: '72px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', boxShadow: '0 2px 12px rgba(28,28,46,0.3)' }}>
-        <Link to="/" style={{ display: 'flex', alignItems: 'center', gap: '14px', textDecoration: 'none' }}>
-          <div style={{ width: '2px', height: '36px', background: 'var(--gold)' }} />
-          <div>
-            <div style={{ fontFamily: 'var(--font-heading)', fontWeight: '600', fontSize: '22px', color: 'var(--gold)', letterSpacing: '0.1em', textTransform: 'uppercase' }}>{businessName}</div>
-            <div style={{ fontSize: '10px', color: 'rgba(255,255,255,0.4)', letterSpacing: '0.2em', textTransform: 'uppercase' }}>{city.deptName}</div>
-          </div>
-        </Link>
-        <Link to="/devis" className="btn btn-primary" style={{ fontSize: '13px' }}>Demander un devis</Link>
-      </header>
+      <PublicHeader businessName={businessName} subtitle={city.deptName} />
 
       {/* ── Hero ── */}
       <VideoHero style={{ textAlign: 'center' }}>
@@ -1248,7 +1257,7 @@ export function CityPageContent({ citySlug, pageType, page, gallery, config, all
             : `${pageType?.label.replace(/^Pages /, '') || 'Salle de réception'} près de ${city.name} — ${businessName}`}
         </h1>
         <p style={{ fontSize: '1.1rem', color: 'rgba(255,255,255,0.7)', maxWidth: '680px', margin: '0 auto 8px' }}>
-          {businessName} — une salle située à Nanteuil-lès-Meaux, en Seine-et-Marne
+          {businessName} — une salle située à Nanteuil les Meaux, en Seine-et-Marne
         </p>
         <p style={{ fontSize: '0.95rem', color: 'rgba(255,255,255,0.55)', maxWidth: '600px', margin: '0 auto 24px' }}>
           Salle de mariage et réception accessible depuis {city.name} ({city.deptName})
@@ -1269,34 +1278,28 @@ export function CityPageContent({ citySlug, pageType, page, gallery, config, all
         <nav aria-label="Fil d’Ariane" style={{ marginBottom: '24px', fontSize: '14px' }}>
           <Link to="/">Accueil</Link> › <span>{city.deptName}</span> › <span aria-current="page">{city.name}</span>
         </nav>
+        <SectionDevis city={city} businessName={businessName} published={published} />
+        {sourceError && <p role="alert">{sourceError}</p>}
         {pageType?.id === 'mariage' && <Section id="acces-local" title={`Organiser votre mariage depuis ${city.name}`}>
-          {page.template?.version === 2 && <p>
-            Ce texte reprend un modèle fourni : les durées, distances et descriptions
-            de lieux qui y figurent proviennent de sa page source et ne constituent
-            pas des informations vérifiées pour {city.name}. Consultez l’itinéraire
-            et vérifiez les lieux et prestations avant de préparer votre événement.
-          </p>}
           <p>
             Vous recherchez une location de salle de mariage pour vos invités de {city.name} ({city.deptName}) ?
-            Notre établissement est situé au 5 avenue Fridingen, 77100 Nanteuil-lès-Meaux
+            Notre établissement est situé au 5 avenue Fridingen, 77100 Nanteuil les Meaux
             {citySlug !== 'nanteuil-les-meaux' && `, et non à ${city.name}`}.
-            La distance entre le centre de {city.name} et la salle est d’environ {getTravelInfo(city).km} km
-            à vol d’oiseau ; elle ne représente pas un trajet routier ni une durée garantie.
           </p>
           <p style={{ marginTop: '12px' }}>
             <a href={`https://www.google.com/maps/dir/?api=1&origin=${encodeURIComponent(`${city.name}, ${city.deptName}, France`)}&destination=${PARADISE_LAT},${PARADISE_LNG}`}
-              target="_blank" rel="noreferrer noopener" title={`Itinéraire depuis ${city.name} vers Le Paradise à Nanteuil-lès-Meaux`}>
+              target="_blank" rel="noreferrer noopener" title={`Itinéraire depuis ${city.name} vers Le Paradise à Nanteuil les Meaux`}>
               Consulter l’itinéraire depuis {city.name}
             </a>. Pour connaître les disponibilités, les prestations et le tarif correspondant à votre projet,
             <Link to="/devis"> demandez un devis personnalisé</Link>.
           </p>
         </Section>}
-        {sectionsWithDevis}
+        {orderedSections}
 
         {/* 11. Carte / Map */}
         <Section id="carte" title={`📍 ${businessName} — Accès depuis ${city.name}`}>
           <p style={{ fontSize: '14px', color: 'var(--text-light)', marginBottom: '16px' }}>
-            5 avenue Fridingen, 77100 Nanteuil-lès-Meaux — consultez l’itinéraire depuis {city.name} pour une estimation du trajet selon le trafic.
+            5 avenue Fridingen, 77100 Nanteuil les Meaux — consultez l’itinéraire depuis {city.name} pour une estimation du trajet selon le trafic.
           </p>
           <CityMap city={city} apiKey={config?.googleMapsApiKey} />
         </Section>

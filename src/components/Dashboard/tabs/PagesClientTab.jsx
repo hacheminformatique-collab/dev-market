@@ -691,10 +691,10 @@ export default function PagesClientTab({ pageType }) {
 
           <Field label="Génération automatique depuis les modèles">
             <p style={{ fontSize: '13px', color: '#555' }}>
-              Six familles de modèles sont utilisées pour les pages mariage :
-              présentation, organisation, réception, personnalisation, budget et accès.
-              Les variantes et deux extraits d’avis Google sont choisis lors de la génération,
+              Vingt modèles complets reprennent les vingt pages fournies.
+              Un modèle entier et deux extraits d’avis Google sont choisis lors de la génération,
               puis sauvegardés. Aucun appel IA ni clé API n’est nécessaire.
+              Seuls xxxx (ville) et yyyy (département) sont remplacés dans le texte.
               Une régénération peut produire une autre combinaison ; elle demande
               confirmation avant de remplacer les textes existants.
             </p>

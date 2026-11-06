@@ -399,7 +399,7 @@ function SectionIntro({ city, businessName, page }) {
     }
   }
   return (
-    <Section id="intro" title={`${businessName} — votre réception depuis ${city.name}`}>
+    <Section id="intro" title={page.template?.version === 2 ? undefined : `${businessName} — votre réception depuis ${city.name}`}>
       <div style={{ fontSize: '15px', color: 'var(--text)', lineHeight: 1.8 }}>
         {renderContent(page.content)}
         {reviewError && <p role="alert">{reviewError}</p>}
@@ -1196,10 +1196,12 @@ export function CityPageContent({ citySlug, pageType, page, gallery, config, all
 
   const orderedSections = [
     <SectionIntro key="intro" city={city} businessName={businessName} page={page} />,
-    <SectionWhyChoose key="why-choose" city={city} businessName={businessName} />,
-    <SectionPrestations key="prestations" city={city} businessName={businessName} />,
-    <SectionReservation key="reservation" city={city} businessName={businessName} />,
-    <SectionCapacite key="capacite" city={city} businessName={businessName} />,
+    ...(page.template?.version === 2 ? [] : [
+      <SectionWhyChoose key="why-choose" city={city} businessName={businessName} />,
+      <SectionPrestations key="prestations" city={city} businessName={businessName} />,
+      <SectionReservation key="reservation" city={city} businessName={businessName} />,
+      <SectionCapacite key="capacite" city={city} businessName={businessName} />,
+    ]),
     <SectionGalerie
       key="galerie"
       gallery={gallery}
@@ -1208,9 +1210,11 @@ export function CityPageContent({ citySlug, pageType, page, gallery, config, all
       tiktokUsername={tiktokUsername}
       tiktokPosts={tiktokPosts}
     />,
-    <SectionLieux key="lieux" city={city} businessName={businessName} />,
-    <SectionConseils key="conseils" city={city} />,
-    <SectionFAQ key="faq" city={city} businessName={businessName} />,
+    ...(page.template?.version === 2 ? [] : [
+      <SectionLieux key="lieux" city={city} businessName={businessName} />,
+      <SectionConseils key="conseils" city={city} />,
+      <SectionFAQ key="faq" city={city} businessName={businessName} />,
+    ]),
     <SectionBlogArticles key="blog-articles" articles={blogArticles} />,
   ]
 
@@ -1266,6 +1270,12 @@ export function CityPageContent({ citySlug, pageType, page, gallery, config, all
           <Link to="/">Accueil</Link> › <span>{city.deptName}</span> › <span aria-current="page">{city.name}</span>
         </nav>
         {pageType?.id === 'mariage' && <Section id="acces-local" title={`Organiser votre mariage depuis ${city.name}`}>
+          {page.template?.version === 2 && <p>
+            Ce texte reprend un modèle fourni : les durées, distances et descriptions
+            de lieux qui y figurent proviennent de sa page source et ne constituent
+            pas des informations vérifiées pour {city.name}. Consultez l’itinéraire
+            et vérifiez les lieux et prestations avant de préparer votre événement.
+          </p>}
           <p>
             Vous recherchez une location de salle de mariage pour vos invités de {city.name} ({city.deptName}) ?
             Notre établissement est situé au 5 avenue Fridingen, 77100 Nanteuil-lès-Meaux

@@ -28,23 +28,34 @@ assets nécessaires aux pages statiques et republier celles-ci pour leur fournir
 ## Génération automatique des pages mariage depuis les modèles
 
 Les pages mariage sont générées **sans IA, sans clé API et sans coût d'API**.
-Six familles éditoriales reprennent les thèmes des vingt pages fournies :
-présentation et visite, organisation, accueil des invités, personnalisation,
-budget et devis, accès et déplacements.
+La base `src/data/weddingSourceModels.json` contient exactement vingt modèles,
+un par archive MHTML fournie dans `model.zip`, avec nom du fichier source,
+empreinte SHA-256, nombre de substitutions et huit sections éditoriales complètes.
 
-Chaque génération choisit une famille, des titres, des paragraphes complets,
-trois questions fréquentes et deux extraits d'avis. L'ordre des sections dépend
-de la famille pour conserver un enchaînement cohérent. Le texte et la sélection
+Chaque génération choisit un modèle entier parmi les vingt et deux extraits
+d'avis. Aucun paragraphe n'est mélangé ou réécrit et l'ordre source est conservé.
+Les marqueurs `xxxx` et `yyyy` sont remplacés par la ville et son département.
+Le marqueur historique `${businessName}` est résolu en `Le Paradise 77` ; les
+autres mentions de l'établissement restent celles des fichiers fournis.
+Le texte et la sélection
 des avis sont sauvegardés avec la version du modèle et sa graine aléatoire :
 ils ne changent pas lors d'une visite, d'une publication ou d'une restauration.
-Une régénération volontaire peut produire une autre combinaison. Les noms de
-villes, départements et codes postaux sont résolus par les données existantes ;
-les distances à vol d'oiseau ne sont pas présentées comme des durées de trajet.
+Une régénération volontaire peut choisir un autre modèle (ou le même).
+Les sections transcrites sont : présentation, pourquoi choisir, prestations,
+réservation, capacité, lieux, conseils et FAQ. Menus, champs de formulaire,
+galerie, carte, actualités, blog et annuaire restent les composants interactifs
+du site, pas des copies figées des widgets source. Pour ces nouveaux modèles,
+les sections éditoriales intégrées ne sont pas ajoutées une seconde fois.
+Les FAQ sont transcrites telles que capturées : les réponses non présentes
+dans les archives ne sont ni reconstituées ni inventées.
 
 La capacité **jusqu'à 300 personnes**, le traiteur, le service, la décoration
 et le DJ sont repris des exemples après accord du propriétaire. Les prestations
-retenues restent à confirmer au devis. Les nouveaux textes indiquent la salle
-réelle à Nanteuil-lès-Meaux, sans nouvelle implantation ni témoignage local inventé.
+retenues restent à confirmer au devis. L'adresse réelle reste Nanteuil-lès-Meaux dans l'en-tête, l'accès et les données
+structurées. Les modèles reprennent les formulations commerciales demandées.
+Leurs distances, durées et descriptions locales restent celles des sources :
+un avertissement visible indique qu'elles ne sont pas vérifiées pour la ville
+cible. Les vérifier avant publication ; la substitution seule ne les actualise pas.
 Le champ historique « Mots clés SEO » reste compatible, mais ne modifie pas les
 textes mariage contrôlés. Les anciens types de pages conservent leur modèle local.
 Le blog et son automatisation ne sont pas modifiés par ce remplacement.
@@ -73,11 +84,12 @@ La variable `OPENAI_API_KEY` et le fichier privé OpenAI ne sont plus nécessair
 aux pages villes ; supprimer la configuration privée si aucun autre outil
 ne l'utilise. Les sauvegardes et les fichiers HTML existants restent compatibles.
 
-Les variantes réduisent les répétitions, sans garantir que chaque page est
-entièrement unique ou un classement Google. Les tests comparent notamment
-100 textes pour une même ville (donc sans masquer les ressemblances par des
-changements de noms) : similarité moyenne des séquences de cinq mots inférieure
-à 30 %, maximum inférieur à 70 %, hors sections communes du site et avis.
+Plusieurs villes peuvent utiliser le même modèle : l'unicité et un classement
+Google ne sont pas garantis. Les anciens seuils de diversité de paragraphes ne
+s'appliquent plus au choix demandé de vingt textes complets. Les tests vérifient
+le nombre exact de modèles, leur sélection et la fidélité du texte à la source
+après les seules substitutions prévues. Les pages et sauvegardes de version 1
+restent lisibles sans réécriture ; régénérer puis republier pour adopter la version 2.
 
 ## Titres et descriptions des pages mariage
 

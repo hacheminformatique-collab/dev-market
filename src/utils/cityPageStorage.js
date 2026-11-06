@@ -1,3 +1,4 @@
+import { siteFetch as fetch } from './siteFetch'
 /**
  * Storage helpers for the "Pages Client" feature.
  *
@@ -27,7 +28,7 @@ function _keyBackup(typeId)  { return typeId === 'mariage' ? KEY_BACKUP  : `para
 
 async function _get(key, requireServer = false) {
   try {
-    const res = await fetch(`/api/storage.php?key=${encodeURIComponent(key)}`)
+    const res = await fetch(`/api/storage.php?key=${encodeURIComponent(key)}`, requireServer ? { cache: 'no-store' } : undefined)
     if (res.ok) {
       const data = await res.json()
       if (requireServer) return data

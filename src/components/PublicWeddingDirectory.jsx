@@ -1,3 +1,4 @@
+import { siteFetch as fetch } from '../utils/siteFetch'
 import { useEffect, useState } from 'react'
 import { useLocation } from 'react-router-dom'
 import { isPublicPath } from '../utils/weddingPublication'

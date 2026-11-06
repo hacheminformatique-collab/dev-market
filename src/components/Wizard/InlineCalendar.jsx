@@ -1,3 +1,4 @@
+import { siteFetch as fetch } from '../../utils/siteFetch'
 import { useState, useEffect } from 'react'
 
 const MONTHS = ['Janvier', 'Février', 'Mars', 'Avril', 'Mai', 'Juin', 'Juillet', 'Août', 'Septembre', 'Octobre', 'Novembre', 'Décembre']

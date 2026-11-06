@@ -1,3 +1,4 @@
+import { siteFetch as fetch } from './siteFetch'
 import { getCityBySlug } from '../data/idf-cities'
 
 export function isPublicPath(pathname) {

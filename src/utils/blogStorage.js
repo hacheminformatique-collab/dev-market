@@ -1,3 +1,4 @@
+import { siteFetch as fetch } from './siteFetch'
 /**
  * blogStorage.js – Persistent storage and AI generation for the blog module.
  *

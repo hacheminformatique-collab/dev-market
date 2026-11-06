@@ -94,7 +94,7 @@ async function refreshStorage() {
   await Promise.all(
     Object.entries(KEYS).map(async ([, key]) => {
       try {
-        const res = await fetch(`/api/storage.php?key=${encodeURIComponent(key)}`)
+        const res = await fetch(`/api/storage.php?key=${encodeURIComponent(key)}`, { paced: true })
         if (!res.ok) return
         const data = await res.json()
         if (data === null || data === undefined) return
@@ -311,45 +311,58 @@ function _save(key, data) {
 }
 
 /**
- * Load all storage keys into the in-memory cache.
+ * Load the selected storage keys into the in-memory cache, once per key.
  * Priority: PHP server → localStorage → built-in defaults.
- * Must be awaited once in App.jsx before the React tree renders.
+ * Public routes request only their required keys and never persist defaults.
  */
 let initialization = null
-export function initStorage() {
+const keyInitializations = new Map()
+export function initStorage(options) {
+  if (options) return initializeStorage(options)
   if (!initialization) initialization = initializeStorage()
   return initialization
 }
 
-async function initializeStorage() {
+async function initializeStorage({ names = Object.keys(KEYS), paced = true, persistDefaults = true } = {}) {
+  if (names.some((name) => !Object.hasOwn(KEYS, name))) throw new Error('Clé de stockage inconnue.')
   await Promise.all(
-    Object.entries(KEYS).map(async ([name, key]) => {
-      let serverConfirmedMissing = false
-      // 1. Try server
-      try {
-        const res = await fetch(`/api/storage.php?key=${encodeURIComponent(key)}`)
-        if (res.ok) {
-          const data = await res.json()
-          if (data !== null && data !== undefined) {
-            _cache[key] = data
+    names.map((name) => {
+      const key = KEYS[name]
+      if (keyInitializations.has(key)) return keyInitializations.get(key)
+      const load = (async () => {
+        let serverConfirmedMissing = false
+        // 1. Try server
+        try {
+          const res = await fetch(`/api/storage.php?key=${encodeURIComponent(key)}`, { paced })
+          if (res.ok) {
+            const data = await res.json()
+            if (data !== null && data !== undefined) {
+              _cache[key] = data
+              return
+            }
+            serverConfirmedMissing = true
+          } else {
+            console.warn(`[storage] Lecture de ${key} refusée (HTTP ${res.status}), utilisation de la copie locale.`)
+          }
+        } catch (error) {
+          console.warn(`[storage] Lecture de ${key} impossible, utilisation de la copie locale :`, error)
+        }
+
+        // 2. Fall back to localStorage
+        try {
+          const raw = localStorage.getItem(key)
+          if (raw !== null) {
+            _cache[key] = JSON.parse(raw)
             return
           }
-          serverConfirmedMissing = true
-        }
-      } catch { /* server unreachable or returned an error – proceed to fallback */ }
+        } catch { /* localStorage may be corrupted – proceed to defaults */ }
 
-      // 2. Fall back to localStorage
-      try {
-        const raw = localStorage.getItem(key)
-        if (raw !== null) {
-          _cache[key] = JSON.parse(raw)
-          return
-        }
-      } catch { /* localStorage may be corrupted – proceed to defaults */ }
-
-      // 3. Nothing found – initialise with defaults and persist them
-      _cache[key] = DEFAULTS[name]
-      if (serverConfirmedMissing) _save(key, DEFAULTS[name])
+        // 3. Nothing found – initialise with defaults and persist them
+        _cache[key] = DEFAULTS[name]
+        if (serverConfirmedMissing && persistDefaults) _save(key, DEFAULTS[name])
+      })()
+      keyInitializations.set(key, load)
+      return load
     })
   )
 
@@ -359,7 +372,7 @@ async function initializeStorage() {
   // Now only lightweight boolean markers (documentsUploaded) are stored there.
   const clientsKey = KEYS.clients
   const clientsList = _cache[clientsKey]
-  if (Array.isArray(clientsList)) {
+  if (persistDefaults && names.includes('clients') && Array.isArray(clientsList)) {
     let needsMigration = false
     const migratedClients = clientsList.map((c) => {
       if (!c.documents) return c

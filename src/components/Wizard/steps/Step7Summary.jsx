@@ -1,6 +1,5 @@
 import { useEffect, useState } from 'react'
 import { getClients, saveClients, generateDevisNumber, notifyEvent } from '../../../utils/storage'
-import { generatePDF } from '../../PDF/generatePDF'
 import SignaturePad from '../../SignaturePad'
 import { getFormuleTarif } from './Step3Formule'
 
@@ -95,7 +94,7 @@ export default function Step7Summary({ data, onBack, onSubmit }) {
     setSubmissionType('brouillon_envoyé')
   }
 
-  function openValidationPreview() {
+  async function openValidationPreview() {
     if (!signatureDataUrl) {
       setSubmitError('Veuillez signer le devis avant de le valider.')
       return
@@ -104,6 +103,7 @@ export default function Step7Summary({ data, onBack, onSubmit }) {
     const devis = buildDevis('signé_client', signatureDataUrl)
     try {
       if (previewUrl) URL.revokeObjectURL(previewUrl)
+      const { generatePDF } = await import('../../PDF/generatePDF')
       const doc = generatePDF(devis, { download: false })
       const blob = doc.output('blob')
       setPreviewUrl(URL.createObjectURL(blob))
@@ -115,11 +115,14 @@ export default function Step7Summary({ data, onBack, onSubmit }) {
     }
   }
 
-  function confirmSignedDevis() {
+  async function confirmSignedDevis() {
     if (!pendingSignedDevis) return
     setSubmitting(true)
     finalizeDevis(pendingSignedDevis, 'devis_signe')
-    try { generatePDF(pendingSignedDevis) } catch (e) { console.error(`Failed to generate signed PDF for devis ${pendingSignedDevis.devisNumber}`, e) }
+    try {
+      const { generatePDF } = await import('../../PDF/generatePDF')
+      generatePDF(pendingSignedDevis)
+    } catch (e) { console.error(`Failed to generate signed PDF for devis ${pendingSignedDevis.devisNumber}`, e) }
     setSubmissionType('signé_client')
     setPreviewOpen(false)
   }

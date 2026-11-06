@@ -1,5 +1,7 @@
 import { useNavigate } from 'react-router-dom'
 import VideoHero from '../VideoHero'
+import PublicHeader from '../PublicHeader'
+import { getSettings } from '../../utils/storage'
 
 export default function LegalLayout({ title, children }) {
   const navigate = useNavigate()
@@ -9,6 +11,7 @@ export default function LegalLayout({ title, children }) {
       background: 'linear-gradient(160deg, #14142a 0%, #1c1c3a 55%, #10101e 100%)',
       color: 'white',
     }}>
+      <PublicHeader businessName={getSettings().nom} />
       <VideoHero>
       <div style={{ maxWidth: '760px', margin: '0 auto' }}>
         <button

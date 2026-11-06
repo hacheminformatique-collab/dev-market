@@ -1,42 +1,16 @@
-import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { getSettings, getStaff } from '../utils/storage'
+import { getSettings } from '../utils/storage'
 import VideoHero from './VideoHero'
+import PublicHeader from './PublicHeader'
 
 export default function HomePage() {
   const navigate = useNavigate()
   const settings = getSettings()
   const nomSalle = settings.nom || 'Le Paradise'
 
-  const [showClientInput, setShowClientInput] = useState(false)
-  const [devisIdInput, setDevisIdInput] = useState('')
-  const [clientError, setClientError] = useState('')
-  const [showStaffInput, setShowStaffInput] = useState(false)
-  const [staffIdInput, setStaffIdInput] = useState('')
-  const [staffPinInput, setStaffPinInput] = useState('')
-  const [staffError, setStaffError] = useState('')
-
-  function handleEspaceClient() {
-    if (!devisIdInput.trim()) { setClientError('Veuillez saisir votre numéro de devis.'); return }
-    setClientError('')
-    navigate(`/espace-client/${devisIdInput.trim()}`)
-  }
-
-  function handleEspaceStaff() {
-    const matricule = staffIdInput.trim()
-    if (!matricule) { setStaffError('Veuillez saisir votre matricule.'); return }
-    const allStaff = getStaff()
-    const member = allStaff.find((s) => s.matricule === matricule)
-    if (!member) { setStaffError('Matricule introuvable.'); return }
-    const expectedPin = member.pin || '1234'
-    if (staffPinInput !== expectedPin) { setStaffError('Code PIN incorrect.'); return }
-    setStaffError('')
-    sessionStorage.setItem(`staffAuth_${member.id}`, '1')
-    navigate(`/espace-staff/${member.id}`)
-  }
-
   return (
     <div style={{ minHeight: '100vh', background: '#14142a', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+    <PublicHeader businessName={nomSalle} />
     <VideoHero as="div" className="video-hero-home" style={{
       minHeight: '100vh',
       background: 'linear-gradient(160deg, #14142a 0%, #1c1c3a 55%, #10101e 100%)',
@@ -75,7 +49,7 @@ export default function HomePage() {
           fontFamily: 'var(--font-body)',
           fontWeight: '700',
         }}>
-          Location salle de mariage à Nanteuil-lès-Meaux
+          Location salle de mariage à Nanteuil les Meaux
         </p>
 
         <h1 style={{
@@ -90,11 +64,11 @@ export default function HomePage() {
         }}>
           {nomSalle}
           <span style={{ display: 'block', fontSize: 'clamp(1.2rem, 3vw, 1.8rem)', letterSpacing: '0.03em', lineHeight: 1.4, marginTop: '16px' }}>
-            Location salle de mariage à Nanteuil-lès-Meaux
+            Location salle de mariage à Nanteuil les Meaux
           </span>
         </h1>
         <p style={{ color: 'rgba(255,255,255,0.85)', marginTop: '16px', lineHeight: 1.6 }}>
-          Votre salle de mariage à Nanteuil-lès-Meaux (77), accessible depuis les communes d’Île-de-France.
+          Votre salle de mariage à Nanteuil les Meaux (77), accessible depuis les communes d’Île-de-France.
         </p>
 
         {/* Gold ornament */}
@@ -111,112 +85,18 @@ export default function HomePage() {
             Demander un devis
           </button>
 
-          <button onClick={() => setShowClientInput((v) => !v)} className="btn btn-outline btn-lg" style={{ width: '100%', maxWidth: '300px', justifyContent: 'center', fontSize: '13px' }}>
+          <button onClick={() => navigate('/espace-client')} className="btn btn-outline btn-lg" style={{ width: '100%', maxWidth: '300px', justifyContent: 'center', fontSize: '13px' }}>
             Espace client
           </button>
 
-          {showClientInput && (
-            <div style={{
-              background: 'rgba(255,255,255,0.06)',
-              backdropFilter: 'blur(8px)',
-              border: '1px solid rgba(184,151,74,0.3)',
-              borderRadius: '12px',
-              padding: '22px',
-              width: '100%',
-              maxWidth: '300px',
-              textAlign: 'left',
-            }}>
-              <p style={{ fontSize: '12px', letterSpacing: '0.08em', textTransform: 'uppercase', color: 'rgba(255,255,255,0.5)', marginBottom: '10px', fontWeight: '700' }}>
-                N° de devis
-              </p>
-              <input
-                type="text"
-                value={devisIdInput}
-                onChange={(e) => setDevisIdInput(e.target.value)}
-                placeholder="DEV-20240101-001"
-                onKeyDown={(e) => e.key === 'Enter' && handleEspaceClient()}
-                style={{
-                  width: '100%', padding: '10px 14px', borderRadius: '6px',
-                  border: '1.5px solid rgba(184,151,74,0.4)',
-                  background: 'rgba(255,255,255,0.08)',
-                  color: 'white', fontSize: '14px', marginBottom: '10px',
-                  outline: 'none', fontFamily: 'var(--font-body)',
-                }}
-              />
-              {clientError && <p style={{ color: '#f5a623', fontSize: '12px', marginBottom: '8px' }}>{clientError}</p>}
-              <button className="btn btn-primary w-100" style={{ justifyContent: 'center', fontSize: '12px' }} onClick={handleEspaceClient}>
-                Accéder →
-              </button>
-            </div>
-          )}
-
-          <button onClick={() => setShowStaffInput((v) => !v)} className="btn btn-outline btn-lg" style={{ width: '100%', maxWidth: '300px', justifyContent: 'center', fontSize: '13px' }}>
+          <button onClick={() => navigate('/espace-staff')} className="btn btn-outline btn-lg" style={{ width: '100%', maxWidth: '300px', justifyContent: 'center', fontSize: '13px' }}>
             Espace staff
           </button>
-
-          {showStaffInput && (
-            <div style={{
-              background: 'rgba(255,255,255,0.06)',
-              backdropFilter: 'blur(8px)',
-              border: '1px solid rgba(255,255,255,0.15)',
-              borderRadius: '12px',
-              padding: '22px',
-              width: '100%',
-              maxWidth: '300px',
-              textAlign: 'left',
-            }}>
-              <p style={{ fontSize: '12px', letterSpacing: '0.08em', textTransform: 'uppercase', color: 'rgba(255,255,255,0.5)', marginBottom: '10px', fontWeight: '700' }}>
-                Identifiant staff
-              </p>
-              <input
-                type="text"
-                value={staffIdInput}
-                onChange={(e) => setStaffIdInput(e.target.value)}
-                placeholder="EMP-XXXX"
-                style={{
-                  width: '100%', padding: '10px 14px', borderRadius: '6px',
-                  border: '1.5px solid rgba(255,255,255,0.2)',
-                  background: 'rgba(255,255,255,0.06)',
-                  color: 'white', fontSize: '14px', marginBottom: '10px',
-                  outline: 'none', fontFamily: 'var(--font-body)',
-                }}
-              />
-              <p style={{ fontSize: '12px', letterSpacing: '0.08em', textTransform: 'uppercase', color: 'rgba(255,255,255,0.5)', marginBottom: '10px', fontWeight: '700' }}>
-                Code PIN
-              </p>
-              <input
-                type="password"
-                value={staffPinInput}
-                onChange={(e) => setStaffPinInput(e.target.value.replace(/\D/g, ''))}
-                placeholder="4 chiffres"
-                maxLength={4}
-                onKeyDown={(e) => e.key === 'Enter' && handleEspaceStaff()}
-                style={{
-                  width: '100%', padding: '10px 14px', borderRadius: '6px',
-                  border: '1.5px solid rgba(255,255,255,0.2)',
-                  background: 'rgba(255,255,255,0.06)',
-                  color: 'white', fontSize: '14px', marginBottom: '10px',
-                  outline: 'none', fontFamily: 'var(--font-body)',
-                }}
-              />
-              {staffError && <p style={{ color: '#f5a623', fontSize: '12px', marginBottom: '8px' }}>{staffError}</p>}
-              <button
-                className="btn w-100"
-                style={{ justifyContent: 'center', fontSize: '12px', background: 'rgba(255,255,255,0.15)', color: 'white', border: '1px solid rgba(255,255,255,0.25)' }}
-                onClick={handleEspaceStaff}
-              >
-                Accéder →
-              </button>
-            </div>
-          )}
 
           <button onClick={() => navigate('/blog')} className="btn btn-outline btn-lg" style={{ width: '100%', maxWidth: '300px', justifyContent: 'center', fontSize: '13px' }}>
             📝 Blog
           </button>
 
-          <button onClick={() => navigate('/admin')} className="btn btn-outline btn-lg" style={{ width: '100%', maxWidth: '300px', justifyContent: 'center', fontSize: '13px' }}>
-            🔐 Administration
-          </button>
         </div>
 
       </div>

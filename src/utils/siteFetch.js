@@ -30,12 +30,14 @@ export function createSiteFetch({ transport, origin, now = Date.now, wait = (ms)
     next = now() + spacing
     storage?.setItem('paradise_network_next', String(next))
   }
-  async function execute(input, options) {
+  async function execute(input, options, paced) {
     const request = async () => {
-      await reserve()
+      if (paced) await reserve()
+      else assertAvailable()
       options?.signal?.throwIfAborted()
       const response = await transport(input, options)
-      if (response.status === 429 || response.status === 509) {
+      const quoteLimit = response.status === 429 && response.headers.get('X-RateLimit-Scope') === 'quote-followup'
+      if ((response.status === 429 && !quoteLimit) || response.status === 509) {
         const retry = response.headers.get('retry-after')
         const seconds = Number(retry)
         const until = retry && !Number.isFinite(seconds) ? Date.parse(retry) : now() + (seconds || 60) * 1000
@@ -46,12 +48,14 @@ export function createSiteFetch({ transport, origin, now = Date.now, wait = (ms)
       return response
     }
     // Hold the lock through dispatch and response so tabs cannot wake in a burst.
-    return locks ? locks.request('paradise-site-network', request) : request()
+    return paced && locks ? locks.request('paradise-site-network', request) : request()
   }
   return function siteFetch(input, options) {
     const url = new URL(typeof input === 'string' || input instanceof URL ? input : input.url, origin)
     if (url.origin !== origin) return transport(input, options)
     const method = (options?.method || input?.method || 'GET').toUpperCase()
+    const paced = options?.paced ?? (method !== 'GET' && method !== 'HEAD')
+    const transportOptions = options && Object.fromEntries(Object.entries(options).filter(([key]) => key !== 'paced'))
     const key = url.href
     const cacheable = method === 'GET' && url.pathname === '/api/storage.php' && !options?.signal && options?.cache !== 'no-store'
     if (method !== 'GET') {
@@ -62,8 +66,8 @@ export function createSiteFetch({ transport, origin, now = Date.now, wait = (ms)
     if (cacheable && cache.has(key) && cache.get(key).expires > now()) return Promise.resolve(cache.get(key).response.clone())
     if (cacheable && reads.has(key)) return reads.get(key).then((response) => response.clone())
     const revision = revisions.get(key) || 0
-    const result = tail.then(() => execute(input, options))
-    tail = result.then(() => undefined, () => undefined)
+    const result = paced ? tail.then(() => execute(input, transportOptions, true)) : execute(input, transportOptions, false)
+    if (paced) tail = result.then(() => undefined, () => undefined)
     if (!cacheable) return result
     const read = result.then((response) => {
       if ((revisions.get(key) || 0) === revision && response.ok && response.headers.get('content-type')?.includes('application/json')) {
@@ -78,6 +82,10 @@ export function createSiteFetch({ transport, origin, now = Date.now, wait = (ms)
 }
 
 let browserFetch
+export function batchFetch(input, options) {
+  return siteFetch(input, { ...options, paced: true })
+}
+
 export function siteFetch(input, options) {
   if (typeof window === 'undefined') return globalThis.fetch(input, options)
   if (!browserFetch) {

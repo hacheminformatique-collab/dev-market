@@ -1,4 +1,4 @@
-import { siteFetch as fetch } from './siteFetch'
+import { batchFetch as fetch } from './siteFetch'
 import { renderToString, renderToStaticMarkup } from 'react-dom/server'
 import { MemoryRouter } from 'react-router-dom'
 import { CityPageContent } from '../components/VillesPages/CityPage'
@@ -8,6 +8,7 @@ import { getCityBySlug } from '../data/idf-cities'
 import { buildSitemapXml, buildRobotsTxt } from './seoFiles'
 import WeddingDirectory from '../components/WeddingDirectory'
 import { validateWeddingTemplate } from './weddingPageTemplates'
+import { resolveWeddingSourceLayout } from './weddingSourceLayout'
 
 function escapeHtml(value) {
   return String(value).replaceAll('&', '&amp;').replaceAll('<', '&lt;')
@@ -27,6 +28,7 @@ export function makeCitySnapshot({ slug, pages, config, gallery, allTypePages, b
   if (Number.isNaN(new Date(page.generatedAt).getTime())) {
     throw new Error(`Date de génération invalide : ${slug}`)
   }
+  if (page.template?.version === 2) resolveWeddingSourceLayout(page, getCityBySlug(slug))
   return {
     citySlug: slug,
     pageType: PAGE_TYPES_BY_ID.mariage,

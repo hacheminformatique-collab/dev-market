@@ -4,6 +4,7 @@ import { getPublishedArticles } from '../../utils/blogStorage'
 import { BLOG_CLUSTERS } from '../../data/blogTopics'
 import { getSettings } from '../../utils/storage'
 import VideoHero from '../VideoHero'
+import PublicHeader from '../PublicHeader'
 
 const PAGE_SIZE = 12
 
@@ -150,25 +151,7 @@ export default function BlogListPage() {
   return (
     <div style={{ minHeight: '100vh', background: 'var(--cream)' }}>
       {/* ── Header ─────────────────────────────────────────────────────────── */}
-      <header style={{
-        background: 'var(--dark)',
-        color: 'white',
-        padding: '0 clamp(16px,5vw,80px)',
-        height: '72px',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        boxShadow: '0 2px 12px rgba(28,28,46,0.3)',
-      }}>
-        <Link to="/" style={{ display: 'flex', alignItems: 'center', gap: '14px', textDecoration: 'none' }}>
-          <div style={{ width: '2px', height: '36px', background: 'var(--gold)' }} />
-          <div>
-            <div style={{ fontFamily: 'var(--font-heading)', fontWeight: '600', fontSize: '22px', color: 'var(--gold)', letterSpacing: '0.1em', textTransform: 'uppercase' }}>{businessName}</div>
-            <div style={{ fontSize: '10px', color: 'rgba(255,255,255,0.4)', letterSpacing: '0.2em', textTransform: 'uppercase' }}>Blog Mariage</div>
-          </div>
-        </Link>
-        <Link to="/devis" className="btn btn-primary" style={{ fontSize: '13px' }}>Demander un devis</Link>
-      </header>
+      <PublicHeader businessName={businessName} subtitle="Blog Mariage" />
 
       {/* ── Hero ───────────────────────────────────────────────────────────── */}
       <VideoHero style={{

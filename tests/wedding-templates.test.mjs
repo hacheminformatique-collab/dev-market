@@ -6,6 +6,7 @@ import { resolve } from 'node:path'
 
 const root = resolve(import.meta.dirname, '..')
 let vite, templates, storage, publication, cities, reviews
+let normalizeCityName
 
 before(async () => {
   vite = await createServer({ root, server: { middlewareMode: true } })
@@ -14,6 +15,7 @@ before(async () => {
   publication = await vite.ssrLoadModule('/src/utils/staticCityPublication.jsx')
   cities = await vite.ssrLoadModule('/src/data/idf-cities.js')
   reviews = await vite.ssrLoadModule('/src/data/weddingReviews.js')
+  ;({ normalizeCityName } = await vite.ssrLoadModule('/src/utils/cityNames.js'))
 })
 after(async () => { await vite?.close() })
 
@@ -71,7 +73,7 @@ test('every supported city produces valid local content while invalid input is e
   for (const city of cities.ALL_CITIES) {
     const page = templates.generateWeddingPage({ slug: city.slug, seed: 1 })
     const resolved = cities.getCityBySlug(city.slug)
-    assert.ok(page.content.includes(resolved.name))
+    assert.ok(page.content.includes(normalizeCityName(resolved.name)))
     assert.ok(page.content.includes(resolved.deptName))
     assert.ok(!page.content.includes('undefined'))
     assert.ok(!page.content.includes('{{'))

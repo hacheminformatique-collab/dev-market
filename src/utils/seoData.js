@@ -1,11 +1,5 @@
 import { getCityBySlug } from '../data/idf-cities'
-
-function plainLocationName(name) {
-  return name.normalize('NFD').replace(/\p{M}/gu, '')
-    .replaceAll('œ', 'oe').replaceAll('Œ', 'OE')
-    .replaceAll('æ', 'ae').replaceAll('Æ', 'AE')
-    .replace(/[^a-zA-Z0-9]+/g, ' ').trim()
-}
+import { normalizeCityName as plainLocationName } from './cityNames'
 
 function normalizeSiteUrl(rawUrl, fallback = window.location.origin) {
   const input = (rawUrl || '').trim()

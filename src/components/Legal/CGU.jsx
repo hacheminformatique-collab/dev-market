@@ -44,6 +44,9 @@ export default function CGU() {
       <p>
         Les demandes de devis effectuées via le formulaire en ligne constituent une simple demande d&apos;information. Elles ne constituent pas une commande ferme et ne génèrent aucune obligation contractuelle de la part de {raisonSociale} tant qu&apos;aucun contrat écrit n&apos;a été signé.
       </p>
+      <p>
+        Lorsque vous acceptez les présentes conditions et validez une étape du formulaire de devis, les informations saisies dans cette étape et les étapes précédemment validées sont transmises à {raisonSociale}, même si vous ne terminez pas le devis. Elles sont utilisées pour traiter votre demande et, si nécessaire, vous recontacter afin de vous aider à la poursuivre.
+      </p>
 
       <h2 style={h2}>7. Propriété intellectuelle</h2>
       <p>

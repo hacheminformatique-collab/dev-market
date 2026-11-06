@@ -1,0 +1,26 @@
+.wedding-source-accordion > summary {
+  list-style: none;
+}
+
+.wedding-source-accordion > summary::-webkit-details-marker {
+  display: none;
+}
+
+.wedding-source-toggle::before {
+  content: '+';
+}
+
+.wedding-source-accordion[open] > summary .wedding-source-toggle::before {
+  content: '−';
+}
+
+.wedding-source-accordion > summary:focus-visible {
+  outline: 2px solid var(--gold);
+  outline-offset: -3px;
+}
+
+@media (max-width: 420px) {
+  .wedding-source-section [style*="grid-template-columns"] {
+    grid-template-columns: minmax(0, 1fr) !important;
+  }
+}

@@ -8,6 +8,7 @@ import { createServer as createTcpServer } from 'node:net'
 import { spawn } from 'node:child_process'
 import { once } from 'node:events'
 import { renderToStaticMarkup } from 'react-dom/server'
+import { normalizeCityName } from '../src/utils/cityNames.js'
 
 const root = resolve(import.meta.dirname, '..')
 let vite, publication, directory, site, origin, template, shellTemplate
@@ -146,6 +147,32 @@ test('the snapshot includes public data only', () => {
   assert.throws(() => publication.makeCitySnapshot({ ...fixture, slug: 'ville-inconnue' }), /invalide/)
 })
 
+test('unsupported restored FAQ edits stop publication before any page write', async () => {
+  const generated = generateWeddingPage({ slug: 'nanteuil-les-meaux', seed: 12 })
+  const changed = {
+    ...generated,
+    content: generated.content.replace('Peut-on apporter son propre traiteur ?', 'Une question sans réponse connue ?'),
+  }
+  assert.notEqual(changed.content, generated.content)
+  const originalFetch = globalThis.fetch
+  let writes = 0
+  globalThis.fetch = async (input, options) => {
+    if (options?.method === 'POST') writes++
+    return originalFetch(new URL(input, origin), options)
+  }
+  try {
+    await assert.rejects(publication.publishWeddingPages({
+      ...fixture,
+      pages: { meaux: fixture.pages.meaux, 'nanteuil-les-meaux': changed },
+      origin,
+      onProgress() {},
+    }), /questions FAQ personnalisées/)
+    assert.equal(writes, 0)
+  } finally {
+    globalThis.fetch = originalFetch
+  }
+})
+
 test('HTML has content, self-canonical, SEO and quote links before JavaScript', () => {
   const snapshot = publication.makeCitySnapshot({ slug: 'meaux', ...fixture })
   const html = publication.renderCityDocument({ template, snapshot, settings: fixture.settings, origin })
@@ -181,12 +208,15 @@ test('HTML has content, self-canonical, SEO and quote links before JavaScript', 
   assert.ok(seo['@graph'].some((entry) => entry['@type'] === 'Service' && entry.areaServed.name === 'Meaux'))
   assert.match(html, /<details[^>]*>.*?<summary/s)
   assert.match(html, /Le tarif de location de/)
-  assert.match(html, /à vol d’oiseau/)
+  assert.doesNotMatch(html, /à vol d’oiseau|Ce texte reprend un modèle fourni/)
+  assert.ok(html.indexOf('id="devis"') < html.indexOf('id="intro"'))
+  assert.match(html, /href="\/espace-client"/)
+  assert.match(html, /href="\/espace-staff"/)
   assert.ok(!html.includes('key=${'))
   const directory = html.match(/<section class="wedding-directory"[\s\S]*?<\/section>/)[0]
   assert.match(directory, /Seine-et-Marne \(77\)/)
   assert.ok(directory.includes('href="/locationsalledemariage/meaux" title="Location salle de mariage Meaux">Location salle de mariage Meaux</a>'))
-  assert.ok(directory.includes('Location salle de mariage Nanteuil-lès-Meaux'))
+  assert.ok(directory.includes('Location salle de mariage Nanteuil les Meaux'))
   assert.ok(!directory.includes('locationsalleanniversaire'))
   assert.ok(!directory.includes('/bobigny'))
   assert.ok(!/\balt=/.test(directory))
@@ -313,10 +343,10 @@ test('directory covers all IDF departments with exact text, title, order and uni
   assert.equal(new Set(links.map((link) => link[1])).size, links.length)
   for (const link of links) {
     assert.equal(link[2], link[3])
-    assert.ok(link[2].startsWith('Location salle de mariage '))
+    assert.equal(link[2], `Location salle de mariage ${normalizeCityName(getCityBySlug(link[1]).name)}`)
   }
-  assert.ok(html.indexOf('Location salle de mariage Meaux') < html.indexOf('Location salle de mariage Mitry-Mory'))
-  assert.ok(html.indexOf('Location salle de mariage Mitry-Mory') < html.indexOf('Location salle de mariage Torcy'))
+  assert.ok(html.indexOf('Location salle de mariage Meaux') < html.indexOf('Location salle de mariage Mitry Mory'))
+  assert.ok(html.indexOf('Location salle de mariage Mitry Mory') < html.indexOf('Location salle de mariage Torcy'))
   assert.ok(!html.includes('ville-inconnue'))
   assert.ok(!html.includes('alt='))
   assert.equal(renderToStaticMarkup(WeddingDirectory({ slugs: [] })), '')

@@ -6,6 +6,7 @@ import { PAGE_TYPES, PAGE_TYPES_BY_ID } from '../data/pageTypes'
 import { getCityBySlug } from '../data/idf-cities'
 import { buildSitemapXml, buildRobotsTxt } from './seoFiles'
 import WeddingDirectory from '../components/WeddingDirectory'
+import { validateWeddingTemplate } from './weddingPageTemplates'
 
 function escapeHtml(value) {
   return String(value).replaceAll('&', '&amp;').replaceAll('<', '&lt;')
@@ -28,7 +29,7 @@ export function makeCitySnapshot({ slug, pages, config, gallery, allTypePages, b
   return {
     citySlug: slug,
     pageType: PAGE_TYPES_BY_ID.mariage,
-    page: { content: page.content, generatedAt: page.generatedAt },
+    page: { content: page.content, generatedAt: page.generatedAt, ...(page.template === undefined ? {} : { template: validateWeddingTemplate(page.template) }) },
     config: {
       businessName: config.businessName,
       googleMapsApiKey: config.googleMapsApiKey,

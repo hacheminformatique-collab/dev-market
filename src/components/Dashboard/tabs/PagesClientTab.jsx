@@ -1,9 +1,10 @@
 import { useState, useEffect } from 'react'
 import {
   makePageTypeStorage,
-  generateCityContent,
+  generateLocalCityContent,
 } from '../../../utils/cityPageStorage'
-import { DEPARTMENTS, ALL_CITIES } from '../../../data/idf-cities'
+import { DEPARTMENTS, ALL_CITIES, getCityBySlug } from '../../../data/idf-cities'
+import { generateWeddingPage } from '../../../utils/weddingPageTemplates'
 import { PAGE_TYPES } from '../../../data/pageTypes'
 import { getSettings } from '../../../utils/storage'
 import { getBlogArticles } from '../../../utils/blogStorage'
@@ -62,7 +63,6 @@ export default function PagesClientTab({ pageType }) {
   const [genProgress, setGenProgress] = useState({ done: 0, total: 0, current: '' })
   const [genDone, setGenDone]       = useState(false)
   const [genError, setGenError]     = useState('')
-  const [genWarn, setGenWarn]       = useState('')
   const [publishing, setPublishing] = useState(false)
   const [publishProgress, setPublishProgress] = useState({ done: 0, total: 0, current: '' })
   const [publishMessage, setPublishMessage] = useState('')
@@ -83,7 +83,6 @@ export default function PagesClientTab({ pageType }) {
     setCitySearch('')
     setGenDone(false)
     setGenError('')
-    setGenWarn('')
     setPublishMessage('')
     setPublishError('')
   }, [pageType.id])
@@ -193,61 +192,52 @@ export default function PagesClientTab({ pageType }) {
 
   async function handleGenerate() {
     if (selectedSlugs.length === 0) return
-
-    const adminPin = getSettings().pin
-    if (!adminPin) {
-      setGenError('❌ PIN administrateur absent. Reconnectez-vous avant de générer.')
-      return
-    }
+    const slugs = [...new Set(selectedSlugs)]
+    const replacedCount = slugs.filter((slug) => pages[slug]).length
+    if (replacedCount > 0 && !window.confirm(`Régénérer les ${replacedCount} pages existantes sélectionnées ? Leurs textes seront remplacés après sauvegarde. Les fichiers HTML publiés ne changeront qu’après republication.`)) return
 
     setGenerating(true)
     setGenDone(false)
     setGenError('')
-    setGenWarn('')
     setPublishMessage('')
-    setGenProgress({ done: 0, total: selectedSlugs.length, current: '' })
-
-    // 1. Backup existing pages
-    await storage.backupPages()
-
-    // 2. Load existing pages to keep unselected ones
-    const existing = await storage.getPages()
-    const updated = { ...existing }
-
-    // 3. Generate content per city — save each page immediately after generation
-    for (let i = 0; i < selectedSlugs.length; i++) {
-      const slug = selectedSlugs[i]
-      const city = ALL_CITIES.find((c) => c.slug === slug)
-      if (!city) continue
-      setGenProgress({ done: i, total: selectedSlugs.length, current: city.name })
-      try {
-        const content = await generateCityContent(
-          city.name,
-          city.deptName,
-          config.keywords,
-          config.businessName,
-          config.businessType,
-          adminPin,
-          pageType.mainKeyword,
-        )
-        updated[slug] = { content, generatedAt: new Date().toISOString() }
-        // Save and publish immediately so the page is never lost on interruption
-        await storage.savePages(updated)
+    setGenProgress({ done: 0, total: slugs.length, current: '' })
+    let done = 0
+    let current = ''
+    try {
+      const cities = slugs.map((slug) => {
+        const city = getCityBySlug(slug)
+        if (!city) throw new Error(`Ville inconnue : ${slug}`)
+        return city
+      })
+      const existing = await storage.getPages({ requireServer: true })
+      const newlyReplaced = slugs.filter((slug) => existing[slug] && !pages[slug]).length
+      if (newlyReplaced && !window.confirm(`${newlyReplaced} autres pages existent sur le serveur. Les remplacer après sauvegarde ?`)) return
+      await storage.backupPages({ requireServer: true })
+      setBackups(await storage.getBackups())
+      const updated = { ...existing }
+      for (const city of cities) {
+        current = city.name
+        setGenProgress({ done, total: slugs.length, current })
+        updated[city.slug] = pageType.id === 'mariage'
+          ? generateWeddingPage({ slug: city.slug, businessName: config.businessName })
+          : {
+            content: generateLocalCityContent(city.name, city.deptName, config.keywords, config.businessName, config.businessType, pageType.mainKeyword),
+            generatedAt: new Date().toISOString(),
+          }
+        await storage.savePages(updated, { requireServer: true })
         setPages({ ...updated })
-      } catch (e) {
-        setGenerating(false)
-        setGenProgress({ done: i, total: selectedSlugs.length, current: '' })
-        setGenError(`❌ Erreur IA pour "${city.name}" : ${e.message} Les pages précédentes restent sauvegardées.`)
-        return
+        done++
+        // Yield between local generations so progress and navigation can render.
+        await new Promise((resolve) => setTimeout(resolve, 0))
       }
+      setGenDone(true)
+    } catch (error) {
+      console.error('[WeddingGeneration]', error)
+      setGenError(`❌ Erreur de génération${current ? ` pour "${current}"` : ''} : ${error.message} Les pages déjà enregistrées restent conservées.`)
+    } finally {
+      setGenerating(false)
+      setGenProgress({ done, total: slugs.length, current: '' })
     }
-
-    setGenerating(false)
-    setGenDone(true)
-    setGenProgress({ done: selectedSlugs.length, total: selectedSlugs.length, current: '' })
-    // Refresh backups list
-    const bkps = await storage.getBackups()
-    setBackups(bkps)
   }
 
   async function handlePublish() {
@@ -539,11 +529,11 @@ export default function PagesClientTab({ pageType }) {
                 onClick={handleGenerate}
                 style={{ fontSize: '14px', padding: '12px 28px' }}
               >
-                🚀 Générer {selectedSlugs.length} page{selectedSlugs.length > 1 ? 's' : ''}
+                🚀 Générer {selectedSlugs.length} page{selectedSlugs.length > 1 ? 's' : ''} depuis les modèles
               </button>
               {genDone && (
                 <span style={{ color: 'var(--success)', fontSize: '13px', fontWeight: '600' }}>
-                  ✅ {selectedSlugs.length} page{selectedSlugs.length > 1 ? 's' : ''} générée{selectedSlugs.length > 1 ? 's' : ''} avec succès !
+                  ✅ {genProgress.done} page{genProgress.done > 1 ? 's' : ''} générée{genProgress.done > 1 ? 's' : ''} et sauvegardée{genProgress.done > 1 ? 's' : ''} !
                 </span>
               )}
             </div>
@@ -563,23 +553,6 @@ export default function PagesClientTab({ pageType }) {
               lineHeight: '1.5',
             }}>
               {genError}
-            </div>
-          )}
-
-          {/* Orange warning message (daily quota reached — not a fatal error) */}
-          {genWarn && !generating && (
-            <div style={{
-              marginTop: '16px',
-              background: '#fff8e1',
-              border: '1.5px solid #f9a825',
-              borderRadius: '10px',
-              padding: '14px 18px',
-              color: '#e65100',
-              fontSize: '13px',
-              fontWeight: '600',
-              lineHeight: '1.6',
-            }}>
-              {genWarn}
             </div>
           )}
 
@@ -699,7 +672,8 @@ export default function PagesClientTab({ pageType }) {
               placeholder="mariage, anniversaire, baptême, soirée privée, traiteur halal…"
             />
             <div style={{ fontSize: '11px', color: '#aaa', marginTop: '4px' }}>
-              Ces mots clés seront intégrés dans le contenu de chaque page ville.
+              Pour les pages mariage, les modèles utilisent le vocabulaire validé ;
+              ce champ historique reste conservé pour les autres types de pages.
             </div>
           </Field>
 
@@ -715,14 +689,14 @@ export default function PagesClientTab({ pageType }) {
             </div>
           </Field>
 
-          <Field label="Génération IA — OpenAI">
+          <Field label="Génération automatique depuis les modèles">
             <p style={{ fontSize: '13px', color: '#555' }}>
-              La génération utilise OpenAI (gpt-4o-mini). Configurez OPENAI_API_KEY
-              dans l’environnement PHP ou utilisez private/openai-config.php
-              hors de public_html, jamais ici.
-              La facturation API est distincte de l’abonnement ChatGPT.
-              Les informations publiques de la salle et les consignes sont transmises à OpenAI.
-              Commencez par une seule ville pour vérifier le résultat et le coût.
+              Six familles de modèles sont utilisées pour les pages mariage :
+              présentation, organisation, réception, personnalisation, budget et accès.
+              Les variantes et deux extraits d’avis Google sont choisis lors de la génération,
+              puis sauvegardés. Aucun appel IA ni clé API n’est nécessaire.
+              Une régénération peut produire une autre combinaison ; elle demande
+              confirmation avant de remplacer les textes existants.
             </p>
           </Field>
 

@@ -8,6 +8,8 @@ import WizardForm from '../Wizard/WizardForm'
 import VideoHero from '../VideoHero'
 import WeddingDirectory from '../WeddingDirectory'
 import { getPublishedWeddingSlugs } from '../../utils/weddingPublication'
+import { WEDDING_REVIEWS, WEDDING_REVIEW_SOURCE } from '../../data/weddingReviews'
+import { validateWeddingTemplate } from '../../utils/weddingPageTemplates'
 
 function Link(props) {
   return <RouterLink {...props} reloadDocument />
@@ -384,10 +386,35 @@ function WhatsAppButton() {
 // ── 1. Section Introduction / Présentation de la salle ────────────────────────
 
 function SectionIntro({ city, businessName, page }) {
+  let reviews = []
+  let reviewError = ''
+  if (page.template !== undefined) {
+    try {
+      const template = validateWeddingTemplate(page.template)
+      reviews = template.reviewIds.map((id) => WEDDING_REVIEWS.find((review) => review.id === id))
+    } catch (error) {
+      console.error('[WeddingReviews]', error)
+      reviewError = error.message
+    }
+  }
   return (
     <Section id="intro" title={`${businessName} — votre réception depuis ${city.name}`}>
       <div style={{ fontSize: '15px', color: 'var(--text)', lineHeight: 1.8 }}>
         {renderContent(page.content)}
+        {reviewError && <p role="alert">{reviewError}</p>}
+        {reviews.length > 0 && (
+          <section aria-labelledby="google-reviews-heading" style={{ marginTop: '32px' }}>
+            <h2 id="google-reviews-heading">Avis Google sur Le Paradise</h2>
+            <p>Extraits d’avis reproduits à partir des captures fournies, sans attribution à une ville particulière.</p>
+            {reviews.map((review) => (
+              <figure key={review.id} style={{ margin: '20px 0', padding: '16px', borderLeft: '3px solid var(--gold)', background: 'var(--bg-light)' }}>
+                <blockquote style={{ margin: '0 0 12px', overflowWrap: 'anywhere' }}>« {review.excerpt} »</blockquote>
+                <figcaption>{review.author} — {review.rating}/5 sur Google (extrait)</figcaption>
+              </figure>
+            ))}
+            <a href={WEDDING_REVIEW_SOURCE} target="_blank" rel="noopener noreferrer">Consulter la fiche Google de Le Paradise</a>
+          </section>
+        )}
       </div>
     </Section>
   )

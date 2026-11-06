@@ -1,3 +1,4 @@
+import { siteFetch as fetch } from './siteFetch'
 const KEYS = {
   settings: 'paradise_settings',
   formules: 'paradise_formules',
@@ -80,7 +81,15 @@ export function offDataRefresh(callback) {
  * Returns true if at least one key was updated, false otherwise.
  * Safe to call at any time – if the server is unreachable the cache is kept as-is.
  */
-export async function refreshFromServer() {
+let refreshInFlight = null
+export function refreshFromServer() {
+  if (!refreshInFlight) {
+    refreshInFlight = refreshStorage().finally(() => { refreshInFlight = null })
+  }
+  return refreshInFlight
+}
+
+async function refreshStorage() {
   let changed = false
   await Promise.all(
     Object.entries(KEYS).map(async ([, key]) => {
@@ -103,15 +112,24 @@ export async function refreshFromServer() {
 
 let _autoRefreshInterval = null
 let _visibilityHandler = null
+let _refreshGeneration = 0
 
 /**
- * Start polling the server every `intervalMs` milliseconds (default 5 s).
+ * Refresh only visible tabs, with a pause after the previous cycle finishes.
  * Also refreshes immediately when the user returns to the tab.
  * Calls stopAutoRefresh() first to prevent duplicate intervals.
  */
-export function startAutoRefresh(intervalMs = 1500) {
+export function startAutoRefresh(intervalMs = 30_000) {
   stopAutoRefresh()
-  _autoRefreshInterval = setInterval(() => { refreshFromServer() }, intervalMs)
+  const generation = _refreshGeneration
+  const delay = Math.max(30_000, intervalMs)
+  const schedule = () => {
+    _autoRefreshInterval = setTimeout(async () => {
+      if (document.visibilityState === 'visible') await refreshFromServer()
+      if (_autoRefreshInterval !== null && generation === _refreshGeneration) schedule()
+    }, delay)
+  }
+  schedule()
   _visibilityHandler = () => {
     if (document.visibilityState === 'visible') refreshFromServer()
   }
@@ -128,8 +146,9 @@ export async function forceRefresh() {
 
 /** Stop the polling interval and remove the visibility listener. */
 export function stopAutoRefresh() {
+  _refreshGeneration++
   if (_autoRefreshInterval !== null) {
-    clearInterval(_autoRefreshInterval)
+    clearTimeout(_autoRefreshInterval)
     _autoRefreshInterval = null
   }
   if (_visibilityHandler !== null) {
@@ -169,7 +188,7 @@ async function _postWithRetry(key, data, attempt = 0) {
     _saveRetryQueue(queue)
     _updateSyncStatus({ pending: Math.max(0, _syncStatus.pending - 1), offline: false, synced: _syncStatus.synced + 1 })
   } catch (err) {
-    if (attempt < MAX_RETRIES) {
+    if (attempt < MAX_RETRIES && err.name !== 'HostingLimitError') {
       setTimeout(() => _postWithRetry(key, data, attempt + 1), RETRY_DELAYS[attempt])
     } else {
       console.warn(`[storage] Failed to persist key "${key}" to server after ${MAX_RETRIES} retries:`, err)
@@ -296,9 +315,16 @@ function _save(key, data) {
  * Priority: PHP server → localStorage → built-in defaults.
  * Must be awaited once in App.jsx before the React tree renders.
  */
-export async function initStorage() {
+let initialization = null
+export function initStorage() {
+  if (!initialization) initialization = initializeStorage()
+  return initialization
+}
+
+async function initializeStorage() {
   await Promise.all(
     Object.entries(KEYS).map(async ([name, key]) => {
+      let serverConfirmedMissing = false
       // 1. Try server
       try {
         const res = await fetch(`/api/storage.php?key=${encodeURIComponent(key)}`)
@@ -308,6 +334,7 @@ export async function initStorage() {
             _cache[key] = data
             return
           }
+          serverConfirmedMissing = true
         }
       } catch { /* server unreachable or returned an error – proceed to fallback */ }
 
@@ -322,7 +349,7 @@ export async function initStorage() {
 
       // 3. Nothing found – initialise with defaults and persist them
       _cache[key] = DEFAULTS[name]
-      _save(key, DEFAULTS[name])
+      if (serverConfirmedMissing) _save(key, DEFAULTS[name])
     })
   )
 

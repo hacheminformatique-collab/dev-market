@@ -1,3 +1,4 @@
+import { siteFetch as fetch } from '../../../utils/siteFetch'
 import { useState, useRef } from 'react'
 import { PAGE_TYPES } from '../../../data/pageTypes'
 import { makePageTypeStorage } from '../../../utils/cityPageStorage'

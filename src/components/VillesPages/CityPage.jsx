@@ -1,3 +1,4 @@
+import { siteFetch as fetch } from '../../utils/siteFetch'
 import { useEffect, useState } from 'react'
 import { useParams, Link as RouterLink } from 'react-router-dom'
 import { makePageTypeStorage, getCityPagesConfig } from '../../utils/cityPageStorage'

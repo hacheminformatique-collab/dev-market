@@ -1,5 +1,30 @@
 # React + Vite
 
+## Protection contre les rafales LWS
+
+Les appels `fetch` de même origine passent par une file commune : au moins
+650 ms entre départs (moins de deux appels par seconde), sans burst et sans
+appels concurrents. Sur HTTPS avec Web Locks, les onglets du même navigateur
+partagent aussi le rythme et la suspension via le stockage local. Si Web Locks
+est indisponible, utiliser un seul onglet d'administration (avertissement console).
+Les lectures identiques de `api/storage.php` sont regroupées et conservées
+5 secondes ; les écritures invalident ce cache, et les lectures de sécurité
+avant génération restent fraîches.
+
+Le rafraîchissement automatique attend au moins 30 secondes **après** la fin
+du cycle précédent, uniquement dans un onglet visible. Les initialisations et
+cycles simultanés sont regroupés. Un HTTP 429/509 suspend les appels en attente
+pendant au moins une minute, sans nouvelle tentative automatique du même appel ;
+le blocage de l'IP peut durer davantage et nécessiter le support LWS.
+
+Cette limite concerne les requêtes contrôlées par JavaScript, pas les fichiers
+CSS/JS/images/vidéos, navigations, autres navigateurs ou appareils partageant l'IP.
+Elle ne garantit donc pas un plafond global par IP. Après déploiement complet de
+`dist/`, fermer les anciens onglets, rouvrir une seule administration et attendre
+la levée du blocage avant toute génération/publication. Conserver les anciens
+assets nécessaires aux pages statiques et republier celles-ci pour leur fournir
+également le nouveau code réseau. Les modèles éditoriaux ne changent pas ici.
+
 ## Génération automatique des pages mariage depuis les modèles
 
 Les pages mariage sont générées **sans IA, sans clé API et sans coût d'API**.

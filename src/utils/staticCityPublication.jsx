@@ -1,3 +1,4 @@
+import { siteFetch as fetch } from './siteFetch'
 import { renderToString, renderToStaticMarkup } from 'react-dom/server'
 import { MemoryRouter } from 'react-router-dom'
 import { CityPageContent } from '../components/VillesPages/CityPage'

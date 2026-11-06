@@ -17,24 +17,21 @@ before(async () => {
 })
 after(async () => { await vite?.close() })
 
-test('six coherent families generate without any network calls and replay saved variants', () => {
+test('twenty whole source models generate without network calls and replay saved selections', () => {
   const nativeFetch = globalThis.fetch
   globalThis.fetch = () => assert.fail('Local generation must not call a provider')
   try {
-    assert.equal(templates.WEDDING_TEMPLATE_FAMILIES.length, 6)
+    assert.equal(templates.WEDDING_TEMPLATE_FAMILIES.length, 20)
     for (const family of templates.WEDDING_TEMPLATE_FAMILIES) {
       const page = templates.generateWeddingPage({ slug: 'meaux', familyId: family.id, seed: 42 })
       assert.equal(page.template.familyId, family.id)
       assert.equal(page.template.reviewIds.length, 2)
       assert.equal(new Set(page.template.reviewIds).size, 2)
-      assert.equal(Object.keys(page.template.blockChoices).length, 6)
       assert.match(page.content, /^## /)
       assert.ok(page.content.split(/\s+/).length >= 550)
       assert.match(page.content, /300/)
-      assert.match(page.content, /5 avenue Fridingen|Nanteuil-lès-Meaux/)
-      assert.match(page.content, /Meaux \(77100\)/)
-      assert.match(page.content, /Seine-et-Marne \(77\)/)
-      assert.match(page.content, /vol d’oiseau/)
+      assert.ok(page.content.includes('Meaux'))
+      assert.ok(page.content.includes('Seine-et-Marne'))
       assert.ok(!page.content.includes('{{'))
       const replay = templates.generateWeddingPage({ slug: 'meaux', familyId: page.template.familyId, seed: page.template.seed })
       assert.equal(replay.content, page.content)
@@ -50,31 +47,24 @@ test('six coherent families generate without any network calls and replay saved 
   }
 })
 
-function shingles(text) {
-  const words = text.toLowerCase().replace(/[^\p{L}\p{N}]+/gu, ' ').trim().split(/\s+/)
-  return new Set(words.slice(0, -4).map((_word, i) => words.slice(i, i + 5).join(' ')))
-}
-
-test('variation changes actual prose, not just the city name or section order', () => {
-  // Use one city for the entire sample so city substitutions cannot mask reuse.
-  const sample = Array.from({ length: 100 }, (_value, seed) => templates.generateWeddingPage({ slug: 'meaux', seed }))
-  assert.equal(new Set(sample.map((page) => page.content)).size, 100)
-  assert.equal(new Set(sample.map((page) => page.template.familyId)).size, 6)
-  const sets = sample.map((page) => shingles(page.content))
-  let max = 0
-  let total = 0
-  let pairs = 0
-  for (let i = 0; i < sets.length; i++) {
-    for (let j = i + 1; j < sets.length; j++) {
-      const shared = [...sets[i]].filter((value) => sets[j].has(value)).length
-      const similarity = shared / (sets[i].size + sets[j].size - shared)
-      max = Math.max(max, similarity)
-      total += similarity
-      pairs++
-    }
+test('random generation selects one of exactly twenty complete models without recombination', () => {
+  const models = templates.WEDDING_SOURCE_MODELS
+  assert.equal(models.length, 20)
+  assert.equal(new Set(models.map((model) => model.sourceFile)).size, 20)
+  const selected = new Set()
+  for (let seed = 0; seed < 500; seed++) {
+    const page = templates.generateWeddingPage({ slug: 'meaux', seed })
+    const model = models.find((item) => item.id === page.template.familyId)
+    const expected = model.sections.map((section) => section.content.replace(/xxxx|yyyy|\$\{businessName\}/g, (marker) => marker === 'xxxx' ? 'Meaux' : marker === 'yyyy' ? 'Seine-et-Marne' : 'Le Paradise 77')).join('\n\n')
+    assert.equal(page.content, expected)
+    selected.add(model.id)
+    assert.equal(model.sections.length, 8)
+    assert.ok(model.cityReplacements > 20)
+    assert.ok(model.departmentReplacements > 0)
+    assert.match(model.sourceSha256, /^[a-f0-9]{64}$/)
+    assert.ok(model.sections.every((section) => !section.content.includes(model.label)))
   }
-  assert.ok(max < 0.70, `Maximum five-word shingle similarity: ${max}`)
-  assert.ok(total / pairs < 0.30, `Average five-word shingle similarity: ${total / pairs}`)
+  assert.equal(selected.size, 20)
 })
 
 test('every supported city produces valid local content while invalid input is explicit', () => {
@@ -82,7 +72,7 @@ test('every supported city produces valid local content while invalid input is e
     const page = templates.generateWeddingPage({ slug: city.slug, seed: 1 })
     const resolved = cities.getCityBySlug(city.slug)
     assert.ok(page.content.includes(resolved.name))
-    assert.ok(page.content.includes(resolved.postalCode))
+    assert.ok(page.content.includes(resolved.deptName))
     assert.ok(!page.content.includes('undefined'))
     assert.ok(!page.content.includes('{{'))
   }
@@ -118,6 +108,14 @@ test('review excerpts are attributed, selected once, and included in published H
   assert.ok(!html.includes('"@type":"Review"'))
   assert.ok(!html.includes('aggregateRating'))
   assert.match(html, /sans attribution à une ville particulière/)
+  const visible = html.split('<script id="city-page-data"')[0]
+  assert.equal((visible.match(/Comment réserver une salle de mariage à Meaux/g) || []).length, 1)
+  assert.equal((visible.match(/Capacité et équipements — Le Paradise/g) || []).length, 1)
+  assert.ok(!html.includes('xxxx'))
+  assert.ok(!html.includes('yyyy'))
+  assert.ok(!html.includes('${businessName}'))
+  const legacyTemplate = { version: 1, familyId: 'presentation', seed: 15, reviewIds: page.template.reviewIds }
+  assert.deepEqual(templates.validateWeddingTemplate(legacyTemplate), legacyTemplate)
   const old = { content: 'Ancien texte conservé', generatedAt: page.generatedAt }
   const oldSnapshot = publication.makeCitySnapshot({ ...params, pages: { meaux: old } })
   assert.equal(oldSnapshot.page.content, old.content)

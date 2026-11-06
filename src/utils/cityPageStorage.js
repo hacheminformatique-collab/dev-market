@@ -25,14 +25,21 @@ function _keyBackup(typeId)  { return typeId === 'mariage' ? KEY_BACKUP  : `para
 
 // ── Helpers ────────────────────────────────────────────────────────────────
 
-async function _get(key) {
+async function _get(key, requireServer = false) {
   try {
     const res = await fetch(`/api/storage.php?key=${encodeURIComponent(key)}`)
     if (res.ok) {
       const data = await res.json()
+      if (requireServer) return data
       if (data !== null && data !== undefined) return data
     }
-  } catch { /* server unreachable */ }
+    if (requireServer) throw new Error(`Stockage inaccessible (HTTP ${res.status}).`)
+  } catch (error) {
+    if (requireServer) {
+      console.error('[CityPagesStorage]', error)
+      throw new Error('Lecture du stockage serveur impossible. La génération est arrêtée pour protéger les pages existantes.', { cause: error })
+    }
+  }
   try {
     const raw = localStorage.getItem(key)
     if (raw) return JSON.parse(raw)
@@ -40,15 +47,23 @@ async function _get(key) {
   return null
 }
 
-async function _set(key, data) {
+async function _set(key, data, requireServer = false) {
   try { localStorage.setItem(key, JSON.stringify(data)) } catch { /* ignore */ }
   try {
-    await fetch(`/api/storage.php?key=${encodeURIComponent(key)}`, {
+    const response = await fetch(`/api/storage.php?key=${encodeURIComponent(key)}`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(data),
     })
-  } catch { /* server unreachable – localStorage backup still written */ }
+    if (requireServer && (!response.ok || !(await response.json())?.ok)) {
+      throw new Error(`Stockage serveur refusé (HTTP ${response.status}).`)
+    }
+  } catch (error) {
+    if (requireServer) {
+      console.error('[CityPagesStorage]', error)
+      throw new Error('Enregistrement serveur impossible. Une copie locale a été tentée ; vérifiez le stockage PHP avant de continuer.', { cause: error })
+    }
+  }
 }
 
 // ── Config (keywords, social, Google Maps key) ─────────────────────────────
@@ -152,12 +167,12 @@ export function makePageTypeStorage(typeId) {
     await _set(kConfig, config)
   }
 
-  async function getPages() {
-    return (await _get(kPages)) || {}
+  async function getPages({ requireServer = false } = {}) {
+    return (await _get(kPages, requireServer)) || {}
   }
 
-  async function savePages(pages) {
-    await _set(kPages, pages)
+  async function savePages(pages, { requireServer = false } = {}) {
+    await _set(kPages, pages, requireServer)
   }
 
   async function getGallery() {
@@ -168,12 +183,12 @@ export function makePageTypeStorage(typeId) {
     await _set(KEY_GALLERY, photos)
   }
 
-  async function backupPages() {
-    const current = await getPages()
+  async function backupPages({ requireServer = false } = {}) {
+    const current = await getPages({ requireServer })
     if (!current || Object.keys(current).length === 0) return
-    const existing = (await _get(kBackup)) || []
+    const existing = (await _get(kBackup, requireServer)) || []
     const entry = { snapshot: current, backedUpAt: new Date().toISOString() }
-    await _set(kBackup, [entry, ...existing].slice(0, 5))
+    await _set(kBackup, [entry, ...existing].slice(0, 5), requireServer)
   }
 
   async function getBackups() {
@@ -181,94 +196,6 @@ export function makePageTypeStorage(typeId) {
   }
 
   return { getConfig, saveConfig, getPages, savePages, getGallery, saveGallery, backupPages, getBackups }
-}
-
-// ── AI content generation ──────────────────────────────────────────────────
-
-/**
- * Cleans raw text returned by GPT before storing or displaying it.
- * - Decodes literal \uXXXX escape sequences (GPT sometimes outputs them as plain text)
- * - Strips markdown code-fence wrappers (```markdown … ```) that GPT occasionally adds
- */
-function _cleanAIText(raw) {
-  if (!raw) return raw
-  let text = raw.replace(/\\u([0-9a-fA-F]{4})/g, (_, hex) =>
-    String.fromCharCode(parseInt(hex, 16))
-  )
-  text = text
-    .split('\n')
-    .filter((line) => !/^```/.test(line.trim()))
-    .join('\n')
-    .trim()
-  return text
-}
-
-/**
- * Generates city content through the PIN-protected PHP OpenAI endpoint.
- * The provider key is configured only in the PHP environment.
- */
-export async function generateCityContent(cityName, deptName, keywords, businessName, businessType, adminPin, mainKeyword) {
-  // Resolve the primary keyword for this page type (default: location salle de mariage)
-  const primaryKw = mainKeyword || 'location salle de mariage'
-  if (adminPin) {
-    const prompt = `Tu es un expert en rédaction SEO pour des salles de réception en France.
-Génère un contenu SEO très riche, UNIQUE et ORIGINAL pour la page web de la ville de "${cityName}" (${deptName}).
-L'établissement s'appelle "${businessName}" et se trouve au 5 avenue Fridingen, 77100 Nanteuil-lès-Meaux, en Seine-et-Marne (77).
-Il s'agit d'un établissement unique, pas d'une salle ou d'une agence située à "${cityName}".
-La page s'adresse aux habitants de "${cityName}" qui organisent leur réception à Nanteuil-lès-Meaux.
-
-Le mot-clé principal de cette page est : "${primaryKw}"
-
-RÈGLES ABSOLUES ANTI-CONTENU-DUPLIQUÉ :
-- Le contenu doit être ENTIÈREMENT ORIGINAL et adapté SPÉCIFIQUEMENT à "${cityName}" — ne jamais réutiliser le même texte que pour une autre ville
-- Utilise uniquement des informations locales vérifiables. Si un trajet, un lieu ou une information n'est pas connu, invite à vérifier l'itinéraire ou à contacter l'établissement.
-- N'invente jamais d'avis, de témoignages, de prix, de capacités, de partenaires ou de temps de trajet.
-- Varie les formulations, les angles d'approche, les anecdotes et les arguments d'une ville à l'autre
-- INTERDIT : phrases génériques copiées-collées d'une ville à l'autre
-
-INSTRUCTIONS DE RÉDACTION :
-- Privilégie un texte utile et concis : pas de longueur minimale ni de quota de répétitions.
-- Utilise "${primaryKw}" naturellement et sans bourrage de mots-clés.
-- Utilise le nom exact "${businessName}" et évite de répéter mécaniquement la ville.
-- Décris une location de salle près de "${cityName}" ou accessible depuis cette ville, jamais un établissement fictif à cette adresse.
-- Utilise le format markdown : ## pour les titres H2 et ### pour les sous-titres H3
-- Commence DIRECTEMENT par un titre ## (sans introduction ni meta-commentary)
-- Structure le contenu en sections utiles avec des titres H2 et, si nécessaire, des sous-titres H3.
-- Intègre naturellement les mots clés supplémentaires : ${keywords || 'mariage, anniversaire, baptême, soirée privée'}
-- Chaque section doit apporter une information concrète ou aider le visiteur à préparer son projet.
-- Le texte doit être naturel, convaincant, chaleureux et favorable au référencement (SEO)
-- Chaque page doit raconter une histoire légèrement différente : angle "romanesque" pour une ville, angle "pratique/logistique" pour une autre, angle "tradition locale" pour une autre, etc.
-
-Structure recommandée (à adapter sans dupliquer les formulations) :
-## ${primaryKw.charAt(0).toUpperCase() + primaryKw.slice(1)} près de ${cityName} — ${businessName}
-## Préparer une réception à Nanteuil-lès-Meaux depuis ${cityName}
-## Vérifier l'accès et organiser le déplacement des invités
-## Définir vos besoins pour les prestations et la restauration
-## Demander les disponibilités et un devis personnalisé
-## Préparer une visite et les questions à poser`
-
-    let res
-    try {
-      res = await fetch('/api/openai-generate.php', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'X-Admin-Pin': adminPin },
-        body: JSON.stringify({ prompt }),
-      })
-    } catch (error) {
-      throw new Error('Connexion au serveur de génération impossible. Vérifiez votre connexion et le déploiement PHP. Aucune relance automatique.', { cause: error })
-    }
-    if (!res.headers.get('content-type')?.includes('application/json')) {
-      throw new Error(`Réponse du serveur invalide (HTTP ${res.status}). Vérifiez le déploiement de api/openai-generate.php.`)
-    }
-    const json = await res.json()
-    if (!res.ok) throw new Error(json.error || `Génération OpenAI refusée (HTTP ${res.status}).`)
-    const text = typeof json.content === 'string' ? json.content.trim() : ''
-    if (!text) throw new Error('Réponse OpenAI vide reçue du serveur.')
-    const cleaned = _cleanAIText(text)
-    if (!cleaned) throw new Error('Réponse OpenAI vide après nettoyage.')
-    return cleaned
-  }
-  throw new Error('PIN administrateur absent. Reconnectez-vous avant de générer.')
 }
 
 export function generateLocalCityContent(cityName, deptName, keywords, businessName, businessType, mainKeyword) {

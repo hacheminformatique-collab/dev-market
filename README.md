@@ -1,71 +1,58 @@
 # React + Vite
 
-## Generation IA des pages villes avec OpenAI
+## Génération automatique des pages mariage depuis les modèles
 
-La generation des pages villes utilise OpenAI `gpt-4o-mini`, via
-`public/api/openai-generate.php`. L'ancien token GitHub n'est plus utilise
-pour ces pages ; les anciennes configurations restent compatibles.
-Les informations publiques de la salle et les consignes sont envoyees a OpenAI.
-La generation du blog et son automatisation ne sont pas migrees par ce changement.
+Les pages mariage sont générées **sans IA, sans clé API et sans coût d'API**.
+Six familles éditoriales reprennent les thèmes des vingt pages fournies :
+présentation et visite, organisation, accueil des invités, personnalisation,
+budget et devis, accès et déplacements.
 
-1. Creer un projet API sur `platform.openai.com`, activer sa facturation et
-   definir ses limites. L'abonnement ChatGPT ne comprend pas les appels API.
-2. Configurer **OPENAI_API_KEY dans l'environnement du processus PHP** depuis
-   le panneau d'hebergement ou avec son support. Ne jamais mettre la cle dans
-   React, une variable `VITE_*`, le stockage du site, une sauvegarde ou Git.
-   Verifier que PHP recoit bien la variable (PHP-FPM peut filtrer l'environnement).
-   Sur LWS/cPanel sans variable d'environnement, utiliser le fichier prive
-   decrit ci-dessous.
-3. Activer PHP cURL et les connexions HTTPS sortantes vers `api.openai.com`.
-   Autoriser au moins 130 secondes pour une requete PHP sur le serveur et le proxy.
-4. Deployer tout `dist/`, notamment `api/openai-generate.php`, puis enregistrer
-   Mes Infos avec le PIN administrateur dans le stockage serveur.
-5. Dans Pages salle de mariage, selectionner **une seule ville** et lancer la
-   generation. Verifier le texte et la consommation avant un lot plus important.
-   Publier ensuite les pages avec le bouton HTML statique.
+Chaque génération choisit une famille, des titres, des paragraphes complets,
+trois questions fréquentes et deux extraits d'avis. L'ordre des sections dépend
+de la famille pour conserver un enchaînement cohérent. Le texte et la sélection
+des avis sont sauvegardés avec la version du modèle et sa graine aléatoire :
+ils ne changent pas lors d'une visite, d'une publication ou d'une restauration.
+Une régénération volontaire peut produire une autre combinaison. Les noms de
+villes, départements et codes postaux sont résolus par les données existantes ;
+les distances à vol d'oiseau ne sont pas présentées comme des durées de trajet.
 
-Chaque appel est authentifie avec le PIN enregistre sur le serveur, limite a
-4096 tokens de sortie et serialise pour eviter des appels payants concurrents.
-Le PIN existant est le mecanisme d'administration du site : utiliser un PIN
-robuste et HTTPS. En cas d'erreur, les pages precedentes restent sauvegardees.
-Il n'y a ni relance automatique payante ni remplacement silencieux par un
-modele de texte local. Une interruption reseau peut survenir apres facturation :
-verifier l'usage OpenAI avant de relancer. Les erreurs distinguent configuration
-manquante, cle invalide, quota, acces reseau et reponse vide/tronquee.
+La capacité **jusqu'à 300 personnes**, le traiteur, le service, la décoration
+et le DJ sont repris des exemples après accord du propriétaire. Les prestations
+retenues restent à confirmer au devis. Les nouveaux textes indiquent la salle
+réelle à Nanteuil-lès-Meaux, sans nouvelle implantation ni témoignage local inventé.
+Le champ historique « Mots clés SEO » reste compatible, mais ne modifie pas les
+textes mariage contrôlés. Les anciens types de pages conservent leur modèle local.
+Le blog et son automatisation ne sont pas modifiés par ce remplacement.
 
-### LWS / cPanel : fichier prive hors de public_html
+Les sept avis identifiés sont de courts extraits inchangés des captures fournies.
+La capture sans auteur ni note n'est pas utilisée. Les noms affichés et les notes
+sont conservés ; aucune date exacte n'est déduite des mentions « il y a un mois ».
+Les avis sont présentés comme des avis Google sur Le Paradise, avec un lien vers
+la fiche, sans leur attribuer une ville d'origine ni ajouter de note globale ou
+de balisage de notation. Les mêmes avis peuvent apparaître sur plusieurs pages.
 
-Pour un site deploye directement dans `/home/VOTRE_COMPTE/public_html` :
+Dans **Pages salle de mariage > Sélection villes**, sélectionner les villes puis
+utiliser **Générer depuis les modèles**. Le remplacement des pages existantes
+demande confirmation ; une sauvegarde est créée avant génération. Chaque page
+est enregistrée immédiatement sur le serveur. Si la lecture, la sauvegarde ou
+l'écriture serveur échoue, un message explicite arrête le lot : les pages déjà
+enregistrées sont conservées. Les villes non sélectionnées ne sont pas modifiées.
 
-```text
-/home/VOTRE_COMPTE/
-  private/
-    openai-config.php
-  public_html/
-    api/
-      openai-generate.php
-```
+Après fusion, déployer tout `dist/`, puis générer et **republier les pages HTML**
+pour afficher les nouveaux textes et avis. Les anciens textes ne sont jamais
+réécrits automatiquement, y compris les témoignages éventuellement présents.
+Après restauration, republier pour synchroniser les fichiers statiques.
+L'ancien endpoint `api/openai-generate.php` renvoie désormais HTTP 410, afin
+de désactiver aussi l'ancienne version lors d'un transfert par écrasement.
+La variable `OPENAI_API_KEY` et le fichier privé OpenAI ne sont plus nécessaires
+aux pages villes ; supprimer la configuration privée si aucun autre outil
+ne l'utilise. Les sauvegardes et les fichiers HTML existants restent compatibles.
 
-Dans le gestionnaire de fichiers cPanel, remonter au dossier parent de
-`public_html`, creer `private`, puis `openai-config.php`. Copier le contenu
-de `config/openai-config.example.php` et remplacer le placeholder par la cle
-uniquement sur l'hebergement. Ce fichier retourne un tableau PHP : il ne
-genere aucun texte et ne fait aucun appel API par lui-meme.
-Permissions recommandees : dossier `0700`, fichier `0600`, avec le meme
-proprietaire que le processus PHP. Ne pas utiliser `0777`.
-
-Le serveur lit `private/openai-config.php` dans le parent de la racine du site
-uniquement si OPENAI_API_KEY n'est pas configuree. Les chemins resolus dans
-la racine publique (y compris via un lien symbolique) sont refuses.
-Si le domaine utilise un sous-dossier ou une autre racine, placer le dossier
-prive dans le parent de cette racine, hors de tout dossier expose sur le web.
-Ne pas appliquer cette disposition si ce parent est lui-meme public.
-Les restrictions PHP `open_basedir` peuvent necessiter l'aide du support LWS.
-
-Supprimer l'ancien script public `openai-texte.php` : il n'est plus necessaire.
-Si sa cle a ete exposee ou partagee, la revoquer et en creer une nouvelle.
-Deployer la nouvelle version de `dist/` avant d'essayer la generation d'une ville.
-Ne jamais transferer le fichier prive dans `dist/`, Git ou les sauvegardes publiques.
+Les variantes réduisent les répétitions, sans garantir que chaque page est
+entièrement unique ou un classement Google. Les tests comparent notamment
+100 textes pour une même ville (donc sans masquer les ressemblances par des
+changements de noms) : similarité moyenne des séquences de cinq mots inférieure
+à 30 %, maximum inférieur à 70 %, hors sections communes du site et avis.
 
 ## Titres et descriptions des pages mariage
 
@@ -124,8 +111,8 @@ fictive dans la ville recherchée. Les informations locales distinguent les
 distances à vol d'oiseau des itinéraires routiers. Les FAQ utilisent
 `details` / `summary` : leurs réponses sont dans le HTML même sans JavaScript.
 
-Les nouvelles générations IA n'imposent aucun quota de mots-clés ni de longueur
-et interdisent les avis, prix, partenaires et trajets inventés. Les textes déjà
+Les modèles locaux utilisent un vocabulaire maîtrisé, sans quota de mots-clés
+ni informations locales ou avis inventés. Les textes déjà
 sauvegardés ne sont pas réécrits automatiquement : relisez-les et corrigez les
 informations non vérifiées avant de republier. La salle reste située à
 Nanteuil-lès-Meaux, même lorsque la page s'adresse aux habitants d'une autre ville.

@@ -231,7 +231,7 @@ test('PHP rejects unauthenticated writes, traversal and malformed HTML', async (
   assert.equal((await post({ action: 'page', slug: 'meaux', html: '' }, 'wrong')).status, 403)
   assert.equal((await post({ action: 'page', slug: '../escape', html: '' })).status, 400)
   assert.equal((await post({ action: 'page', slug: 'meaux', html: '<html>bad</html>' })).status, 400)
-  assert.equal((await post({ action: 'seo', sitemap: 'bad', robots: 'bad' })).status, 400)
+  assert.equal((await post({ action: 'seo', sitemap: 'bad', robots: 'bad', expectedRegistryHash: 'missing' })).status, 400)
   assert.equal((await post({ action: 'page', slug: 'meaux', html: 'x'.repeat(15 * 1024 * 1024) })).status, 413)
 })
 
@@ -246,7 +246,7 @@ test('publishes physical files at extensionless URLs and republishes safely', as
   globalThis.fetch = (url, options) => nativeFetch(new URL(url, origin), options)
   const progress = []
   try {
-    assert.equal(await publication.publishWeddingPages({ ...fixture, origin, onProgress: (value) => progress.push(value) }), 2)
+    assert.deepEqual(await publication.publishWeddingPages({ ...fixture, origin, onProgress: (value) => progress.push(value) }), { total: 2, published: 2, unchanged: 0, upgraded: 0 })
     assert.equal(progress.at(-1).done, 2)
     for (const slug of Object.keys(fixture.pages)) {
       const response = await fetch(`/locationsalledemariage/${slug}`)
@@ -282,7 +282,7 @@ test('publishes physical files at extensionless URLs and republishes safely', as
     }))
     assert.ok(!(await (await fetch('/locationsalledemariage/meaux')).text()).includes('SOURCE-CHANGED-NOT-YET-PUBLISHED'))
     const changed = { ...fixture, pages: { ...fixture.pages, meaux: { ...fixture.pages.meaux, content: 'Contenu republié et fixe.' } } }
-    await publication.publishWeddingPages({ ...changed, origin, onProgress() {} })
+    assert.deepEqual(await publication.publishWeddingPages({ ...changed, origin, onProgress() {} }), { total: 2, published: 1, unchanged: 1, upgraded: 0 })
     assert.match(await (await fetch('/locationsalledemariage/meaux')).text(), /Contenu republié et fixe/)
     assert.match(await (await fetch('/locationsalledemariage/nanteuil-les-meaux')).text(), /Une salle pour votre mariage/)
     assert.match(await (await fetch('/devis')).text(), /id="root"/)
@@ -413,12 +413,14 @@ test('publication reports API failures, incorrect routing and canonical domain m
         ? new Response(shellTemplate)
         : new Response(JSON.stringify({ error: 'Droits insuffisants' }), { status: 500, headers: { 'Content-Type': 'application/json' } })
     await assert.rejects(publication.publishWeddingPages(options), /Droits insuffisants/)
-    globalThis.fetch = async (url) => url === '/static-city.html'
+    globalThis.fetch = async (url, request) => url === '/static-city.html'
       ? new Response(template)
       : url === '/'
         ? new Response(shellTemplate)
         : url === '/api/static-publish.php'
-          ? new Response('{"ok":true}', { headers: { 'Content-Type': 'application/json' } })
+          ? new Response(JSON.stringify(JSON.parse(request.body).action === 'inspect'
+            ? { ok: true, registryHash: 'missing', publishedSlugs: [], pages: Object.fromEntries(Object.keys(fixture.pages).map((slug) => [slug, { fileHash: 'missing', fingerprint: null, sharedDirectory: false }])) }
+            : { ok: true }), { headers: { 'Content-Type': 'application/json' } })
           : new Response('<div id="root"></div>')
     await assert.rejects(publication.publishWeddingPages(options), /ne sert pas le HTML publié/)
     let writes = 0
@@ -452,5 +454,87 @@ test('video and poster are deployed once with fast-start MP4 and bounded sizes',
     const response = await fetch(`${origin}/media/${path}`)
     assert.equal(response.status, 200)
     assert.deepEqual(Buffer.from(await response.arrayBuffer()), content)
+  }
+})
+
+test('publication migrates legacy directories and writes updated city links into HTML', async () => {
+  const nativeFetch = globalThis.fetch
+  const requests = []
+  globalThis.fetch = (url, options) => {
+    if (url === '/api/static-publish.php') requests.push(JSON.parse(options.body))
+    return nativeFetch(new URL(url, origin), options)
+  }
+  try {
+    const options = { ...fixture, origin, onProgress() {} }
+    await publication.publishWeddingPages(options)
+    const file = join(site, 'locationsalledemariage', 'meaux.html')
+    const original = await readFile(file, 'utf8')
+    assert.match(original, /<!-- CITY_DIRECTORY_START -->/)
+    const block = original.match(/<!-- CITY_DIRECTORY_START -->([\s\S]*?)<!-- CITY_DIRECTORY_END -->/)[0]
+    const legacyDirectory = block.replace('<!-- CITY_DIRECTORY_START -->', '').replace('<!-- CITY_DIRECTORY_END -->', '')
+    const rootEnd = original.lastIndexOf('</div>', original.indexOf('<!-- CITY_DIRECTORY_START -->'))
+    assert.ok(rootEnd > original.indexOf('<div id="root">'))
+    const legacy = (original.slice(0, rootEnd) + legacyDirectory + original.slice(rootEnd))
+      .replace(block, '')
+      .replace('</body>', '<script defer src="/shared-wedding-directory-v1.js"></script>\n</body>')
+    assert.notEqual(legacy, original)
+    await writeFile(file, legacy)
+    requests.length = 0
+    const upgrade = await publication.publishWeddingPages(options)
+    assert.equal(upgrade.upgraded, 1)
+    assert.equal(upgrade.published, 0)
+    const migrated = await readFile(file, 'utf8')
+    assert.match(migrated, /<!-- CITY_DIRECTORY_START -->/)
+    assert.match(migrated, /legacy-wedding-directory-style/)
+    assert.doesNotMatch(migrated, /shared-wedding-directory-v1\.js/)
+    assert.equal(requests.filter((request) => request.action === 'city-directory').length, 1)
+    assert.equal(requests.filter((request) => request.action === 'page').length, 0)
+
+    const withNewCity = { ...fixture.pages, bobigny: { content: 'Nouvelle page Bobigny', generatedAt: '2026-02-01T12:00:00Z' } }
+    requests.length = 0
+    const addition = await publication.publishWeddingPages({ ...options, pages: withNewCity })
+    assert.deepEqual(addition, { total: 3, published: 1, unchanged: 0, upgraded: 2 })
+    const withDirectory = await readFile(file, 'utf8')
+    const visibleDirectory = withDirectory.match(/<!-- CITY_DIRECTORY_START -->([\s\S]*?)<!-- CITY_DIRECTORY_END -->/)[1]
+    assert.match(visibleDirectory, /href="\/locationsalledemariage\/bobigny"/)
+    assert.match(visibleDirectory, /Location salle de mariage près de Meaux/)
+    assert.notEqual(withDirectory, migrated)
+    const updatedBlock = withDirectory.match(/<!-- CITY_DIRECTORY_START -->[\s\S]*?<!-- CITY_DIRECTORY_END -->/)[0]
+    const migratedBlock = migrated.match(/<!-- CITY_DIRECTORY_START -->[\s\S]*?<!-- CITY_DIRECTORY_END -->/)[0]
+    assert.equal(withDirectory.replace(updatedBlock, migratedBlock), migrated, 'Only the directory block may change')
+    assert.deepEqual(requests.filter((request) => request.action === 'page').map((request) => request.slug), ['bobigny'])
+    assert.match(await (await fetch('/wedding-directory.html')).text(), /locationsalledemariage\/bobigny/)
+    assert.doesNotMatch(original, /href="\/locationsalledemariage\/bobigny"/)
+    assert.match(await (await fetch('/locationsalledemariage/meaux')).text(), /<!-- CITY_DIRECTORY_START -->[\s\S]*href="\/locationsalledemariage\/bobigny"/)
+    assert.match(await readFile(join(site, 'locationsalledemariage', 'bobigny.html'), 'utf8'), /Location salle de mariage près de Bobigny/)
+
+    requests.length = 0
+    const subset = await publication.publishWeddingPages({ ...options, pages: { meaux: fixture.pages.meaux } })
+    assert.deepEqual(subset, { total: 3, published: 0, unchanged: 3, upgraded: 0 })
+    assert.equal(await readFile(file, 'utf8'), withDirectory)
+    assert.deepEqual(requests.filter((request) => request.action === 'page' || request.action === 'city-directory'), [])
+    assert.match(await (await fetch('/sitemap.xml')).text(), /locationsalledemariage\/bobigny/)
+    assert.match(await (await fetch('/wedding-directory.html')).text(), /locationsalledemariage\/nanteuil-les-meaux/)
+
+    requests.length = 0
+    const forced = await publication.publishWeddingPages({ ...options, pages: { meaux: fixture.pages.meaux }, updateTemplate: true })
+    assert.deepEqual(forced, { total: 3, published: 1, unchanged: 2, upgraded: 0 })
+    assert.deepEqual(requests.filter((request) => request.action === 'page').map((request) => request.slug), ['meaux'])
+    const updated = await readFile(file, 'utf8')
+    assert.match(updated, /<h2 id="wedding-directory-heading">Location salle de mariage près de Meaux<\/h2>/)
+
+    const post = (body) => fetch('/api/static-publish.php', {
+      method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Admin-Pin': pin }, body: JSON.stringify(body),
+    })
+    const race = await post({ action: 'city-directory', slug: 'meaux', directory: visibleDirectory, styles: '.wedding-directory{}', expectedHash: '0'.repeat(64) })
+    assert.equal(race.status, 409)
+    assert.equal(await readFile(file, 'utf8'), updated)
+    const oldClient = await post({ action: 'page', slug: 'meaux', html: updated })
+    assert.equal(oldClient.status, 409)
+    const conflict = await post({ action: 'page', slug: 'meaux', html: updated, expectedHash: '0'.repeat(64) })
+    assert.equal(conflict.status, 409)
+    assert.equal(await readFile(file, 'utf8'), updated)
+  } finally {
+    globalThis.fetch = nativeFetch
   }
 })

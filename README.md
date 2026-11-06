@@ -25,8 +25,8 @@ CSS/JS/images/vidéos, navigations, autres navigateurs ou appareils partageant l
 Elle ne garantit donc pas un plafond global par IP. Après déploiement complet de
 `dist/`, fermer les anciens onglets, rouvrir une seule administration et attendre
 la levée du blocage avant toute génération/publication. Conserver les anciens
-assets nécessaires aux pages statiques et republier celles-ci pour leur fournir
-également le nouveau code réseau.
+assets nécessaires aux pages statiques et utiliser, si souhaité, **Mettre à jour
+le modèle des pages** pour leur fournir également le nouveau code réseau.
 
 L'accueil et les pages légales ne chargent que les réglages nécessaires ; les
 données du dashboard ne sont plus chargées avant chaque page publique.
@@ -139,8 +139,9 @@ ceux du modèle demandé, indépendamment du nom configuré pour les autres cont
 Les noms de villes affichés et injectés dans les nouveaux textes sont également
 sans accents ni ponctuation. Les URL et adresses structurées restent inchangées ;
 les anciens textes sauvegardés sont conservés et normalisés à l'affichage.
-Déployer puis **republier toutes les pages mariage statiques**, y compris après
-restauration d'une sauvegarde, pour actualiser leurs métadonnées.
+Déployer puis utiliser **Mettre à jour le modèle des pages** pour actualiser
+les métadonnées des pages enregistrées dont le HTML utilise un ancien modèle.
+Après restauration, publier les pages dont les données ont changé.
 
 `src/data/wedding-postcodes.json` contient les codes postaux par département
 et slug, sans requête externe au chargement. Source : base officielle La Poste
@@ -159,19 +160,24 @@ Les URL homonymes conservent la première commune résolue par le site.
 
 ## Annuaire public et SEO local
 
-Après publication, chaque page publique propose une **Zone de location de salle
-de mariage**, classée par département puis par nom de commune, en colonnes
-adaptées au mobile. Les liens utilisent le texte et l'attribut `title`
+Après publication, les pages villes affichent **Location salle de mariage près
+de <ville>** ; l'accueil conserve son titre générique. L'annuaire est classé
+par département puis par nom de commune, en colonnes adaptées au mobile. Les
+liens utilisent le texte et l'attribut `title`
 `Location salle de mariage <ville>`. Les liens textuels n'ont pas d'attribut
 `alt` : cet attribut concerne les images, dont les descriptions identifient
 la salle réelle à Nanteuil-lès-Meaux.
 
 Seules les pages mariage publiées sont incluses. Le bouton de publication
 vérifie les URL, puis écrit `wedding-directory.html`, `wedding-pages.json` et
-insère l'annuaire dans `index.html`. Les liens sont donc présents dans le HTML
-initial, sans dépendre de JavaScript. Le modèle React des pages villes publiées
-contient le même annuaire. Les espaces privés et l'administration ne l'affichent
-pas. La génération SEO depuis Mes Infos filtre également les pages mariage
+insère l'annuaire dans `index.html` et dans le HTML de chaque page ville.
+Les liens sont accessibles sans JavaScript. Après publication de nouvelles
+villes, les fichiers existants sont modifiés pour actualiser leur annuaire,
+sans reconstruire le reste de leur page. Lors de la migration des anciennes
+pages, leur ancien annuaire React est conservé mais masqué pour préserver les
+interactions de leurs anciens fichiers JavaScript ; le nouvel annuaire visible
+est directement inscrit dans le HTML. Les espaces privés et l'administration ne
+l'affichent pas. La génération SEO depuis Mes Infos filtre les pages mariage
 sur le registre de publication ; le devis, marqué `noindex`, n'est pas dans
 le sitemap.
 
@@ -190,11 +196,12 @@ sauvegardés ne sont pas réécrits automatiquement : relisez-les et corrigez le
 informations non vérifiées avant de republier. La salle reste située à
 Nanteuil-lès-Meaux, même lorsque la page s'adresse aux habitants d'une autre ville.
 
-**Déployer tout `dist/`, puis republier les pages mariage.** Le compte PHP doit
+**Déployer tout `dist/`, puis lancer la publication des pages mariage.** Le compte PHP doit
 pouvoir remplacer `index.html` en plus des fichiers de publication précédents.
 Conserver `wedding-directory.html`, `wedding-pages.json`, les contenus et les
-anciens assets lors des mises à jour ; republier après un déploiement remplaçant
-`index.html` ou après restauration pour réinsérer l'annuaire et actualiser le HTML.
+anciens assets tant qu'une page publiée les utilise ; relancer la publication
+après un déploiement remplaçant `index.html` ou après restauration pour
+réinsérer l'annuaire et actualiser les contenus modifiés.
 Si le modèle `index.html` est ancien, la publication est refusée avec un message
 explicite. Aucune page départementale supplémentaire ni ancienne URL n'est
 créée/supprimée par ce changement : les départements organisent l'annuaire.
@@ -227,8 +234,8 @@ d'échec, l'image reste visible et un message explicite est affiché.
 
 Déployer tout `dist/`, notamment `media/`. Les sauvegardes de contenus
 antérieures restent compatibles : elles utilisent le modèle actuel après
-restauration. **Republier les pages mariage statiques après le déploiement ou
-une restauration** pour remplacer leur HTML par celui incluant le bandeau.
+restauration. Utiliser **Mettre à jour le modèle des pages** après le déploiement
+si les fichiers HTML existants ne contiennent pas encore le bandeau.
 Les anciens fichiers HTML ne sont pas modifiés automatiquement ; restaurer
 un ancien fichier HTML complet rétablira son ancien aspect.
 
@@ -238,8 +245,22 @@ L'administration ne propose plus que l'onglet **Pages salle de mariage**.
 Les contenus sauvegardés et les anciennes URL des autres types restent disponibles.
 
 Dans **Pages salle de mariage > Sélection villes**, le bouton
-**Publier les pages en HTML statique** publie toutes les pages mariage déjà
-générées. Chaque ville possède un fichier physique
+**Publier les pages en HTML statique** crée les pages manquantes et actualise
+celles dont le contenu, la configuration, les photos ou les articles ont
+changé. Les fichiers dont le contenu et l'annuaire sont inchangés ne sont ni
+remplacés ni vérifiés chacun par une requête HTTP. L'ajout d'une ville modifie
+le bloc d'annuaire des pages déjà publiées. La première publication migre les
+anciens fichiers vers cet annuaire HTML.
+Les pages déjà publiées absentes d'une sauvegarde restaurée restent dans le
+registre et l'annuaire tant que leur fichier existe.
+
+Après une mise à jour du modèle du site, le bouton distinct **Mettre à jour le
+modèle des pages** demande confirmation avant de remplacer les fichiers des
+pages sauvegardées, même si leurs textes n'ont pas changé. Utilisez-le seulement
+si vous souhaitez appliquer ce nouveau modèle aux anciennes pages. Les pages
+non présentes dans la sauvegarde ne sont pas remplacées.
+
+Chaque ville possède un fichier physique
 `locationsalledemariage/<ville>.html`, servi à l'adresse existante
 `/locationsalledemariage/<ville>`. Le fichier contient le texte complet, la
 galerie, les liens, les métadonnées et la canonical avant toute exécution de
@@ -261,10 +282,13 @@ devis), mais n'est pas nécessaire à la lecture du contenu.
   permet d'écrire que les fichiers prévus.
 - Enregistrer la configuration, les photos et les réseaux sociaux, puis cliquer
   sur le bouton de publication. Garder l'onglet ouvert jusqu'au message final.
-  Chaque URL est contrôlée par une requête HTTP avant d'être comptée comme
-  publiée ; le sitemap et `robots.txt` sont ensuite actualisés et contrôlés.
-- Republier après une modification du contenu, des réglages, des liens ou de la
-  galerie. Les fichiers existants restent inchangés tant qu'on ne republie pas.
+  Chaque URL nouvellement écrite est contrôlée par une requête HTTP ; les pages
+  inchangées sont détectées par comparaison de leurs données enregistrées.
+  Le sitemap et `robots.txt` sont ensuite actualisés et contrôlés.
+- Republier après une modification du contenu, de la configuration de page ou
+  de la galerie. L'ajout d'une ville actualise l'annuaire HTML dans chaque
+  fichier existant sans reconstruire le reste de la page. Les fichiers restent
+  inchangés tant qu'on ne publie pas.
   En cas d'interruption ou d'erreur, les fichiers déjà écrits restent conservés ;
   relancer l'opération pour terminer. Aucun ancien fichier de page n'est supprimé.
 - Préserver les dossiers `storage-data/` et `locationsalledemariage/` lors des

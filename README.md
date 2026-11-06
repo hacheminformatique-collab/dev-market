@@ -170,13 +170,13 @@ la salle réelle à Nanteuil-lès-Meaux.
 
 Seules les pages mariage publiées sont incluses. Le bouton de publication
 vérifie les URL, puis écrit `wedding-directory.html`, `wedding-pages.json` et
-insère l'annuaire dans `index.html`. Sur l'accueil, les liens sont présents
-dans le HTML initial. Sur les pages villes, le script partagé charge l'annuaire
-à jour lors de chaque visite, sans réécriture des pages à chaque nouvelle ville.
-Le HTML initial d'une page contient l'annuaire figé lors de sa dernière
-publication : les liens ajoutés ensuite nécessitent JavaScript pour apparaître
-et ne sont pas garantis visibles par tous les robots. Si le chargement échoue,
-l'annuaire initial reste affiché. Les espaces privés et l'administration ne
+insère l'annuaire dans `index.html` et dans le HTML de chaque page ville.
+Les liens sont accessibles sans JavaScript. Après publication de nouvelles
+villes, les fichiers existants sont modifiés pour actualiser leur annuaire,
+sans reconstruire le reste de leur page. Lors de la migration des anciennes
+pages, leur ancien annuaire React est conservé mais masqué pour préserver les
+interactions de leurs anciens fichiers JavaScript ; le nouvel annuaire visible
+est directement inscrit dans le HTML. Les espaces privés et l'administration ne
 l'affichent pas. La génération SEO depuis Mes Infos filtre les pages mariage
 sur le registre de publication ; le devis, marqué `noindex`, n'est pas dans
 le sitemap.
@@ -247,10 +247,10 @@ Les contenus sauvegardés et les anciennes URL des autres types restent disponib
 Dans **Pages salle de mariage > Sélection villes**, le bouton
 **Publier les pages en HTML statique** crée les pages manquantes et actualise
 celles dont le contenu, la configuration, les photos ou les articles ont
-changé. Les fichiers inchangés ne sont ni remplacés ni vérifiés chacun par
-une requête HTTP. La première publication avec l'annuaire partagé ajoute une
-seule balise de script aux anciens fichiers qui n'en disposent pas ; les
-publications suivantes ne les modifient plus pour mettre à jour l'annuaire.
+changé. Les fichiers dont le contenu et l'annuaire sont inchangés ne sont ni
+remplacés ni vérifiés chacun par une requête HTTP. L'ajout d'une ville modifie
+le bloc d'annuaire des pages déjà publiées. La première publication migre les
+anciens fichiers vers cet annuaire HTML.
 Les pages déjà publiées absentes d'une sauvegarde restaurée restent dans le
 registre et l'annuaire tant que leur fichier existe.
 
@@ -286,8 +286,9 @@ devis), mais n'est pas nécessaire à la lecture du contenu.
   inchangées sont détectées par comparaison de leurs données enregistrées.
   Le sitemap et `robots.txt` sont ensuite actualisés et contrôlés.
 - Republier après une modification du contenu, de la configuration de page ou
-  de la galerie. L'ajout d'une ville actualise l'annuaire partagé, sans republier
-  les autres villes. Les fichiers existants restent inchangés tant qu'on ne publie pas.
+  de la galerie. L'ajout d'une ville actualise l'annuaire HTML dans chaque
+  fichier existant sans reconstruire le reste de la page. Les fichiers restent
+  inchangés tant qu'on ne publie pas.
   En cas d'interruption ou d'erreur, les fichiers déjà écrits restent conservés ;
   relancer l'opération pour terminer. Aucun ancien fichier de page n'est supprimé.
 - Préserver les dossiers `storage-data/` et `locationsalledemariage/` lors des

@@ -457,7 +457,7 @@ test('video and poster are deployed once with fast-start MP4 and bounded sizes',
   }
 })
 
-test('incremental publication upgrades old pages once and keeps them byte-for-byte unchanged when adding a city', async () => {
+test('publication migrates legacy directories and writes updated city links into HTML', async () => {
   const nativeFetch = globalThis.fetch
   const requests = []
   globalThis.fetch = (url, options) => {
@@ -469,32 +469,50 @@ test('incremental publication upgrades old pages once and keeps them byte-for-by
     await publication.publishWeddingPages(options)
     const file = join(site, 'locationsalledemariage', 'meaux.html')
     const original = await readFile(file, 'utf8')
-    assert.match(original, /<script defer src="\/shared-wedding-directory-v1.js"><\/script>/)
-    const legacy = original.replace('<script defer src="/shared-wedding-directory-v1.js"></script>\n', '')
+    assert.match(original, /<!-- CITY_DIRECTORY_START -->/)
+    const block = original.match(/<!-- CITY_DIRECTORY_START -->([\s\S]*?)<!-- CITY_DIRECTORY_END -->/)[0]
+    const legacyDirectory = block.replace('<!-- CITY_DIRECTORY_START -->', '').replace('<!-- CITY_DIRECTORY_END -->', '')
+    const rootEnd = original.lastIndexOf('</div>', original.indexOf('<!-- CITY_DIRECTORY_START -->'))
+    assert.ok(rootEnd > original.indexOf('<div id="root">'))
+    const legacy = (original.slice(0, rootEnd) + legacyDirectory + original.slice(rootEnd))
+      .replace(block, '')
+      .replace('</body>', '<script defer src="/shared-wedding-directory-v1.js"></script>\n</body>')
     assert.notEqual(legacy, original)
     await writeFile(file, legacy)
     requests.length = 0
     const upgrade = await publication.publishWeddingPages(options)
     assert.equal(upgrade.upgraded, 1)
     assert.equal(upgrade.published, 0)
-    assert.equal(await readFile(file, 'utf8'), original)
-    assert.equal(requests.filter((request) => request.action === 'upgrade-directory').length, 1)
+    const migrated = await readFile(file, 'utf8')
+    assert.match(migrated, /<!-- CITY_DIRECTORY_START -->/)
+    assert.match(migrated, /legacy-wedding-directory-style/)
+    assert.doesNotMatch(migrated, /shared-wedding-directory-v1\.js/)
+    assert.equal(requests.filter((request) => request.action === 'city-directory').length, 1)
     assert.equal(requests.filter((request) => request.action === 'page').length, 0)
 
     const withNewCity = { ...fixture.pages, bobigny: { content: 'Nouvelle page Bobigny', generatedAt: '2026-02-01T12:00:00Z' } }
     requests.length = 0
     const addition = await publication.publishWeddingPages({ ...options, pages: withNewCity })
-    assert.deepEqual(addition, { total: 3, published: 1, unchanged: 2, upgraded: 0 })
-    assert.equal(await readFile(file, 'utf8'), original)
+    assert.deepEqual(addition, { total: 3, published: 1, unchanged: 0, upgraded: 2 })
+    const withDirectory = await readFile(file, 'utf8')
+    const visibleDirectory = withDirectory.match(/<!-- CITY_DIRECTORY_START -->([\s\S]*?)<!-- CITY_DIRECTORY_END -->/)[1]
+    assert.match(visibleDirectory, /href="\/locationsalledemariage\/bobigny"/)
+    assert.match(visibleDirectory, /Location salle de mariage près de Meaux/)
+    assert.notEqual(withDirectory, migrated)
+    const updatedBlock = withDirectory.match(/<!-- CITY_DIRECTORY_START -->[\s\S]*?<!-- CITY_DIRECTORY_END -->/)[0]
+    const migratedBlock = migrated.match(/<!-- CITY_DIRECTORY_START -->[\s\S]*?<!-- CITY_DIRECTORY_END -->/)[0]
+    assert.equal(withDirectory.replace(updatedBlock, migratedBlock), migrated, 'Only the directory block may change')
     assert.deepEqual(requests.filter((request) => request.action === 'page').map((request) => request.slug), ['bobigny'])
     assert.match(await (await fetch('/wedding-directory.html')).text(), /locationsalledemariage\/bobigny/)
     assert.doesNotMatch(original, /href="\/locationsalledemariage\/bobigny"/)
+    assert.match(await (await fetch('/locationsalledemariage/meaux')).text(), /<!-- CITY_DIRECTORY_START -->[\s\S]*href="\/locationsalledemariage\/bobigny"/)
+    assert.match(await readFile(join(site, 'locationsalledemariage', 'bobigny.html'), 'utf8'), /Location salle de mariage près de Bobigny/)
 
     requests.length = 0
     const subset = await publication.publishWeddingPages({ ...options, pages: { meaux: fixture.pages.meaux } })
     assert.deepEqual(subset, { total: 3, published: 0, unchanged: 3, upgraded: 0 })
-    assert.equal(await readFile(file, 'utf8'), original)
-    assert.deepEqual(requests.filter((request) => request.action === 'page' || request.action === 'upgrade-directory'), [])
+    assert.equal(await readFile(file, 'utf8'), withDirectory)
+    assert.deepEqual(requests.filter((request) => request.action === 'page' || request.action === 'city-directory'), [])
     assert.match(await (await fetch('/sitemap.xml')).text(), /locationsalledemariage\/bobigny/)
     assert.match(await (await fetch('/wedding-directory.html')).text(), /locationsalledemariage\/nanteuil-les-meaux/)
 
@@ -508,7 +526,7 @@ test('incremental publication upgrades old pages once and keeps them byte-for-by
     const post = (body) => fetch('/api/static-publish.php', {
       method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Admin-Pin': pin }, body: JSON.stringify(body),
     })
-    const race = await post({ action: 'upgrade-directory', slug: 'meaux', expectedHash: '0'.repeat(64) })
+    const race = await post({ action: 'city-directory', slug: 'meaux', directory: visibleDirectory, styles: '.wedding-directory{}', expectedHash: '0'.repeat(64) })
     assert.equal(race.status, 409)
     assert.equal(await readFile(file, 'utf8'), updated)
     const oldClient = await post({ action: 'page', slug: 'meaux', html: updated })

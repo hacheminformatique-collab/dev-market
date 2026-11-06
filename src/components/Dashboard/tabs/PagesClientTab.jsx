@@ -267,7 +267,7 @@ export default function PagesClientTab({ pageType }) {
         updateTemplate,
       })
       setPages(allTypePages.mariage)
-      setPublishMessage(`✅ ${result.published} page(s) publiée(s) ou actualisée(s), ${result.unchanged} inchangée(s), ${result.upgraded} mise(s) à niveau pour l’annuaire partagé. Annuaire, sitemap et robots.txt actualisés.`)
+      setPublishMessage(`✅ ${result.published} page(s) publiée(s) ou actualisée(s), ${result.unchanged} inchangée(s), ${result.upgraded} avec annuaire HTML actualisé. Annuaire, sitemap et robots.txt actualisés.`)
     } catch (error) {
       setPublishError(`❌ ${error.message} Les fichiers déjà écrits sont conservés ; corrigez le problème puis relancez la publication.`)
     } finally {
@@ -604,8 +604,8 @@ export default function PagesClientTab({ pageType }) {
                   </button>
                   <p style={{ fontSize: '13px', color: 'var(--text-light)', marginTop: '12px', lineHeight: 1.6 }}>
                     Publie les nouvelles pages et actualise celles dont le contenu, la galerie, la configuration ou les articles ont changé.
-                    Les autres fichiers ne sont pas remplacés ; une mise à niveau unique ajoute l’annuaire partagé aux anciens fichiers.
-                    L’annuaire affiche uniquement les pages publiées et ses nouveaux liens nécessitent JavaScript.
+                    Les autres fichiers sont modifiés uniquement si leur annuaire doit être actualisé.
+                    L’annuaire des pages publiées est inscrit directement dans leur HTML, sans nécessiter JavaScript.
                     Après une mise à jour du modèle du site, utilisez le second bouton si vous souhaitez l’appliquer aux pages enregistrées.
                     Enregistrez la configuration et gardez cet onglet ouvert jusqu’à la fin.
                   </p>

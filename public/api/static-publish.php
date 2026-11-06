@@ -69,6 +69,16 @@ function assertUnchangedFile($html, $expected): void {
     }
 }
 
+function cityDirectoryHash(string $html) {
+    $start = '<!-- CITY_DIRECTORY_START -->';
+    $end = '<!-- CITY_DIRECTORY_END -->';
+    if (substr_count($html, $start) !== 1 || substr_count($html, $end) !== 1
+        || strpos($html, $end) < strpos($html, $start)
+        || strpos($html, 'src="/shared-wedding-directory-v1.js"') !== false) return null;
+    $from = strpos($html, $start) + strlen($start);
+    return hash('sha256', substr($html, $from, strpos($html, $end) - $from));
+}
+
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     header('Allow: POST');
     failPublication(405, 'Méthode non autorisée.');
@@ -131,7 +141,7 @@ if (($data['action'] ?? '') === 'inspect') {
         $html = readCityFile(cityFile($root, $slug));
         if ($html === false) {
             if (in_array($slug, $previous, true)) failPublication(409, 'Une page du registre est absente : ' . $slug . '. Vérifiez les fichiers publiés.');
-            $result[$slug] = ['fileHash' => 'missing', 'fingerprint' => null, 'sharedDirectory' => false];
+            $result[$slug] = ['fileHash' => 'missing', 'fingerprint' => null, 'directoryHash' => null];
         } else {
             $fingerprint = snapshotFingerprint($html);
             if ($fingerprint === false) failPublication(409, 'Une page existante ne contient pas de données de publication reconnues : ' . $slug . '. Aucun fichier ne sera remplacé.');
@@ -140,26 +150,54 @@ if (($data['action'] ?? '') === 'inspect') {
             $result[$slug] = [
                 'fileHash' => hash('sha256', $html),
                 'fingerprint' => $fingerprint,
-                'sharedDirectory' => strpos($html, 'src="/shared-wedding-directory-v1.js"') !== false,
+                'directoryHash' => cityDirectoryHash($html),
+                'businessName' => !empty($savedSnapshot->config->businessName) ? $savedSnapshot->config->businessName : 'Le Paradise 77',
                 'generatedAt' => $savedSnapshot->page->generatedAt ?? null,
             ];
         }
     }
     echo json_encode(['ok' => true, 'pages' => $result, 'publishedSlugs' => $previous, 'registryHash' => $registryHash]);
     exit;
-} elseif (($data['action'] ?? '') === 'upgrade-directory') {
+} elseif (($data['action'] ?? '') === 'city-directory') {
     $slug = $data['slug'] ?? '';
     if (!validCitySlug($slug)) failPublication(400, 'Identifiant de ville invalide.');
+    $directoryHtml = $data['directory'] ?? null;
+    $styles = $data['styles'] ?? null;
+    if (!is_string($directoryHtml) || strpos($directoryHtml, '<section class="wedding-directory"') !== 0
+        || substr($directoryHtml, -10) !== '</section>' || !is_string($styles)
+        || strpos($styles, '.wedding-directory') === false || stripos($styles, '</style') !== false) {
+        failPublication(400, 'Annuaire ou styles de ville invalides.');
+    }
+    preg_match_all('~href="/locationsalledemariage/([a-z0-9-]+)"~', $directoryHtml, $links);
+    if (!in_array($slug, $links[1], true)) failPublication(400, 'La ville est absente de son annuaire.');
     $path = cityFile($root, $slug);
     $html = readCityFile($path);
     assertUnchangedFile($html, $data['expectedHash'] ?? null);
     if ($html === false || snapshotFingerprint($html) === false) failPublication(409, 'Page existante non reconnue.');
-    if (strpos($html, 'src="/shared-wedding-directory-v1.js"') === false) {
-        if (substr_count(strtolower($html), '</body>') !== 1) failPublication(409, 'Page incompatible avec l’annuaire partagé.');
-        $position = stripos($html, '</body>');
-        $html = substr($html, 0, $position) . "<script defer src=\"/shared-wedding-directory-v1.js\"></script>\n" . substr($html, $position);
-        writePublication($path, $html);
+    $start = '<!-- CITY_DIRECTORY_START -->';
+    $end = '<!-- CITY_DIRECTORY_END -->';
+    $block = $start . $directoryHtml . $end;
+    if (substr_count($html, $start) === 1 && substr_count($html, $end) === 1
+        && strpos($html, $end) > strpos($html, $start)) {
+        $from = strpos($html, $start);
+        $html = substr($html, 0, $from) . $block . substr($html, strpos($html, $end) + strlen($end));
+    } elseif (strpos($html, $start) === false && strpos($html, $end) === false) {
+        $anchor = '<script id="city-page-data" type="application/json">';
+        if (substr_count($html, $anchor) !== 1) failPublication(409, 'Page incompatible avec l’annuaire HTML.');
+        // Keep legacy React markup intact so its original bundle can still hydrate.
+        $legacyStyle = '<style id="legacy-wedding-directory-style">' . $styles
+            . (strpos($html, '<section class="wedding-directory"') !== false ? "\n#root .wedding-directory{display:none!important}" : '')
+            . "</style>\n";
+        $html = str_replace($anchor, $legacyStyle . $block . "\n" . $anchor, $html);
+    } else {
+        failPublication(409, 'Balises de l’annuaire HTML invalides.');
     }
+    $html = str_replace("<script defer src=\"/shared-wedding-directory-v1.js\"></script>\n", '', $html);
+    if (strpos($html, 'src="/shared-wedding-directory-v1.js"') !== false) failPublication(409, 'Ancien script d’annuaire non reconnu.');
+    writeIfChanged($path, $html);
+    if (readCityFile($path) !== $html) failPublication(500, 'Impossible de vérifier l’annuaire écrit sur le serveur.');
+    echo json_encode(['ok' => true, 'directoryHash' => cityDirectoryHash($html)]);
+    exit;
 } elseif (($data['action'] ?? '') === 'page') {
     $slug = $data['slug'] ?? '';
     $html = $data['html'] ?? '';

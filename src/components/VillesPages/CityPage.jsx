@@ -7,7 +7,6 @@ import { PAGE_TYPES } from '../../data/pageTypes'
 import { getBlogArticles } from '../../utils/blogStorage'
 import WizardForm from '../Wizard/WizardForm'
 import VideoHero from '../VideoHero'
-import WeddingDirectory from '../WeddingDirectory'
 import { getPublishedWeddingSlugs } from '../../utils/weddingPublication'
 import { WEDDING_REVIEWS, WEDDING_REVIEW_SOURCE } from '../../data/weddingReviews'
 import { validateWeddingTemplate } from '../../utils/weddingPageTemplates'
@@ -1316,7 +1315,6 @@ export function CityPageContent({ citySlug, pageType, page, gallery, config, all
         </div>
       </div>
 
-      {published && <WeddingDirectory slugs={Object.keys(allTypePages.mariage || {})} businessName={businessName} cityName={city.name} />}
       <WhatsAppButton />
     </div>
   )

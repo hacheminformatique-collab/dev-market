@@ -48,6 +48,21 @@ export default function Step1Client({ data, onChange, onNext, conditionsAccepted
           <label>Téléphone *</label>
           <input type="tel" className="form-control" value={data.telephone || ''} onChange={(e) => onChange('telephone', e.target.value)} required />
         </div>
+        <div className="form-group">
+          <label>Adresse</label>
+          <input className="form-control" value={data.adresse || ''} onChange={(e) => onChange('adresse', e.target.value)} />
+        </div>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: '16px' }}>
+          <div className="form-group">
+            <label>Code postal</label>
+            <input className="form-control" value={data.codePostal || ''} onChange={(e) => onChange('codePostal', e.target.value)} />
+          </div>
+          <div className="form-group">
+            <label>Ville</label>
+            <input className="form-control" value={data.ville || ''} onChange={(e) => onChange('ville', e.target.value)} />
+          </div>
+        </div>
+
         <div className="form-group" style={{ marginTop: '16px' }}>
           <label style={{ display: 'flex', alignItems: 'flex-start', gap: '9px', fontWeight: '400', lineHeight: '1.5' }}>
             <input
@@ -65,21 +80,6 @@ export default function Step1Client({ data, onChange, onNext, conditionsAccepted
           </label>
           {conditionsError && <p role="alert" style={{ color: '#c0392b', fontSize: '13px', marginTop: '6px' }}>{conditionsError}</p>}
         </div>
-        <div className="form-group">
-          <label>Adresse</label>
-          <input className="form-control" value={data.adresse || ''} onChange={(e) => onChange('adresse', e.target.value)} />
-        </div>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: '16px' }}>
-          <div className="form-group">
-            <label>Code postal</label>
-            <input className="form-control" value={data.codePostal || ''} onChange={(e) => onChange('codePostal', e.target.value)} />
-          </div>
-          <div className="form-group">
-            <label>Ville</label>
-            <input className="form-control" value={data.ville || ''} onChange={(e) => onChange('ville', e.target.value)} />
-          </div>
-        </div>
-
         <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '24px' }}>
           <button type="submit" className="btn btn-primary btn-lg">
             Suivant →

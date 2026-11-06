@@ -22,6 +22,53 @@ function writePublication(string $path, string $content): void {
     }
 }
 
+function writeIfChanged(string $path, string $content): void {
+    if (is_link($path)) failPublication(409, 'Un fichier de publication est un lien symbolique.');
+    if (is_file($path)) {
+        $existing = file_get_contents($path);
+        if ($existing === false) failPublication(500, 'Impossible de lire un fichier publié. Aucun remplacement n’a été effectué.');
+        if ($existing === $content) return;
+    }
+    writePublication($path, $content);
+}
+
+function validCitySlug($slug): bool {
+    return is_string($slug) && strlen($slug) <= 120 && preg_match('/^[a-z0-9]+(?:-[a-z0-9]+)*$/D', $slug) === 1;
+}
+
+function cityFile(string $root, string $slug): string {
+    return $root . '/locationsalledemariage/' . $slug . '.html';
+}
+
+function readCityFile(string $path) {
+    if (is_link($path)) failPublication(409, 'Un fichier de page est un lien symbolique ; publication arrêtée.');
+    if (!file_exists($path)) return false;
+    $html = file_get_contents($path);
+    if ($html === false) failPublication(500, 'Impossible de lire un fichier de page publié.');
+    return $html;
+}
+
+function snapshotFingerprint(string $html) {
+    if (!preg_match('~<script id="city-page-data" type="application/json">(.*?)</script>~s', $html, $matches)) return false;
+    $snapshot = json_decode($matches[1]);
+    if (!is_object($snapshot) || !isset($snapshot->page, $snapshot->config, $snapshot->gallery, $snapshot->blogArticles)) return false;
+    $value = [
+        'page' => $snapshot->page,
+        'config' => $snapshot->config,
+        'gallery' => $snapshot->gallery,
+        'blogArticles' => $snapshot->blogArticles,
+    ];
+    $json = json_encode($value, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_LINE_TERMINATORS);
+    return $json === false ? false : hash('sha256', $json);
+}
+
+function assertUnchangedFile($html, $expected): void {
+    $actual = $html === false ? 'missing' : hash('sha256', $html);
+    if (!is_string($expected) || !hash_equals($actual, $expected)) {
+        failPublication(409, 'La page a changé depuis la vérification. Relancez la publication pour protéger le fichier.');
+    }
+}
+
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     header('Allow: POST');
     failPublication(405, 'Méthode non autorisée.');
@@ -39,6 +86,12 @@ if (!is_string($savedPin) || $savedPin === '' || !hash_equals($savedPin, $provid
     failPublication(403, 'Publication non autorisée. Reconnectez-vous avec le code PIN enregistré.');
 }
 
+$lock = @fopen($root . '/storage-data/.publication.lock', 'c+');
+if (!$lock || !flock($lock, LOCK_EX)) {
+    if ($lock) fclose($lock);
+    failPublication(500, 'Impossible de verrouiller la publication. Vérifiez les droits du stockage serveur.');
+}
+
 $body = file_get_contents('php://input');
 if (strlen($body) > 15 * 1024 * 1024) {
     failPublication(413, 'Page trop volumineuse (maximum 15 Mo). Réduisez la taille de la galerie.');
@@ -48,10 +101,69 @@ if (json_last_error() !== JSON_ERROR_NONE || !is_array($data)) {
     failPublication(400, 'Requête JSON invalide. Vérifiez aussi la limite PHP post_max_size.');
 }
 
-if (($data['action'] ?? '') === 'page') {
+$cityDirectory = $root . '/locationsalledemariage';
+if (is_link($cityDirectory) || (file_exists($cityDirectory) && !is_dir($cityDirectory))) {
+    failPublication(500, 'Le dossier de publication est invalide.');
+}
+
+if (($data['action'] ?? '') === 'inspect') {
+    $slugs = $data['slugs'] ?? null;
+    if (!is_array($slugs) || count($slugs) > 6000) failPublication(400, 'Liste de villes invalide.');
+    $registryFile = $root . '/wedding-pages.json';
+    $previous = [];
+    $registryHash = 'missing';
+    if (is_link($registryFile)) failPublication(409, 'Registre des pages publiées invalide.');
+    if (is_file($registryFile)) {
+        $registryContent = file_get_contents($registryFile);
+        if ($registryContent === false) failPublication(500, 'Impossible de lire le registre des pages publiées.');
+        $registryHash = hash('sha256', $registryContent);
+        $previous = json_decode($registryContent, true);
+        if (!is_array($previous) || array_values($previous) !== $previous || count($previous) > 6000) {
+            failPublication(409, 'Registre des pages publiées invalide. Aucun fichier ne sera remplacé.');
+        }
+    }
+    foreach (array_merge($previous, $slugs) as $slug) {
+        if (!validCitySlug($slug)) failPublication(400, 'Identifiant de ville invalide.');
+    }
+    $result = [];
+    foreach (array_unique(array_merge($previous, $slugs)) as $slug) {
+        if (!validCitySlug($slug)) failPublication(400, 'Identifiant de ville invalide.');
+        $html = readCityFile(cityFile($root, $slug));
+        if ($html === false) {
+            if (in_array($slug, $previous, true)) failPublication(409, 'Une page du registre est absente : ' . $slug . '. Vérifiez les fichiers publiés.');
+            $result[$slug] = ['fileHash' => 'missing', 'fingerprint' => null, 'sharedDirectory' => false];
+        } else {
+            $fingerprint = snapshotFingerprint($html);
+            if ($fingerprint === false) failPublication(409, 'Une page existante ne contient pas de données de publication reconnues : ' . $slug . '. Aucun fichier ne sera remplacé.');
+            preg_match('~<script id="city-page-data" type="application/json">(.*?)</script>~s', $html, $snapshotMatch);
+            $savedSnapshot = json_decode($snapshotMatch[1] ?? '');
+            $result[$slug] = [
+                'fileHash' => hash('sha256', $html),
+                'fingerprint' => $fingerprint,
+                'sharedDirectory' => strpos($html, 'src="/shared-wedding-directory-v1.js"') !== false,
+                'generatedAt' => $savedSnapshot->page->generatedAt ?? null,
+            ];
+        }
+    }
+    echo json_encode(['ok' => true, 'pages' => $result, 'publishedSlugs' => $previous, 'registryHash' => $registryHash]);
+    exit;
+} elseif (($data['action'] ?? '') === 'upgrade-directory') {
+    $slug = $data['slug'] ?? '';
+    if (!validCitySlug($slug)) failPublication(400, 'Identifiant de ville invalide.');
+    $path = cityFile($root, $slug);
+    $html = readCityFile($path);
+    assertUnchangedFile($html, $data['expectedHash'] ?? null);
+    if ($html === false || snapshotFingerprint($html) === false) failPublication(409, 'Page existante non reconnue.');
+    if (strpos($html, 'src="/shared-wedding-directory-v1.js"') === false) {
+        if (substr_count(strtolower($html), '</body>') !== 1) failPublication(409, 'Page incompatible avec l’annuaire partagé.');
+        $position = stripos($html, '</body>');
+        $html = substr($html, 0, $position) . "<script defer src=\"/shared-wedding-directory-v1.js\"></script>\n" . substr($html, $position);
+        writePublication($path, $html);
+    }
+} elseif (($data['action'] ?? '') === 'page') {
     $slug = $data['slug'] ?? '';
     $html = $data['html'] ?? '';
-    if (!is_string($slug) || strlen($slug) > 120 || !preg_match('/^[a-z0-9]+(?:-[a-z0-9]+)*$/D', $slug)) {
+    if (!validCitySlug($slug)) {
         failPublication(400, 'Identifiant de ville invalide.');
     }
     if (!is_string($html) || stripos(ltrim($html), '<!doctype html>') !== 0
@@ -66,8 +178,13 @@ if (($data['action'] ?? '') === 'page') {
     if (!is_dir($directory) && !mkdir($directory, 0755)) {
         failPublication(500, 'Impossible de créer le dossier locationsalledemariage. Vérifiez les droits du serveur.');
     }
-    writePublication($directory . '/' . $slug . '.html', $html);
+    $path = $directory . '/' . $slug . '.html';
+    if (!array_key_exists('expectedHash', $data)) failPublication(409, 'Rechargez le dashboard : la version de publication est trop ancienne.');
+    assertUnchangedFile(readCityFile($path), $data['expectedHash']);
+    writeIfChanged($path, $html);
 } elseif (($data['action'] ?? '') === 'seo') {
+    if (!array_key_exists('expectedRegistryHash', $data)) failPublication(409, 'Rechargez le dashboard : la version de publication est trop ancienne.');
+    assertUnchangedFile(readCityFile($root . '/wedding-pages.json'), $data['expectedRegistryHash']);
     $sitemap = $data['sitemap'] ?? null;
     $robots = $data['robots'] ?? null;
     if (!is_string($sitemap) || strpos(ltrim($sitemap), '<?xml') !== 0
@@ -113,11 +230,11 @@ if (($data['action'] ?? '') === 'page') {
         . substr($index, strpos($index, $end));
     $index = substr($index, 0, strpos($index, $seoStart)) . $seoStart . "\n" . $homeSeo . "\n"
         . substr($index, strpos($index, $seoEnd));
-    writePublication($root . '/wedding-directory.html', $directory);
-    writePublication($root . '/wedding-pages.json', json_encode(array_values(array_unique($slugs))));
-    writePublication($indexFile, $index);
-    writePublication($root . '/sitemap.xml', $sitemap);
-    writePublication($root . '/robots.txt', $robots);
+    writeIfChanged($root . '/wedding-directory.html', $directory);
+    writeIfChanged($root . '/wedding-pages.json', json_encode(array_values(array_unique($slugs))));
+    writeIfChanged($indexFile, $index);
+    writeIfChanged($root . '/sitemap.xml', $sitemap);
+    writeIfChanged($root . '/robots.txt', $robots);
 } else {
     failPublication(400, 'Action de publication invalide.');
 }

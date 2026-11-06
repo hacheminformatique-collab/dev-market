@@ -240,7 +240,8 @@ export default function PagesClientTab({ pageType }) {
     }
   }
 
-  async function handlePublish() {
+  async function handlePublish(updateTemplate = false) {
+    if (updateTemplate && !window.confirm('Mettre à jour le modèle HTML de toutes les pages enregistrées ? Leurs fichiers existants seront remplacés, même si leurs textes n’ont pas changé.')) return
     setPublishing(true)
     setPublishMessage('')
     setPublishError('')
@@ -254,7 +255,7 @@ export default function PagesClientTab({ pageType }) {
       ])
       const allTypePages = Object.fromEntries(PAGE_TYPES.map((pt, i) => [pt.id, typePages[i]]))
       const { publishWeddingPages } = await import('../../../utils/staticCityPublication')
-      const count = await publishWeddingPages({
+      const result = await publishWeddingPages({
         pages: allTypePages.mariage,
         config: savedConfig,
         gallery: savedGallery,
@@ -263,9 +264,10 @@ export default function PagesClientTab({ pageType }) {
         settings: getSettings(),
         origin: window.location.origin,
         onProgress: setPublishProgress,
+        updateTemplate,
       })
       setPages(allTypePages.mariage)
-      setPublishMessage(`✅ ${count} page${count > 1 ? 's' : ''} HTML publiée${count > 1 ? 's' : ''} et accessible${count > 1 ? 's' : ''} aux URL actuelles. Annuaire par département, sitemap et robots.txt actualisés.`)
+      setPublishMessage(`✅ ${result.published} page(s) publiée(s) ou actualisée(s), ${result.unchanged} inchangée(s), ${result.upgraded} mise(s) à niveau pour l’annuaire partagé. Annuaire, sitemap et robots.txt actualisés.`)
     } catch (error) {
       setPublishError(`❌ ${error.message} Les fichiers déjà écrits sont conservés ; corrigez le problème puis relancez la publication.`)
     } finally {
@@ -587,16 +589,25 @@ export default function PagesClientTab({ pageType }) {
                     type="button"
                     className="btn btn-primary"
                     disabled={publishing || generating || saving || restoringIdx !== null}
-                    onClick={handlePublish}
+                    onClick={() => handlePublish()}
                   >
                     {publishing ? '⏳ Publication en cours…' : '📄 Publier les pages en HTML statique'}
                   </button>
+                  <button
+                    type="button"
+                    className="btn btn-outline"
+                    disabled={publishing || generating || saving || restoringIdx !== null}
+                    onClick={() => handlePublish(true)}
+                    style={{ marginLeft: '8px' }}
+                  >
+                    Mettre à jour le modèle des pages
+                  </button>
                   <p style={{ fontSize: '13px', color: 'var(--text-light)', marginTop: '12px', lineHeight: 1.6 }}>
-                    Crée un fichier HTML complet par page mariage sur le serveur, avec sa canonical et son contenu lisible sans JavaScript.
-                    Actualise aussi la zone de location par département sur les pages publiques, avec uniquement les pages publiées.
-                    Les adresses et les fonctionnalités sont conservées. Enregistrez votre configuration avant de publier.
-                    Après toute modification du contenu, de la galerie ou des réglages, republiez pour actualiser les fichiers.
-                    Gardez cet onglet ouvert jusqu’à la fin.
+                    Publie les nouvelles pages et actualise celles dont le contenu, la galerie, la configuration ou les articles ont changé.
+                    Les autres fichiers ne sont pas remplacés ; une mise à niveau unique ajoute l’annuaire partagé aux anciens fichiers.
+                    L’annuaire affiche uniquement les pages publiées et ses nouveaux liens nécessitent JavaScript.
+                    Après une mise à jour du modèle du site, utilisez le second bouton si vous souhaitez l’appliquer aux pages enregistrées.
+                    Enregistrez la configuration et gardez cet onglet ouvert jusqu’à la fin.
                   </p>
                   <div aria-live="polite" style={{ fontSize: '13px', marginTop: '8px' }}>
                     {publishing && (

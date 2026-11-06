@@ -31,3 +31,22 @@ test('public header exposes working access routes without admin links and home r
     await vite.close()
   }
 })
+
+test('conditions checkbox is after all contact fields, immediately before the Next button', async () => {
+  const vite = await createServer({ root: new URL('../', import.meta.url).pathname, server: { middlewareMode: true } })
+  try {
+    const { default: Step1Client } = await vite.ssrLoadModule('/src/components/Wizard/steps/Step1Client.jsx')
+    const { createElement } = await import('react')
+    const { renderToStaticMarkup } = await import('react-dom/server')
+    const html = renderToStaticMarkup(createElement(Step1Client, { data: {}, conditionsAccepted: false, onChange() {}, onConditionsChange() {}, onNext() {} }))
+    const checkbox = html.indexOf('type="checkbox"')
+    assert.ok(html.indexOf('Code postal') < checkbox)
+    assert.ok(html.indexOf('<label>Ville</label>') < checkbox)
+    assert.ok(checkbox < html.indexOf('Suivant'))
+    assert.doesNotMatch(html.slice(checkbox, html.indexOf('Suivant')), /<input(?! type="checkbox")/)
+    assert.match(html, /href="\/conditions-generales"/)
+    assert.doesNotMatch(html, /type="checkbox"[^>]*checked/)
+  } finally {
+    await vite.close()
+  }
+})

@@ -20,6 +20,18 @@ function scriptJson(value) {
     .replaceAll('&', '\\u0026').replaceAll('\u2028', '\\u2028').replaceAll('\u2029', '\\u2029')
 }
 
+async function snapshotFingerprint(snapshot) {
+  if (!globalThis.crypto?.subtle) throw new Error('La vérification des pages nécessite HTTPS et un navigateur compatible.')
+  const json = JSON.stringify({
+    page: snapshot.page,
+    config: snapshot.config,
+    gallery: snapshot.gallery,
+    blogArticles: snapshot.blogArticles,
+  })
+  const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(json))
+  return Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, '0')).join('')
+}
+
 export function makeCitySnapshot({ slug, pages, config, gallery, allTypePages, blogArticles }) {
   if (!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(slug) || !getCityBySlug(slug) || !pages[slug]?.content?.trim()) {
     throw new Error(`Page mariage invalide ou vide : ${slug}`)
@@ -77,6 +89,7 @@ export function renderSeoHead(seo) {
 export function renderCityDocument({ template, snapshot, settings, origin }) {
   if (!template.includes('<!-- CITY_SEO -->') || !template.includes('<!-- CITY_DATA -->')
     || !template.includes('<div id="root"></div>')
+    || !template.includes('</body>')
     || !/src="\/assets\/[^"]+\.js"/.test(template) || template.includes('/src/')) {
     throw new Error('Le modèle statique compilé est absent ou invalide. Déployez le dossier dist complet après npm run build.')
   }
@@ -99,9 +112,10 @@ export function renderCityDocument({ template, snapshot, settings, origin }) {
     .replace('<!-- CITY_SEO -->', () => head)
     .replace('<div id="root"></div>', () => `<div id="root">${body}</div>`)
     .replace('<!-- CITY_DATA -->', () => `<script id="city-page-data" type="application/json">${scriptJson(snapshot)}</script>`)
+    .replace('</body>', '<script defer src="/shared-wedding-directory-v1.js"></script>\n</body>')
 }
 
-export async function publishWeddingPages({ pages, config, gallery, allTypePages, blogArticles, settings, origin, onProgress }) {
+export async function publishWeddingPages({ pages, config, gallery, allTypePages, blogArticles, settings, origin, onProgress, updateTemplate = false }) {
   const slugs = Object.keys(pages)
   if (!slugs.length) throw new Error('Aucune page mariage à publier.')
   if (!settings.pin) throw new Error('Enregistrez votre code PIN dans Mes Infos avant de publier.')
@@ -125,6 +139,7 @@ export async function publishWeddingPages({ pages, config, gallery, allTypePages
     }
     const data = await res.json()
     if (!res.ok || !data.ok) throw new Error(data.error || `Publication refusée (HTTP ${res.status}).`)
+    return data
   }
 
   const shell = await fetch('/', { cache: 'no-store' })
@@ -136,25 +151,52 @@ export async function publishWeddingPages({ pages, config, gallery, allTypePages
   }
   // Validate all inputs before writing the first file.
   for (const slug of slugs) makeCitySnapshot({ slug, pages, config, gallery, allTypePages, blogArticles })
-  for (let i = 0; i < slugs.length; i++) {
-    const slug = slugs[i]
-    onProgress({ done: i, total: slugs.length, current: getCityBySlug(slug).name })
-    const snapshot = makeCitySnapshot({ slug, pages, config, gallery, allTypePages, blogArticles })
+  const inspection = await write({ action: 'inspect', slugs })
+  if (!inspection.pages || typeof inspection.pages !== 'object' || !Array.isArray(inspection.publishedSlugs)
+    || typeof inspection.registryHash !== 'string'
+    || (inspection.registryHash !== 'missing' && !/^[a-f0-9]{64}$/.test(inspection.registryHash))
+    || inspection.publishedSlugs.some((slug) => typeof slug !== 'string' || !getCityBySlug(slug))) {
+    throw new Error('Vérification des fichiers publiés invalide.')
+  }
+  const allSlugs = [...new Set([...inspection.publishedSlugs, ...slugs])]
+  const counts = { published: 0, unchanged: 0, upgraded: 0 }
+  for (let i = 0; i < allSlugs.length; i++) {
+    const slug = allSlugs[i]
+    onProgress({ done: i, total: allSlugs.length, current: getCityBySlug(slug).name })
+    const existing = inspection.pages[slug]
+    if (!existing || typeof existing.fileHash !== 'string'
+      || (existing.fileHash !== 'missing' && !/^[a-f0-9]{64}$/.test(existing.fileHash))) {
+      throw new Error(`Vérification du fichier de ${getCityBySlug(slug).name} invalide.`)
+    }
+    const snapshot = pages[slug] ? makeCitySnapshot({ slug, pages, config, gallery, allTypePages, blogArticles }) : null
+    if (!snapshot || (!updateTemplate && existing.fingerprint === await snapshotFingerprint(snapshot))) {
+      if (!snapshot && existing.fileHash === 'missing') throw new Error(`Page publiée manquante : ${slug}.`)
+      if (!existing.sharedDirectory) {
+        await write({ action: 'upgrade-directory', slug, expectedHash: existing.fileHash })
+        counts.upgraded++
+      } else {
+        counts.unchanged++
+      }
+      onProgress({ done: i + 1, total: allSlugs.length, current: '' })
+      continue
+    }
     const html = renderCityDocument({ template, snapshot, settings, origin })
-    await write({ action: 'page', slug, html })
+    await write({ action: 'page', slug, html, expectedHash: existing.fileHash })
     const check = await fetch(`${snapshot.pageType.basePath}/${slug}`, { cache: 'no-store' })
     if (!check.ok || await check.text() !== html) {
       throw new Error(`Le fichier de ${getCityBySlug(slug).name} a été écrit, mais son URL ne sert pas le HTML publié. Vérifiez le fichier .htaccess et mod_rewrite.`)
     }
-    onProgress({ done: i + 1, total: slugs.length, current: '' })
+    counts.published++
+    onProgress({ done: i + 1, total: allSlugs.length, current: '' })
   }
-  onProgress({ done: slugs.length, total: slugs.length, current: 'Publication de l’annuaire, du sitemap et de robots.txt' })
-  const sitemap = buildSitemapXml({ baseUrl: origin, allTypePages: { ...allTypePages, mariage: pages }, blogArticles })
+  onProgress({ done: allSlugs.length, total: allSlugs.length, current: 'Publication de l’annuaire, du sitemap et de robots.txt' })
+  const sitemapPages = Object.fromEntries(allSlugs.map((slug) => [slug, pages[slug] || { content: 'published', generatedAt: inspection.pages[slug].generatedAt }]))
+  const sitemap = buildSitemapXml({ baseUrl: origin, allTypePages: { ...allTypePages, mariage: sitemapPages }, blogArticles })
   const robots = buildRobotsTxt(origin)
-  const directory = renderToStaticMarkup(<WeddingDirectory slugs={slugs} businessName={config.businessName || settings.nom} />)
+  const directory = renderToStaticMarkup(<WeddingDirectory slugs={allSlugs} businessName={config.businessName || settings.nom} />)
   const homeSeo = renderSeoHead(buildSeoData('/', { ...settings, siteUrl: origin }, {}, null, null, null, origin))
-  await write({ action: 'seo', sitemap, robots, directory, slugs, homeSeo })
-  for (const [path, content] of [['/sitemap.xml', sitemap], ['/robots.txt', robots], ['/wedding-directory.html', directory], ['/wedding-pages.json', JSON.stringify(slugs)]]) {
+  await write({ action: 'seo', sitemap, robots, directory, slugs: allSlugs, homeSeo, expectedRegistryHash: inspection.registryHash })
+  for (const [path, content] of [['/sitemap.xml', sitemap], ['/robots.txt', robots], ['/wedding-directory.html', directory], ['/wedding-pages.json', JSON.stringify(allSlugs)]]) {
     const check = await fetch(path, { cache: 'no-store' })
     if (!check.ok || await check.text() !== content) throw new Error(`Le fichier ${path} a été écrit mais n'est pas accessible à son URL.`)
   }
@@ -162,6 +204,6 @@ export async function publishWeddingPages({ pages, config, gallery, allTypePages
   if (!home.ok || !(await home.text()).includes(directory)) {
     throw new Error('L’annuaire a été publié mais n’est pas présent dans le HTML initial de l’accueil. Vérifiez le déploiement de index.html.')
   }
-  onProgress({ done: slugs.length, total: slugs.length, current: '' })
-  return slugs.length
+  onProgress({ done: allSlugs.length, total: allSlugs.length, current: '' })
+  return { total: allSlugs.length, ...counts }
 }

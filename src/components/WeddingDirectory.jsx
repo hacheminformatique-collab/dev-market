@@ -2,7 +2,7 @@ import { DEPARTMENTS, getCityBySlug } from '../data/idf-cities'
 import './WeddingDirectory.css'
 import { normalizeCityName } from '../utils/cityNames'
 
-export default function WeddingDirectory({ slugs, businessName = 'Le Paradise' }) {
+export default function WeddingDirectory({ slugs, businessName = 'Le Paradise', cityName = '' }) {
   // Resolve each URL exactly as CityPage does, including legacy duplicate slugs.
   const published = [...new Set(slugs)].map(getCityBySlug).filter(Boolean)
   const departments = DEPARTMENTS.map((department) => ({
@@ -14,7 +14,7 @@ export default function WeddingDirectory({ slugs, businessName = 'Le Paradise' }
 
   return (
     <section className="wedding-directory" aria-labelledby="wedding-directory-heading">
-      <h2 id="wedding-directory-heading">Zone de location de salle de mariage</h2>
+      <h2 id="wedding-directory-heading">{cityName ? `Location salle de mariage près de ${normalizeCityName(cityName)}` : 'Zone de location de salle de mariage'}</h2>
       <p>
         Un seul lieu de réception : {businessName}, au 5 avenue Fridingen,
         77100 Nanteuil les Meaux. Retrouvez les pages de location de salle de mariage

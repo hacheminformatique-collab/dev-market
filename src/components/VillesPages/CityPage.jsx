@@ -1316,7 +1316,7 @@ export function CityPageContent({ citySlug, pageType, page, gallery, config, all
         </div>
       </div>
 
-      {published && <WeddingDirectory slugs={Object.keys(allTypePages.mariage || {})} businessName={businessName} />}
+      {published && <WeddingDirectory slugs={Object.keys(allTypePages.mariage || {})} businessName={businessName} cityName={city.name} />}
       <WhatsAppButton />
     </div>
   )

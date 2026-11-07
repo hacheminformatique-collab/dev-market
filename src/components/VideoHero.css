@@ -4,7 +4,29 @@
   overflow: hidden;
   background: #14142a;
   color: white;
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
   padding: clamp(40px, 6vw, 70px) clamp(16px, 5vw, 80px) 80px;
+}
+
+.home-event-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 20px;
+  text-align: left;
+}
+
+@media (min-width: 600px) {
+  .home-event-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (min-width: 1100px) {
+  .home-event-grid {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
 }
 
 .video-hero-media,

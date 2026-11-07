@@ -1,11 +1,12 @@
 import { siteFetch as fetch } from '../../../utils/siteFetch'
 import { useState } from 'react'
-import { getSettings, saveSettings } from '../../../utils/storage'
+import { getSettings, saveSettingsConfirmed } from '../../../utils/storage'
 import { makePageTypeStorage } from '../../../utils/cityPageStorage'
 import { buildSitemapXml, buildRobotsTxt, downloadTextFile } from '../../../utils/seoFiles'
 import { PAGE_TYPES } from '../../../data/pageTypes'
 import { getBlogArticles } from '../../../utils/blogStorage'
-import { getPublishedWeddingSlugs } from '../../../utils/weddingPublication'
+import { getPublishedWeddingSlugs, getPublishedWeddingDepartments } from '../../../utils/weddingPublication'
+import SiteAccessControls from '../SiteAccessControls'
 
 function resizeImageToDataUrl(file, maxW, maxH) {
   return new Promise((resolve, reject) => {
@@ -51,6 +52,9 @@ function resizeImageToSquare(file, size) {
 export default function MesInfosTab() {
   const [data, setData] = useState(getSettings())
   const [saved, setSaved] = useState(false)
+  const [saveError, setSaveError] = useState('')
+  const [saving, setSaving] = useState(false)
+  const [editing, setEditing] = useState(false)
   const [seoBusy, setSeoBusy] = useState(false)
   const [seoMessage, setSeoMessage] = useState('')
   const [faviconBusy, setFaviconBusy] = useState(false)
@@ -116,10 +120,24 @@ export default function MesInfosTab() {
     }
   }
 
-  function handleSave() {
-    saveSettings(data)
-    setSaved(true)
-    setTimeout(() => setSaved(false), 2000)
+  async function handleSave() {
+    setSaving(true)
+    setSaveError('')
+    try {
+      await saveSettingsConfirmed(data)
+      setEditing(false)
+      setSaved(true)
+      setTimeout(() => setSaved(false), 2000)
+    } catch (error) {
+      setSaveError(error.message)
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  function handleCancel() {
+    setData(getSettings())
+    setEditing(false)
   }
 
   async function handleGenerateSeoFiles() {
@@ -137,7 +155,7 @@ export default function MesInfosTab() {
       allTypePages.mariage = Object.fromEntries(Object.entries(allTypePages.mariage || {})
         .filter(([slug]) => published.has(slug)))
       totalPages = Object.values(allTypePages).reduce((count, pages) => count + Object.keys(pages).length, 0)
-      const sitemapXml = buildSitemapXml({ baseUrl: data.siteUrl, allTypePages, blogArticles: await getBlogArticles() })
+      const sitemapXml = buildSitemapXml({ baseUrl: data.siteUrl, allTypePages, blogArticles: await getBlogArticles(), departmentCodes: await getPublishedWeddingDepartments() })
       const robotsTxt = buildRobotsTxt(data.siteUrl)
 
       // Try to write files directly on the server
@@ -170,8 +188,16 @@ export default function MesInfosTab() {
 
   return (
     <div>
+      <SiteAccessControls kind="maintenance" />
+      {saveError && <p role="alert" style={{ color: '#c0392b' }}>{saveError}</p>}
       <h3 style={{ marginBottom: '20px', color: '#1a1a2e' }}>Informations générales</h3>
       <div className="card" style={{ maxWidth: '600px' }}>
+        {!editing && (
+          <p style={{ color: '#777', fontSize: '13px', marginBottom: '16px' }}>
+            Ces informations sont utilisées par le site. Cliquez sur « Modifier » pour les changer.
+          </p>
+        )}
+        <fieldset disabled={!editing} style={{ border: 0, padding: 0, margin: 0, minWidth: 0 }}>
         <div className="form-group">
           <label>Nom de la salle</label>
           <input className="form-control" value={data.nom || ''} onChange={(e) => handleChange('nom', e.target.value)} />
@@ -321,14 +347,23 @@ export default function MesInfosTab() {
           <input className="form-control" value={data.bankInfo?.bic || ''} onChange={(e) => handleBankChange('bic', e.target.value)} />
         </div>
 
-        <button onClick={handleSave} className="btn btn-primary">
-          {saved ? '✅ Sauvegardé !' : '💾 Sauvegarder'}
-        </button>
+        </fieldset>
+
+        {editing ? (
+          <>
+            <button onClick={handleSave} disabled={saving} className="btn btn-primary">{saving ? 'Enregistrement…' : '💾 Sauvegarder'}</button>
+            <button onClick={handleCancel} disabled={saving} className="btn btn-outline" style={{ marginLeft: '10px' }}>Annuler</button>
+          </>
+        ) : (
+          <button onClick={() => setEditing(true)} className="btn btn-primary">
+            {saved ? '✅ Sauvegardé !' : '✏️ Modifier'}
+          </button>
+        )}
         <button
           onClick={handleGenerateSeoFiles}
           className="btn btn-outline"
           style={{ marginLeft: '10px' }}
-          disabled={seoBusy}
+          disabled={seoBusy || editing}
         >
           {seoBusy ? '⏳ Génération...' : '🗺️ Générer sitemap.xml + robots.txt'}
         </button>

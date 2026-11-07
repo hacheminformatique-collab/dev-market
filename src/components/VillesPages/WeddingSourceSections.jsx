@@ -1,6 +1,7 @@
 import { createElement } from 'react'
 import { injectWeddingSource, sourceStyle } from '../../utils/weddingSourceLayout'
 import './WeddingSourceSections.css'
+import { testimonialBlockIndexes } from '../../utils/weddingDisplayText'
 
 const safeTags = new Set(['section', 'div', 'span', 'p', 'h2', 'h3', 'h4', 'strong', 'b', 'em', 'i', 'ul', 'ol', 'li', 'a', 'br'])
 
@@ -37,6 +38,7 @@ export default function WeddingSourceSections({ layout, city, knownFaqs, busines
   let faqIndex = 0
   function renderNode(node, section, key) {
     if (typeof node === 'string') return injectWeddingSource(node, city)
+    if (node.block !== undefined && testimonialBlockIndexes(section.originals).has(node.block)) return null
     if (node.faq) {
       return <SourceAccordion key={key} node={node} city={city} knownFaqs={knownFaqs} businessName={businessName} index={faqIndex++} />
     }
@@ -52,7 +54,8 @@ export default function WeddingSourceSections({ layout, city, knownFaqs, busines
       props.href = node.attrs.href
       if (props.target === '_blank') props.rel = 'noopener noreferrer'
     }
-    let children = node.children.map((child, index) => renderNode(child, section, `${key}-${index}`))
+    let children = node.children.map((child, index) => renderNode(child, section, `${key}-${index}`)).filter((child) => child !== null)
+    if (node.children.length && !children.length) return null
     if (node.block !== undefined) {
       const saved = section.blocks[node.block]
       const generated = injectWeddingSource(section.originals[node.block], city)

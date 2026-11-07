@@ -1,5 +1,112 @@
 # React + Vite
 
+## Maintenance, adresse administrative et purge
+
+**Mes Infos > Maintenance du site** ferme les pages publiques sauf l'accueil.
+Les HTML existants ne sont ni effacés ni redirigés vers une page indexable :
+les URL indisponibles répondent **503** avec `Retry-After`. Les assets nécessaires
+à l'accueil et robots.txt restent servis. La connexion administrative, le
+dashboard et les API d'une session administrative restent accessibles.
+Les API publiques autres que les réglages de l'accueil sont bloquées.
+Rouvrir le site avant de publier/vérifier les URL HTML publiques.
+
+**Code PIN > Adresse privée de l'administration** choisit un chemin de 8 à
+80 caractères (minuscules, chiffres, tirets), par exemple `/gestion-paradise`.
+La connexion est à cette adresse et le dashboard à son suffixe `/dashboard`.
+Les anciennes URL `/admin` et `/dashboard` répondent 404. Le chemin n'est pas
+inséré dans les pages publiques ni dans robots.txt ; les pages administratives
+ont un en-tête `X-Robots-Tag: noindex`. Notez votre nouvelle adresse avant de
+la modifier. La discrétion d'une URL ne remplace pas l'authentification.
+
+Le PIN est vérifié côté PHP, avec trois erreurs autorisées avant un blocage
+de dix minutes par IP et une session HttpOnly/SameSite. Les réglages publics
+ne renvoient plus le PIN. Les nouvelles opérations de maintenance, changement
+d'adresse et purge exigent cette session ; reconnectez-vous après déploiement
+si votre ancien onglet n'avait qu'une authentification locale.
+
+**Back-up > Purge des données** propose une suppression par onglet et
+**Tout purger**, avec saisie obligatoire de `PURGER`. Aucune purge réelle n'est
+faite lors du déploiement. Exportez les deux sauvegardes (données métier et
+pages/blog) avant de l'utiliser : il n'y a pas de sauvegarde automatique de
+purge. Terminez la synchronisation et fermez les autres administrations pour
+éviter de réenregistrer leurs copies anciennes. Utilisez de préférence la
+maintenance pour éviter l'arrivée de nouvelles demandes pendant la purge.
+
+- Clients & Devis : clients, documents, reçus, prospects et affectations.
+- Calendrier : événements manuels, promotions/ajustements et affectations ;
+  les devis restent enregistrés avec leur date mais ne réservent plus le
+  calendrier. Une nouvelle signature/validation réactive leur réservation.
+- Comptabilité : paiements et reçus ; les devis conservés sont exclus des
+  calculs jusqu'à un nouveau paiement, une signature ou une validation.
+- Staff, Stock, Matières premières, Formules, Menus, Gâteaux, Prestations :
+  collections correspondantes ; Staff retire aussi les affectations.
+- Pages salle de mariage : données, configuration, galerie, sauvegardes,
+  HTML villes/départements, registre et annuaires, avec retrait du sitemap.
+  Les anciennes adresses ne restent pas accessibles.
+- Tout purger : toutes ces catégories, les autres types de pages villes et
+  le blog avec ses sauvegardes. Mes Infos, le PIN administrateur, l'adresse administrative
+  et l'état de maintenance sont conservés.
+
+Les écritures sont atomiques et partagent les verrous existants du stockage
+et de la publication. Une erreur de stockage ou de suppression est explicite ;
+en cas d'erreur disque en cours d'opération, vérifier les données avant de
+relancer (la purge n'est pas une transaction multi-fichiers).
+Les collections vides sont enregistrées, pas simplement effacées, afin que
+les anciens caches et les valeurs d'exemple ne les recréent pas au rechargement.
+
+Le dashboard charge les composants d'onglet à la demande et seulement leurs
+données nécessaires : cinq clés pour Clients & Devis au lieu de seize au
+démarrage, sans second rafraîchissement complet immédiat. Les rafraîchissements
+périodiques suivent l'onglet actif et conservent l'espacement réseau de 650 ms.
+À la réouverture d'un onglet, les données âgées de plus de 30 secondes sont relues.
+Back-up ne charge toutes les données métier que lors de leur export.
+
+Déployer **tout `dist/`**, notamment `api/site-admin.php`, `site-controls.php`,
+`site-guard.php`, `site-router.php`, `data-purge.php`, les API modifiées et
+`.htaccess`. Préserver `storage-data/site-controls.json` et le fichier racine
+`site-maintenance.flag` lors des déploiements suivants, comme les données métier.
+Pour récupérer une adresse oubliée, lire `site-controls.json` directement sur
+le serveur ; pour une désactivation manuelle, mettre `maintenance` à `false`
+et supprimer uniquement le fichier `site-maintenance.flag`.
+
+## Identifiants postaux et prospects
+
+Toutes les pages villes utilisent désormais `ville-codepostal`, par exemple
+`meaux-77100`. Les homonymes restent distincts : `villeroy-77410` (77) et
+`villeroy-89100` (89). Les liens, canonical, sitemap, fichiers mariage et clés
+de stockage suivent cette identité dans les six familles de pages.
+Les anciennes sauvegardes restent importables : les clés sont normalisées
+sans modifier leurs textes. Une copie déjà enregistrée sous une clé postale
+est prioritaire sur la copie historique du même identifiant.
+
+Après déploiement complet de `dist/`, lancer **Publier les pages en HTML statique**.
+La génération et la publication sauvegardent les collections à migrer, puis renomment leurs clés
+côté serveur par lots de 250 correspondances, sans retransmettre les contenus.
+Les anciens HTML absents d'une sauvegarde restaurée sont copiés à leur nouvelle
+adresse en conservant leur contenu ; les fichiers historiques ne sont pas supprimés.
+Les fichiers postaux existants restent protégés contre l'écrasement concurrent.
+Le registre `wedding-city-aliases.json` et `api/city-redirect.php` redirigent
+les anciennes adresses en HTTP 301 après publication. Préserver ce registre,
+les HTML et les anciens assets lors des déploiements suivants.
+Sans métadonnées permettant de distinguer un homonyme, une ancienne clé seule
+désigne sa commune historique, c'est-à-dire la première occurrence du catalogue.
+Un contenu déjà écrasé avant ce correctif ne peut être récupéré que depuis
+une sauvegarde qui le contient.
+
+Dans la sélection d'un département, **Pages non générée** choisit seulement
+les villes sans contenu généré, sans changer les sélections des autres départements.
+L'onglet **Prospect** liste uniquement les nouveaux suivis ayant validé les
+coordonnées et l'événement (étapes 1 et 2), mais pas la formule (étape 3).
+Un devis finalisé est exclu ; un retour arrière ne réintroduit pas une demande
+plus avancée. Ces demandes peuvent être encore en cours, sans délai d'abandon
+supposé. Les anciens journaux ne permettent pas de reconstruire les coordonnées.
+`api/prospects.php` exige le PIN enregistré et ne met pas les résultats en cache ;
+les dossiers restent dans le stockage privé `storage-data/quote-followups/`.
+
+Le formulaire intégré réinitialise sa couleur de texte pour éviter l'héritage
+blanc des sections villes, notamment pour DJ. Utiliser **Mettre à jour le modèle
+des pages** pour fournir ce nouveau code aux HTML sauvegardés avec d'anciens assets.
+
 ## Protection contre les rafales LWS
 
 Les écritures et les appels des lots de génération/publication passent par une
@@ -107,6 +214,19 @@ demande confirmation ; une sauvegarde est créée avant génération. Chaque pag
 est enregistrée immédiatement sur le serveur. Si la lecture, la sauvegarde ou
 l'écriture serveur échoue, un message explicite arrête le lot : les pages déjà
 enregistrées sont conservées. Les villes non sélectionnées ne sont pas modifiées.
+
+La génération envoie uniquement la ville courante à `api/city-page-storage.php`,
+qui fusionne la page sous verrou avec le fichier JSON existant. La taille des
+requêtes ne croît plus avec le nombre de villes. Les cinq dernières sauvegardes
+sont créées côté serveur, sans renvoyer leurs snapshots depuis le navigateur.
+Le format des fichiers et des restaurations reste compatible. Les appels
+conservent l'espacement de 650 ms et l'arrêt sur limitation de l'hébergement.
+Les erreurs affichent le statut HTTP et, si disponible, le détail PHP.
+Déployer ce nouvel endpoint avec le front-end et `api/storage.php`, puis
+recharger le dashboard. Le compte PHP doit pouvoir créer les verrous et fichiers
+temporaires dans `storage-data/`. Les gros fichiers JSON sont toujours lus et
+écrits côté serveur : vérifier aussi les quotas disque et mémoire PHP si une
+erreur persiste. Ce changement ne modifie pas les fichiers HTML déjà publiés.
 
 Après fusion, déployer tout `dist/`, puis générer et **republier les pages HTML**
 pour afficher les nouveaux textes et avis. Les anciens textes ne sont jamais
@@ -254,11 +374,52 @@ anciens fichiers vers cet annuaire HTML.
 Les pages déjà publiées absentes d'une sauvegarde restaurée restent dans le
 registre et l'annuaire tant que leur fichier existe.
 
+La publication crée également **16 pages département**, pour les huit
+départements d'Île-de-France et l'Aisne (02), l'Eure (27), l'Eure-et-Loir (28),
+le Loiret (45), la Marne (51), l'Oise (60), la Seine-Maritime (76) et l'Yonne (89).
+Elles sont enregistrées dans `locationsalledemariage/departements/<code>.html`
+et accessibles sans extension à `/locationsalledemariage/departements/<code>`.
+Leur contenu, leur canonical et leur liste de communes sont présents en HTML.
+Les titres département dans l'annuaire pointent vers ces pages et le sitemap
+les référence après publication. Le registre `wedding-departments.json` permet
+à Mes Infos de conserver ces URL lors d'une nouvelle génération du sitemap.
+Une page département inchangée n'est ni réécrite ni vérifiée par une nouvelle
+requête HTTP.
+
+L'annuaire général et celui des villes d'Île-de-France conservent toutes les
+communes publiées. Sur une page ville hors Île-de-France, l'annuaire de pied de
+page ne liste que les communes publiées de son propre département. Une page
+département liste également uniquement ses communes ; aucun lien vers une
+commune non publiée n'est ajouté.
+
+Le bandeau supérieur de l'accueil propose **BLOG** juste après **ESPACE STAFF** ;
+ce lien supplémentaire n'est pas ajouté aux bandeaux des autres pages.
+La liste du blog et tous ses articles affichent uniquement l'annuaire des
+départements et communes publiées d'Île-de-France. La publication crée
+`wedding-directory-idf.html` ; Apache sert les routes `/blog` et `/blog/...`
+via `api/blog-shell.php`, qui insère ce fragment dans le HTML initial.
+La navigation côté navigateur charge le même fragment régional.
+Déployer `.htaccess` et `api/blog-shell.php`, puis lancer une publication
+des pages mariage pour créer ou actualiser ce fragment. Aucune republication
+des fichiers ville inchangés n'est nécessaire pour cette modification du blog.
+
 Après une mise à jour du modèle du site, le bouton distinct **Mettre à jour le
 modèle des pages** demande confirmation avant de remplacer les fichiers des
 pages sauvegardées, même si leurs textes n'ont pas changé. Utilisez-le seulement
 si vous souhaitez appliquer ce nouveau modèle aux anciennes pages. Les pages
 non présentes dans la sauvegarde ne sont pas remplacées.
+
+La vidéo des en-têtes occupe au moins une hauteur d'écran, comme sur l'accueil.
+Les boutons superposés de l'accueil sont retirés, mais les accès du bandeau
+supérieur restent disponibles. Les quatre thèmes de l'accueil s'affichent sur
+une ligne à partir de 1100 px, en deux lignes de deux entre 600 et 1099 px et
+sur une colonne en dessous. Le baptême utilise l'icône bébé.
+Les blocs génériques « Témoignages » des modèles ne sont plus affichés :
+les extraits d'avis Google conservés présentent le nom, la note, les étoiles
+jaunes et le texte dans une carte blanche. Ce ne sont pas des avis chargés
+en direct depuis Google.
+Pour appliquer ces changements visuels aux fichiers de villes existants,
+utiliser **Mettre à jour le modèle des pages** après le déploiement.
 
 Chaque ville possède un fichier physique
 `locationsalledemariage/<ville>.html`, servi à l'adresse existante
@@ -300,6 +461,38 @@ devis), mais n'est pas nécessaire à la lecture du contenu.
 La canonical et le sitemap facilitent l'exploration, sans garantir l'indexation
 ni le classement par Google. Les pages des autres types et leurs données ne
 sont pas supprimées par le retrait des onglets.
+
+### Trajets routiers et informations de l'établissement
+
+La génération calcule un itinéraire routier OSRM entre le centre de la commune
+et Le Paradise, au **5 avenue Fridingen, 77100 Nanteuil-lès-Meaux**
+(48.937362, 2.882801). La distance et la durée arrondies sont enregistrées avec
+la page et reprises dans les textes, les cartes de présentation et les FAQ.
+Il s'agit d'un itinéraire automobile sans trafic en temps réel, pas d'une
+garantie de durée. Aucun calcul ni appel OSRM n'a lieu à l'ouverture d'une page.
+La carte Google Maps recherche explicitement l'établissement à son adresse ;
+les coordonnées des données structurées utilisent le même emplacement.
+
+Les requêtes de génération sont séquentielles, espacées d'au moins 1,1 seconde
+et limitées à 20 secondes. Une erreur du service arrête le lot sans enregistrer
+de chiffres inventés ; les pages déjà enregistrées sont conservées. Le service
+public OSRM exige une connexion Internet et peut être indisponible ou limiter
+les requêtes. Les tests automatisés simulent ses réponses.
+
+Pour les pages anciennes ou restaurées sans trajet enregistré, utiliser
+**Mettre à jour les trajets**, puis **Publier les pages en HTML statique**.
+La mise à jour sauvegarde les pages côté serveur, conserve leurs modèles et
+leurs textes personnalisés et ne calcule que les trajets manquants. La publication
+refuse les pages sans trajet : elle ne substitue pas une estimation géométrique.
+Les fichiers HTML existants restent inchangés jusqu'à la republication.
+
+**Mes Infos** affiche les informations de l'établissement préremplies et
+verrouillées. Cliquer sur **Modifier**, puis **Sauvegarder** après une modification.
+Les valeurs déjà enregistrées priment ; seuls les champs vides ou absents
+reçoivent les valeurs par défaut. Elles sont enregistrées lors de l'initialisation
+administrative, pas pendant une visite publique. Vérifier le domaine SEO avant
+publication. Le titulaire du compte, l'IBAN et le BIC restent vides dans le code
+du dépôt public et doivent être saisis manuellement dans Mes Infos.
 
 ### Vérification
 

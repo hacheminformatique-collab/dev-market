@@ -10,6 +10,10 @@ import WeddingDirectory from '../components/WeddingDirectory'
 import directoryStyles from '../components/WeddingDirectory.css?raw'
 import { validateWeddingTemplate } from './weddingPageTemplates'
 import { resolveWeddingSourceLayout } from './weddingSourceLayout'
+import { validateWeddingTravel } from './weddingTravel'
+import { WEDDING_DEPARTMENTS, departmentPath, directoryDepartmentCode } from './weddingDepartments'
+import DepartmentPage from '../components/VillesPages/DepartmentPage'
+import { canonicalCityPages, legacyCityAliases } from './cityPageIdentity'
 
 function escapeHtml(value) {
   return String(value).replaceAll('&', '&amp;').replaceAll('<', '&lt;')
@@ -38,10 +42,36 @@ async function snapshotFingerprint(snapshot) {
 }
 
 function cityDirectory(slugs, slug, businessName) {
-  return renderToStaticMarkup(<WeddingDirectory slugs={slugs} businessName={businessName} cityName={getCityBySlug(slug).name} />)
+  const city = getCityBySlug(slug)
+  return renderToStaticMarkup(<WeddingDirectory slugs={slugs} businessName={businessName} cityName={city.name} departmentCode={directoryDepartmentCode(city)} />)
+}
+
+export function renderDepartmentDocument({ template, departmentCode, businessName, slugs, origin }) {
+  const department = WEDDING_DEPARTMENTS.find(({ code }) => code === departmentCode)
+  if (!department || !template.includes('<!-- CITY_SEO -->') || !template.includes('<!-- CITY_DATA -->')) {
+    throw new Error('Département ou modèle HTML invalide.')
+  }
+  const path = departmentPath(departmentCode)
+  const snapshot = { departmentCode, businessName, slugs }
+  const canonical = new URL(path, origin).href
+  const title = `Location salle de mariage — ${department.name} (${department.code}) | ${businessName}`
+  const description = `Préparez votre mariage depuis ${department.name} (${department.code}). ${businessName} vous accueille au 5 avenue Fridingen à Nanteuil les Meaux. Découvrez les communes et demandez votre devis.`
+  const head = renderSeoHead({
+    title, description, keywords: `location salle mariage ${department.name}`,
+    canonical, robots: 'index, follow', imageUrl: `${origin}/media/hero-paradise.jpg`,
+    jsonLd: { '@context': 'https://schema.org', '@type': 'CollectionPage', name: title, url: canonical, description, about: { '@type': 'AdministrativeArea', name: department.name } },
+  })
+  const body = renderToString(<DepartmentPage {...snapshot} />)
+  return template
+    .replace(/<meta name="robots" content="noindex, nofollow"\s*\/?>/, '')
+    .replace('<!-- CITY_SEO -->', () => head)
+    .replace('<div id="root"></div>', () => `<div id="root">${body}</div>`)
+    .replace('<!-- CITY_DATA -->', () => `<script id="city-page-data" type="application/json">${scriptJson(snapshot)}</script>`)
 }
 
 export function makeCitySnapshot({ slug, pages, config, gallery, allTypePages, blogArticles }) {
+  pages = canonicalCityPages(pages)
+  slug = getCityBySlug(slug)?.slug || slug
   if (!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(slug) || !getCityBySlug(slug) || !pages[slug]?.content?.trim()) {
     throw new Error(`Page mariage invalide ou vide : ${slug}`)
   }
@@ -49,11 +79,17 @@ export function makeCitySnapshot({ slug, pages, config, gallery, allTypePages, b
   if (Number.isNaN(new Date(page.generatedAt).getTime())) {
     throw new Error(`Date de génération invalide : ${slug}`)
   }
+  if (!page.travel) {
+    throw new Error(`Trajet routier non calculé pour ${getCityBySlug(slug).name}. Cliquez sur « Mettre à jour les trajets » avant de publier.`)
+  }
+  const travel = validateWeddingTravel(page.travel)
   if (page.template?.version === 2) resolveWeddingSourceLayout(page, getCityBySlug(slug))
   return {
     citySlug: slug,
     pageType: PAGE_TYPES_BY_ID.mariage,
-    page: { content: page.content, generatedAt: page.generatedAt, ...(page.template === undefined ? {} : { template: validateWeddingTemplate(page.template) }) },
+    page: { content: page.content, generatedAt: page.generatedAt, travel,
+      city: { slug, name: getCityBySlug(slug).name, postalCode: getCityBySlug(slug).postalCode, deptCode: getCityBySlug(slug).deptCode },
+      ...(page.template === undefined ? {} : { template: validateWeddingTemplate(page.template) }) },
     config: {
       businessName: config.businessName,
       googleMapsApiKey: config.googleMapsApiKey,
@@ -65,7 +101,7 @@ export function makeCitySnapshot({ slug, pages, config, gallery, allTypePages, b
     gallery,
     allTypePages: Object.fromEntries(PAGE_TYPES.map((pt) => [
       pt.id,
-      Object.fromEntries(Object.keys(pt.id === 'mariage' ? pages : allTypePages[pt.id] || {}).map((citySlug) => [citySlug, true])),
+      Object.fromEntries(Object.keys(pt.id === 'mariage' ? pages : canonicalCityPages(allTypePages[pt.id] || {})).map((citySlug) => [citySlug, true])),
     ])),
     blogArticles: Object.values(blogArticles)
       .filter((article) => article.status === 'published')
@@ -125,6 +161,7 @@ export function renderCityDocument({ template, snapshot, settings, origin, direc
 }
 
 export async function publishWeddingPages({ pages, config, gallery, allTypePages, blogArticles, settings, origin, onProgress, updateTemplate = false }) {
+  pages = canonicalCityPages(pages)
   const slugs = Object.keys(pages)
   if (!slugs.length) throw new Error('Aucune page mariage à publier.')
   if (!settings.pin) throw new Error('Enregistrez votre code PIN dans Mes Infos avant de publier.')
@@ -160,7 +197,7 @@ export async function publishWeddingPages({ pages, config, gallery, allTypePages
   }
   // Validate all inputs before writing the first file.
   for (const slug of slugs) makeCitySnapshot({ slug, pages, config, gallery, allTypePages, blogArticles })
-  const inspection = await write({ action: 'inspect', slugs })
+  const inspection = await write({ action: 'inspect', slugs, aliases: legacyCityAliases })
   if (!inspection.pages || typeof inspection.pages !== 'object' || !Array.isArray(inspection.publishedSlugs)
     || typeof inspection.registryHash !== 'string'
     || (inspection.registryHash !== 'missing' && !/^[a-f0-9]{64}$/.test(inspection.registryHash))
@@ -182,6 +219,19 @@ export async function publishWeddingPages({ pages, config, gallery, allTypePages
     }
     const snapshot = pages[slug] ? makeCitySnapshot({ slug, pages, config, gallery, allTypePages, blogArticles }) : null
     if (!snapshot || (!updateTemplate && existing.fingerprint === await snapshotFingerprint(snapshot))) {
+      if (!snapshot && existing.fileHash === 'missing' && existing.legacySlug) {
+        const result = await write({ action: 'city-migrate', slug, legacySlug: existing.legacySlug, expectedHash: existing.legacyHash })
+        const check = await fetch(`${PAGE_TYPES_BY_ID.mariage.basePath}/${slug}`, { cache: 'no-store' })
+        if (!check.ok || await hashText(await check.text()) !== result.fileHash) {
+          throw new Error(`La nouvelle URL de ${getCityBySlug(slug).name} ne sert pas le fichier migré. Vérifiez .htaccess et mod_rewrite.`)
+        }
+        pageHashes[slug] = result.fileHash
+        directoryHashes[slug] = result.directoryHash
+        counts.published++
+        publishedNow.add(slug)
+        onProgress({ done: i + 1, total: allSlugs.length, current: '' })
+        continue
+      }
       if (!snapshot && existing.fileHash === 'missing') throw new Error(`Page publiée manquante : ${slug}.`)
       pageHashes[slug] = existing.fileHash
       directoryHashes[slug] = existing.directoryHash
@@ -219,14 +269,27 @@ export async function publishWeddingPages({ pages, config, gallery, allTypePages
       }
     }
   }
+  const departmentCodes = WEDDING_DEPARTMENTS.map(({ code }) => code)
+  for (const code of departmentCodes) {
+    onProgress({ done: allSlugs.length, total: allSlugs.length, current: `Département : ${code}` })
+    const departmentSlugs = allSlugs.filter((slug) => getCityBySlug(slug).deptCode === code)
+    const html = renderDepartmentDocument({ template, departmentCode: code, businessName: config.businessName || settings.nom || 'Le Paradise', slugs: departmentSlugs, origin })
+    const expectedHash = inspection.departments?.[code] ?? 'missing'
+    if (expectedHash !== await hashText(html)) {
+      await write({ action: 'department', code, html, expectedHash })
+      const check = await fetch(departmentPath(code), { cache: 'no-store' })
+      if (!check.ok || await check.text() !== html) throw new Error(`La page du département ${code} n’est pas accessible. Vérifiez .htaccess.`)
+    }
+  }
   onProgress({ done: allSlugs.length, total: allSlugs.length, current: 'Publication de l’annuaire, du sitemap et de robots.txt' })
   const sitemapPages = Object.fromEntries(allSlugs.map((slug) => [slug, pages[slug] || { content: 'published', generatedAt: inspection.pages[slug].generatedAt }]))
-  const sitemap = buildSitemapXml({ baseUrl: origin, allTypePages: { ...allTypePages, mariage: sitemapPages }, blogArticles })
+  const sitemap = buildSitemapXml({ baseUrl: origin, allTypePages: { ...allTypePages, mariage: sitemapPages }, blogArticles, departmentCodes })
   const robots = buildRobotsTxt(origin)
   const directory = renderToStaticMarkup(<WeddingDirectory slugs={allSlugs} businessName={config.businessName || settings.nom} />)
+  const idfDirectory = renderToStaticMarkup(<WeddingDirectory slugs={allSlugs} businessName={config.businessName || settings.nom} region="Île-de-France" />)
   const homeSeo = renderSeoHead(buildSeoData('/', { ...settings, siteUrl: origin }, {}, null, null, null, origin))
-  await write({ action: 'seo', sitemap, robots, directory, slugs: allSlugs, homeSeo, expectedRegistryHash: inspection.registryHash })
-  for (const [path, content] of [['/sitemap.xml', sitemap], ['/robots.txt', robots], ['/wedding-directory.html', directory], ['/wedding-pages.json', JSON.stringify(allSlugs)]]) {
+  await write({ action: 'seo', sitemap, robots, directory, idfDirectory, slugs: allSlugs, aliases: legacyCityAliases, departmentCodes, homeSeo, expectedRegistryHash: inspection.registryHash })
+  for (const [path, content] of [['/sitemap.xml', sitemap], ['/robots.txt', robots], ['/wedding-directory.html', directory], ['/wedding-directory-idf.html', idfDirectory], ['/wedding-pages.json', JSON.stringify(allSlugs)], ['/wedding-city-aliases.json', JSON.stringify(legacyCityAliases)], ['/wedding-departments.json', JSON.stringify(departmentCodes)]]) {
     const check = await fetch(path, { cache: 'no-store' })
     if (!check.ok || await check.text() !== content) throw new Error(`Le fichier ${path} a été écrit mais n'est pas accessible à son URL.`)
   }

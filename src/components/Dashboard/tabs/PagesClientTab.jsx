@@ -5,6 +5,8 @@ import {
 } from '../../../utils/cityPageStorage'
 import { DEPARTMENTS, ALL_CITIES, getCityBySlug } from '../../../data/idf-cities'
 import { generateWeddingPage } from '../../../utils/weddingPageTemplates'
+import { applyWeddingTravel, fetchWeddingTravel } from '../../../utils/weddingTravel'
+import { ungeneratedCitySlugs } from '../../../utils/cityPageIdentity'
 import { PAGE_TYPES } from '../../../data/pageTypes'
 import { getSettings } from '../../../utils/storage'
 import { getBlogArticles } from '../../../utils/blogStorage'
@@ -133,6 +135,16 @@ export default function PagesClientTab({ pageType }) {
     setSelDepts((prev) => { const n = { ...prev }; delete n[code]; return n })
   }
 
+  function selectUngeneratedDept(department) {
+    const slugs = ungeneratedCitySlugs(department, pages)
+    setSelDepts((prev) => {
+      const next = { ...prev }
+      if (slugs.length) next[department.code] = new Set(slugs)
+      else delete next[department.code]
+      return next
+    })
+  }
+
   function toggleCity(deptCode, slug) {
     setSelDepts((prev) => {
       const cur = prev[deptCode]
@@ -212,19 +224,21 @@ export default function PagesClientTab({ pageType }) {
       const existing = await storage.getPages({ requireServer: true })
       const newlyReplaced = slugs.filter((slug) => existing[slug] && !pages[slug]).length
       if (newlyReplaced && !window.confirm(`${newlyReplaced} autres pages existent sur le serveur. Les remplacer après sauvegarde ?`)) return
+      await storage.migratePageKeys()
       await storage.backupPages({ requireServer: true })
       setBackups(await storage.getBackups())
       const updated = { ...existing }
       for (const city of cities) {
         current = city.name
         setGenProgress({ done, total: slugs.length, current })
-        updated[city.slug] = pageType.id === 'mariage'
-          ? generateWeddingPage({ slug: city.slug, businessName: config.businessName })
+        const page = pageType.id === 'mariage'
+          ? generateWeddingPage({ slug: city.slug, businessName: config.businessName, travel: await fetchWeddingTravel(city) })
           : {
             content: generateLocalCityContent(city.name, city.deptName, config.keywords, config.businessName, config.businessType, pageType.mainKeyword),
             generatedAt: new Date().toISOString(),
           }
-        await storage.savePages(updated, { requireServer: true })
+        await storage.savePage(city.slug, page)
+        updated[city.slug] = page
         setPages({ ...updated })
         done++
         // Yield between local generations so progress and navigation can render.
@@ -240,6 +254,47 @@ export default function PagesClientTab({ pageType }) {
     }
   }
 
+  async function handleUpdateTravel() {
+    setGenerating(true)
+    setGenDone(false)
+    setGenError('')
+    setPublishMessage('')
+    let done = 0
+    let current = ''
+    let total = 0
+    try {
+      const existing = await storage.getPages({ requireServer: true })
+      const slugs = Object.keys(existing).filter((slug) => !existing[slug]?.travel && getCityBySlug(slug))
+      total = slugs.length
+      if (!total) {
+        setPublishMessage('✅ Toutes les pages ont déjà un trajet routier calculé.')
+        return
+      }
+      if (!window.confirm(`Calculer le trajet routier réel de ${total} page(s) ? Une requête par ville sera envoyée, au rythme d’une par seconde maximum.`)) return
+      await storage.migratePageKeys()
+      await storage.backupPages({ requireServer: true })
+      setBackups(await storage.getBackups())
+      const updated = { ...existing }
+      for (const slug of slugs) {
+        const city = getCityBySlug(slug)
+        current = city.name
+        setGenProgress({ done, total, current })
+        const travel = await fetchWeddingTravel(city)
+        const page = { ...existing[slug], content: applyWeddingTravel(existing[slug].content, travel), travel }
+        await storage.savePage(slug, page)
+        updated[slug] = page
+        setPages({ ...updated })
+        done++
+      }
+      setPublishMessage(`✅ Trajets mis à jour pour ${done} page(s). Cliquez sur « Publier les pages en HTML statique » pour actualiser les fichiers publiés.`)
+    } catch (error) {
+      setGenError(`❌ Mise à jour du trajet impossible${current ? ` pour "${current}"` : ''} : ${error.message} Les pages déjà mises à jour restent conservées.`)
+    } finally {
+      setGenerating(false)
+      setGenProgress({ done, total, current: '' })
+    }
+  }
+
   async function handlePublish(updateTemplate = false) {
     if (updateTemplate && !window.confirm('Mettre à jour le modèle HTML de toutes les pages enregistrées ? Leurs fichiers existants seront remplacés, même si leurs textes n’ont pas changé.')) return
     setPublishing(true)
@@ -247,6 +302,7 @@ export default function PagesClientTab({ pageType }) {
     setPublishError('')
     setPublishProgress({ done: 0, total: Object.keys(pages).length, current: 'Préparation des pages' })
     try {
+      for (const pt of PAGE_TYPES) await makePageTypeStorage(pt.id).migratePageKeys()
       const [savedConfig, savedGallery, blogArticles, ...typePages] = await Promise.all([
         storage.getConfig(),
         storage.getGallery(),
@@ -444,7 +500,7 @@ export default function PagesClientTab({ pageType }) {
 
               {/* Toolbar: search + select-all (only when a dept is focused) */}
               {focusDeptObj && (
-                <div style={{ padding: '8px 12px', borderBottom: '1px solid var(--border-light)', display: 'flex', gap: '8px', alignItems: 'center', background: '#fafafa' }}>
+                <div style={{ padding: '8px 12px', borderBottom: '1px solid var(--border-light)', display: 'flex', flexWrap: 'wrap', gap: '8px', alignItems: 'center', background: '#fafafa' }}>
                   <input
                     type="text"
                     placeholder="🔍 Rechercher une ville…"
@@ -468,6 +524,9 @@ export default function PagesClientTab({ pageType }) {
                       </button>
                     )
                   })()}
+                  <button type="button" className="btn btn-outline" onClick={() => selectUngeneratedDept(focusDeptObj)} style={{ fontSize: '12px', padding: '6px 12px' }}>
+                    Pages non générée
+                  </button>
                 </div>
               )}
 
@@ -507,7 +566,7 @@ export default function PagesClientTab({ pageType }) {
                           onChange={() => toggleCity(focusDeptObj.code, city.slug)}
                           style={{ cursor: 'pointer', accentColor: 'var(--gold)' }}
                         />
-                        <span style={{ fontSize: '13px', color: 'var(--text)', flex: 1 }}>{city.name}</span>
+                        <span style={{ fontSize: '13px', color: 'var(--text)', flex: 1 }}>{city.name} ({city.postalCode})</span>
                         {pages[city.slug] && (
                           <span title={`Générée le ${new Date(pages[city.slug].generatedAt).toLocaleDateString('fr-FR')}`}
                             style={{ fontSize: '10px', background: '#e8f5e9', color: '#2e7d52', padding: '2px 6px', borderRadius: '4px' }}>
@@ -602,11 +661,23 @@ export default function PagesClientTab({ pageType }) {
                   >
                     Mettre à jour le modèle des pages
                   </button>
+                  <button
+                    type="button"
+                    className="btn btn-outline"
+                    disabled={publishing || generating || saving || restoringIdx !== null}
+                    onClick={handleUpdateTravel}
+                    style={{ marginLeft: '8px' }}
+                  >
+                    🚗 Mettre à jour les trajets
+                  </button>
                   <p style={{ fontSize: '13px', color: 'var(--text-light)', marginTop: '12px', lineHeight: 1.6 }}>
                     Publie les nouvelles pages et actualise celles dont le contenu, la galerie, la configuration ou les articles ont changé.
                     Les autres fichiers sont modifiés uniquement si leur annuaire doit être actualisé.
                     L’annuaire des pages publiées est inscrit directement dans leur HTML, sans nécessiter JavaScript.
+                    La publication crée aussi les 16 pages département et les actualise uniquement si leur HTML change.
+                    Hors Île-de-France, l’annuaire des villes ne contient que les communes publiées du même département.
                     Après une mise à jour du modèle du site, utilisez le second bouton si vous souhaitez l’appliquer aux pages enregistrées.
+                    Le bouton « Mettre à jour les trajets » calcule la distance et la durée routières réelles depuis Le Paradise pour les pages enregistrées avant ce calcul ; elles sont exigées pour publier.
                     Enregistrez la configuration et gardez cet onglet ouvert jusqu’à la fin.
                   </p>
                   <div aria-live="polite" style={{ fontSize: '13px', marginTop: '8px' }}>

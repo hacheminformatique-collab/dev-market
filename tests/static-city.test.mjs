@@ -8,7 +8,10 @@ import { createServer as createTcpServer } from 'node:net'
 import { spawn } from 'node:child_process'
 import { once } from 'node:events'
 import { renderToStaticMarkup } from 'react-dom/server'
+import { createElement } from 'react'
 import { normalizeCityName } from '../src/utils/cityNames.js'
+
+const travel = { km: 16, minutes: 20, source: 'test', computedAt: '2026-01-01T00:00:00Z' }
 
 const root = resolve(import.meta.dirname, '..')
 let vite, publication, directory, site, origin, template, shellTemplate
@@ -20,14 +23,14 @@ const processes = []
 const pin = 'publication-test-pin'
 const fixture = {
   pages: {
-    meaux: { content: '## Mariage à Meaux\nTexte unique $& et <script>non exécuté</script>.', generatedAt: '2026-01-10T12:00:00Z' },
-    'nanteuil-les-meaux': { content: 'Une salle pour votre mariage à Nanteuil.', generatedAt: '2026-01-11T12:00:00Z' },
+    'meaux-77100': { content: '## Mariage à Meaux\nTexte unique $& et <script>non exécuté</script>.', generatedAt: '2026-01-10T12:00:00Z', travel },
+    'nanteuil-les-meaux-77100': { content: 'Une salle pour votre mariage à Nanteuil.', generatedAt: '2026-01-11T12:00:00Z', travel },
   },
   config: { businessName: 'Salle de test & mariage', githubToken: 'DO-NOT-PUBLISH-TOKEN', instagramPosts: [], tiktokPosts: [] },
   gallery: [],
   allTypePages: {
-    mariage: { meaux: { content: 'INTERNAL-OTHER-CONTENT' }, 'nanteuil-les-meaux': { content: 'INTERNAL-OTHER-CONTENT' }, bobigny: { content: 'ONLY-GENERATED-NOT-PUBLISHED' } },
-    anniversaire: { 'nanteuil-les-meaux': { content: 'LEGACY-OTHER-CONTENT' } },
+    mariage: { 'meaux-77100': { content: 'INTERNAL-OTHER-CONTENT' }, 'nanteuil-les-meaux-77100': { content: 'INTERNAL-OTHER-CONTENT' }, 'bobigny-93000': { content: 'ONLY-GENERATED-NOT-PUBLISHED' } },
+    anniversaire: { 'nanteuil-les-meaux-77100': { content: 'LEGACY-OTHER-CONTENT' } },
   },
   blogArticles: {
     exemple: { slug: 'exemple', title: 'Préparer son mariage', theme: 'mariage', excerpt: 'Conseils utiles', status: 'published' },
@@ -136,19 +139,19 @@ after(async () => {
 })
 
 test('the snapshot includes public data only', () => {
-  const snapshot = publication.makeCitySnapshot({ slug: 'meaux', ...fixture })
+  const snapshot = publication.makeCitySnapshot({ slug: 'meaux-77100', ...fixture })
   const json = JSON.stringify(snapshot)
   for (const privateValue of ['DO-NOT-PUBLISH-TOKEN', pin, 'PRIVATE-BANK-INFO', 'PRIVATE-DRAFT', 'INTERNAL-OTHER-CONTENT', 'LEGACY-OTHER-CONTENT']) {
     assert.ok(!json.includes(privateValue), privateValue)
   }
-  assert.equal(snapshot.allTypePages.anniversaire['nanteuil-les-meaux'], true)
+  assert.equal(snapshot.allTypePages.anniversaire['nanteuil-les-meaux-77100'], true)
   assert.equal(snapshot.blogArticles[0].slug, 'exemple')
   assert.throws(() => publication.makeCitySnapshot({ ...fixture, slug: '../escape' }), /invalide/)
   assert.throws(() => publication.makeCitySnapshot({ ...fixture, slug: 'ville-inconnue' }), /invalide/)
 })
 
 test('unsupported restored FAQ edits stop publication before any page write', async () => {
-  const generated = generateWeddingPage({ slug: 'nanteuil-les-meaux', seed: 12 })
+  const generated = generateWeddingPage({ slug: 'nanteuil-les-meaux-77100', seed: 12, travel })
   const changed = {
     ...generated,
     content: generated.content.replace('Peut-on apporter son propre traiteur ?', 'Une question sans réponse connue ?'),
@@ -163,7 +166,7 @@ test('unsupported restored FAQ edits stop publication before any page write', as
   try {
     await assert.rejects(publication.publishWeddingPages({
       ...fixture,
-      pages: { meaux: fixture.pages.meaux, 'nanteuil-les-meaux': changed },
+      pages: { 'meaux-77100': fixture.pages['meaux-77100'], 'nanteuil-les-meaux-77100': changed },
       origin,
       onProgress() {},
     }), /questions FAQ personnalisées/)
@@ -174,7 +177,7 @@ test('unsupported restored FAQ edits stop publication before any page write', as
 })
 
 test('HTML has content, self-canonical, SEO and quote links before JavaScript', () => {
-  const snapshot = publication.makeCitySnapshot({ slug: 'meaux', ...fixture })
+  const snapshot = publication.makeCitySnapshot({ slug: 'meaux-77100', ...fixture })
   const html = publication.renderCityDocument({ template, snapshot, settings: fixture.settings, origin })
   assert.match(html, /<h1[^>]*>Location salle de mariage près de Meaux/)
   assert.ok(html.includes('<title>Le Paradise 0184196949 | Salle de mariage Meaux 77100</title>'))
@@ -183,7 +186,7 @@ test('HTML has content, self-canonical, SEO and quote links before JavaScript', 
   assert.ok(html.includes(`<meta property="og:description" content="${expectedDescription}" />`))
   assert.ok(html.includes('<meta property="og:title" content="Le Paradise 0184196949 | Salle de mariage Meaux 77100" />'))
   assert.match(html, /Texte unique \$&amp; et &lt;script&gt;/)
-  assert.ok(html.includes(`<link rel="canonical" href="${origin}/locationsalledemariage/meaux"`))
+  assert.ok(html.includes(`<link rel="canonical" href="${origin}/locationsalledemariage/meaux-77100"`))
   assert.match(html, /name="robots" content="index, follow/)
   assert.ok(!html.includes('noindex'))
   assert.match(html, /href="\/devis"/)
@@ -215,7 +218,7 @@ test('HTML has content, self-canonical, SEO and quote links before JavaScript', 
   assert.ok(!html.includes('key=${'))
   const directory = html.match(/<section class="wedding-directory"[\s\S]*?<\/section>/)[0]
   assert.match(directory, /Seine-et-Marne \(77\)/)
-  assert.ok(directory.includes('href="/locationsalledemariage/meaux" title="Location salle de mariage Meaux">Location salle de mariage Meaux</a>'))
+  assert.ok(directory.includes('href="/locationsalledemariage/meaux-77100" title="Location salle de mariage Meaux">Location salle de mariage Meaux</a>'))
   assert.ok(directory.includes('Location salle de mariage Nanteuil les Meaux'))
   assert.ok(!directory.includes('locationsalleanniversaire'))
   assert.ok(!directory.includes('/bobigny'))
@@ -228,11 +231,12 @@ test('PHP rejects unauthenticated writes, traversal and malformed HTML', async (
     method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Admin-Pin': adminPin }, body: JSON.stringify(body),
   })
   assert.equal((await fetch(`${origin}/api/static-publish.php`)).status, 405)
-  assert.equal((await post({ action: 'page', slug: 'meaux', html: '' }, 'wrong')).status, 403)
+  assert.equal((await post({ action: 'page', slug: 'meaux-77100', html: '' }, 'wrong')).status, 403)
   assert.equal((await post({ action: 'page', slug: '../escape', html: '' })).status, 400)
-  assert.equal((await post({ action: 'page', slug: 'meaux', html: '<html>bad</html>' })).status, 400)
-  assert.equal((await post({ action: 'seo', sitemap: 'bad', robots: 'bad', expectedRegistryHash: 'missing' })).status, 400)
-  assert.equal((await post({ action: 'page', slug: 'meaux', html: 'x'.repeat(15 * 1024 * 1024) })).status, 413)
+  assert.equal((await post({ action: 'page', slug: 'meaux-77100', html: '<html>bad</html>' })).status, 400)
+  assert.equal((await post({ action: 'seo', sitemap: 'bad', robots: 'bad', expectedRegistryHash: 'missing', aliases: {} })).status, 400)
+  assert.equal((await post({ action: 'inspect', slugs: ['meaux'] })).status, 409)
+  assert.equal((await post({ action: 'page', slug: 'meaux-77100', html: 'x'.repeat(15 * 1024 * 1024) })).status, 413)
 })
 
 test('the former OpenAI endpoint is disabled even when deployed over an old site', async () => {
@@ -260,12 +264,12 @@ test('publishes physical files at extensionless URLs and republishes safely', as
       }
     }
     const sitemap = await (await fetch('/sitemap.xml')).text()
-    assert.ok(sitemap.includes(`${origin}/locationsalledemariage/meaux`))
-    assert.ok(sitemap.includes('/locationsalleanniversaire/nanteuil-les-meaux'))
+    assert.ok(sitemap.includes(`${origin}/locationsalledemariage/meaux-77100`))
+    assert.ok(sitemap.includes('/locationsalleanniversaire/nanteuil-les-meaux-77100'))
     assert.ok(sitemap.includes('/blog/exemple'))
     assert.ok(!sitemap.includes('/blog/brouillon'))
     assert.ok(!sitemap.includes('/devis'))
-    assert.ok(!sitemap.includes('/locationsalledemariage/bobigny'))
+    assert.ok(!sitemap.includes('/locationsalledemariage/bobigny-93000'))
     assert.ok((await (await fetch('/robots.txt')).text()).includes(`Sitemap: ${origin}/sitemap.xml`))
     assert.equal((await fetch('/storage-data/paradise_settings.json')).status, 403)
     const directory = await (await fetch('/wedding-directory.html')).text()
@@ -275,18 +279,18 @@ test('publishes physical files at extensionless URLs and republishes safely', as
     assert.match(home, /<title>Location salle de mariage à Nanteuil-lès-Meaux/)
     assert.ok(home.includes(`rel="canonical" href="${origin}/"`))
     assert.equal((home.match(/id="public-wedding-directory"/g) || []).length, 1)
-    assert.deepEqual(await getPublishedWeddingSlugs(), ['meaux', 'nanteuil-les-meaux'])
+    assert.deepEqual(await getPublishedWeddingSlugs(), ['meaux-77100', 'nanteuil-les-meaux-77100'])
     // Changing the source JSON must not change a published page until republication.
     await writeFile(join(site, 'storage-data/paradise_city_pages.json'), JSON.stringify({
-      meaux: { content: 'SOURCE-CHANGED-NOT-YET-PUBLISHED', generatedAt: '2026-01-12T12:00:00Z' },
+      'meaux-77100': { content: 'SOURCE-CHANGED-NOT-YET-PUBLISHED', generatedAt: '2026-01-12T12:00:00Z', travel },
     }))
-    assert.ok(!(await (await fetch('/locationsalledemariage/meaux')).text()).includes('SOURCE-CHANGED-NOT-YET-PUBLISHED'))
-    const changed = { ...fixture, pages: { ...fixture.pages, meaux: { ...fixture.pages.meaux, content: 'Contenu republié et fixe.' } } }
+    assert.ok(!(await (await fetch('/locationsalledemariage/meaux-77100')).text()).includes('SOURCE-CHANGED-NOT-YET-PUBLISHED'))
+    const changed = { ...fixture, pages: { ...fixture.pages, 'meaux-77100': { ...fixture.pages['meaux-77100'], content: 'Contenu republié et fixe.' } } }
     assert.deepEqual(await publication.publishWeddingPages({ ...changed, origin, onProgress() {} }), { total: 2, published: 1, unchanged: 1, upgraded: 0 })
-    assert.match(await (await fetch('/locationsalledemariage/meaux')).text(), /Contenu republié et fixe/)
-    assert.match(await (await fetch('/locationsalledemariage/nanteuil-les-meaux')).text(), /Une salle pour votre mariage/)
+    assert.match(await (await fetch('/locationsalledemariage/meaux-77100')).text(), /Contenu republié et fixe/)
+    assert.match(await (await fetch('/locationsalledemariage/nanteuil-les-meaux-77100')).text(), /Une salle pour votre mariage/)
     assert.match(await (await fetch('/devis')).text(), /id="root"/)
-    assert.match(await (await fetch('/locationsalleanniversaire/nanteuil-les-meaux')).text(), /id="root"/)
+    assert.match(await (await fetch('/locationsalleanniversaire/nanteuil-les-meaux-77100')).text(), /id="root"/)
     const updatedHome = await (await fetch('/')).text()
     assert.equal((updatedHome.match(/id="public-wedding-directory"/g) || []).length, 1)
     assert.equal((updatedHome.match(/rel="canonical"/g) || []).length, 1)
@@ -299,20 +303,20 @@ test('publishes saved local templates with the same reviews and keeps legacy pag
   const nativeFetch = globalThis.fetch
   globalThis.fetch = (url, options) => nativeFetch(new URL(url, origin), options)
   try {
-    const savedPage = generateWeddingPage({ slug: 'meaux', seed: 15 })
-    const pages = { ...fixture.pages, meaux: savedPage }
+    const savedPage = generateWeddingPage({ slug: 'meaux-77100', seed: 15, travel })
+    const pages = { ...fixture.pages, 'meaux-77100': savedPage }
     const options = { ...fixture, pages, origin, onProgress() {} }
     await publication.publishWeddingPages(options)
-    const html = await (await fetch('/locationsalledemariage/meaux')).text()
+    const html = await (await fetch('/locationsalledemariage/meaux-77100')).text()
     const snapshot = JSON.parse(html.match(/<script id="city-page-data" type="application\/json">([\s\S]*?)<\/script>/)[1])
     assert.equal(snapshot.page.content, savedPage.content)
     assert.deepEqual(snapshot.page.template.reviewIds, savedPage.template.reviewIds)
     assert.equal((html.match(/<blockquote/g) || []).length, 2)
-    const legacy = await (await fetch('/locationsalledemariage/nanteuil-les-meaux')).text()
-    assert.ok(legacy.includes(fixture.pages['nanteuil-les-meaux'].content))
+    const legacy = await (await fetch('/locationsalledemariage/nanteuil-les-meaux-77100')).text()
+    assert.ok(legacy.includes(fixture.pages['nanteuil-les-meaux-77100'].content))
     assert.ok(!legacy.includes('google-reviews-heading'))
     await publication.publishWeddingPages(options)
-    assert.equal(await (await fetch('/locationsalledemariage/meaux')).text(), html)
+    assert.equal(await (await fetch('/locationsalledemariage/meaux-77100')).text(), html)
   } finally {
     globalThis.fetch = nativeFetch
   }
@@ -333,7 +337,7 @@ test('publication registry returns no links before publication and rejects inval
 })
 
 test('directory covers all IDF departments with exact text, title, order and unique URLs', () => {
-  const slugs = ['meaux', 'torcy', 'mitry-mory', 'paris-1er', 'versailles', 'evry', 'nanterre', 'bobigny', 'creteil', 'argenteuil', 'meaux', 'ville-inconnue']
+  const slugs = ['meaux-77100', 'torcy-77200', 'mitry-mory-77290', 'paris-1er-75001', 'versailles-78000', 'evry-91000', 'nanterre-92000', 'bobigny-93000', 'creteil-94000', 'argenteuil-95100', 'meaux-77100', 'ville-inconnue']
   const html = renderToStaticMarkup(WeddingDirectory({ slugs }))
   for (const department of ['75', '77', '78', '91', '92', '93', '94', '95']) {
     assert.ok(html.includes(`(${department})`), department)
@@ -354,15 +358,15 @@ test('directory covers all IDF departments with exact text, title, order and uni
 
 test('SEO uses unique local titles without moving the venue or indexing private pages', () => {
   const settings = { nom: 'Le Paradise', siteUrl: origin }
-  const meaux = buildSeoData('/locationsalledemariage/meaux', settings, fixture.pages, PAGE_TYPES_BY_ID.mariage, null, null, origin)
-  const nanteuil = buildSeoData('/locationsalledemariage/nanteuil-les-meaux', settings, fixture.pages, PAGE_TYPES_BY_ID.mariage, null, null, origin)
+  const meaux = buildSeoData('/locationsalledemariage/meaux-77100', settings, fixture.pages, PAGE_TYPES_BY_ID.mariage, null, null, origin)
+  const nanteuil = buildSeoData('/locationsalledemariage/nanteuil-les-meaux-77100', settings, fixture.pages, PAGE_TYPES_BY_ID.mariage, null, null, origin)
   assert.notEqual(meaux.title, nanteuil.title)
   assert.notEqual(meaux.description, nanteuil.description)
   assert.equal(meaux.title, 'Le Paradise 0184196949 | Salle de mariage Meaux 77100')
   assert.equal(meaux.description, 'Vous recherchez une salle de mariage à Meaux 77 ? Découvrez notre salle de réception a proximité de seine et marne, idéale pour célébrer votre mariage. Contactez-nous pour réserver une salle de mariage et obtenir un devis personnalisé à Meaux !')
   assert.equal(nanteuil.title, 'Le Paradise 0184196949 | Salle de mariage Nanteuil les Meaux 77100')
   assert.ok(meaux.imageUrl.endsWith('/media/hero-paradise.jpg'))
-  for (const path of ['/', '/blog', '/blog/exemple', '/devis', '/mentions-legales', '/conditions-generales', '/politique-confidentialite', '/locationsalledemariage/meaux', '/locationsalledereception/meaux']) {
+  for (const path of ['/', '/blog', '/blog/exemple', '/devis', '/mentions-legales', '/conditions-generales', '/politique-confidentialite', '/locationsalledemariage/meaux-77100', '/locationsalledereception/meaux-77100']) {
     assert.equal(isPublicPath(path), true, path)
     assert.doesNotThrow(() => buildSeoData(path, settings, fixture.pages, null, null, null, origin))
   }
@@ -386,19 +390,19 @@ test('all wedding cities have a real postal code and punctuation-free metadata n
     assert.equal(seo.canonical, `${origin}/locationsalledemariage/${city.slug}`)
   }
   for (const [slug, name, postcode, department] of [
-    ['paris-1er', 'Paris 1er', '75001', 'paris'],
-    ['versailles', 'Versailles', '78000', 'yvelines'],
-    ['evry', 'Evry', '91000', 'essonne'],
-    ['boulogne-billancourt', 'Boulogne Billancourt', '92100', 'hauts de seine'],
-    ['epinay-sur-seine', 'Epinay sur Seine', '93800', 'seine saint denis'],
-    ['hay-les-roses', 'Hay les Roses', '94240', 'val de marne'],
-    ['cergy', 'Cergy', '95000', 'val d oise'],
+    ['paris-1er-75001', 'Paris 1er', '75001', 'paris'],
+    ['versailles-78000', 'Versailles', '78000', 'yvelines'],
+    ['evry-91000', 'Evry', '91000', 'essonne'],
+    ['boulogne-billancourt-92100', 'Boulogne Billancourt', '92100', 'hauts de seine'],
+    ['epinay-sur-seine-93800', 'Epinay sur Seine', '93800', 'seine saint denis'],
+    ['hay-les-roses-94240', 'Hay les Roses', '94240', 'val de marne'],
+    ['cergy-95000', 'Cergy', '95000', 'val d oise'],
   ]) {
     const seo = buildSeoData(`/locationsalledemariage/${slug}`, fixture.settings, { [slug]: { content: 'Contenu' } }, PAGE_TYPES_BY_ID.mariage, null, null, origin)
     assert.equal(seo.title, `Le Paradise 0184196949 | Salle de mariage ${name} ${postcode}`)
     assert.ok(seo.description.includes(`proximité de ${department},`))
   }
-  const reception = buildSeoData('/locationsalledereception/nanteuil-les-meaux', fixture.settings, fixture.pages, PAGE_TYPES_BY_ID.reception, null, null, origin)
+  const reception = buildSeoData('/locationsalledereception/nanteuil-les-meaux-77100', fixture.settings, fixture.pages, PAGE_TYPES_BY_ID.reception, null, null, origin)
   assert.equal(reception.title, `Salle de réception à Nanteuil-lès-Meaux — ${fixture.settings.nom}`)
 })
 
@@ -457,6 +461,84 @@ test('video and poster are deployed once with fast-start MP4 and bounded sizes',
   }
 })
 
+async function testDepartments() {
+  const { WEDDING_DEPARTMENTS, departmentPath } = await vite.ssrLoadModule('/src/utils/weddingDepartments.js')
+  assert.equal(WEDDING_DEPARTMENTS.length, 16)
+  const nativeFetch = globalThis.fetch
+  const requests = []
+  globalThis.fetch = (url, options) => {
+    if (url === '/api/static-publish.php') requests.push(JSON.parse(options.body))
+    return nativeFetch(new URL(url, origin), options)
+  }
+  try {
+    const pages = { ...fixture.pages }
+    for (const department of WEDDING_DEPARTMENTS) {
+      const city = department.cities.find((city) => getCityBySlug(city.slug)?.deptCode === department.code)
+      assert.ok(city)
+      pages[city.slug] = { content: `Présentation depuis ${city.name}`, generatedAt: '2026-01-01T00:00:00Z', travel }
+    }
+    const options = { ...fixture, pages, origin, onProgress() {} }
+    await publication.publishWeddingPages(options)
+    for (const department of WEDDING_DEPARTMENTS) {
+      const path = departmentPath(department.code)
+      const response = await fetch(path)
+      assert.equal(response.status, 200)
+      const html = await response.text()
+      assert.equal(html, await readFile(join(site, `${path}.html`), 'utf8'))
+      assert.ok(html.includes(`<link rel="canonical" href="${origin}${path}"`))
+      assert.ok(html.includes(`Location salle de mariage — ${department.name}`.replaceAll('&', '&amp;')))
+      const data = JSON.parse(html.match(/<script id="city-page-data" type="application\/json">([\s\S]*?)<\/script>/)[1])
+      assert.equal(data.departmentCode, department.code)
+      assert.ok(data.slugs.every((slug) => getCityBySlug(slug).deptCode === department.code))
+      assert.ok(!html.includes(pin))
+      const citySlug = Object.keys(pages).find((slug) => getCityBySlug(slug).deptCode === department.code)
+      const cityHtml = await (await fetch(`/locationsalledemariage/${citySlug}`)).text()
+      const directoryHtml = cityHtml.match(/<!-- CITY_DIRECTORY_START -->([\s\S]*?)<!-- CITY_DIRECTORY_END -->/)[1]
+      const links = [...directoryHtml.matchAll(/href="\/locationsalledemariage\/([a-z0-9-]+)"/g)].map((match) => match[1])
+      if (department.region !== 'Île-de-France') assert.ok(links.every((slug) => getCityBySlug(slug).deptCode === department.code))
+      else assert.ok(links.includes('meaux-77100') && links.some((slug) => getCityBySlug(slug).deptCode === '02'))
+      assert.ok(directoryHtml.includes(`href="${path}"`))
+      assert.ok((await (await fetch('/sitemap.xml')).text()).includes(`${origin}${path}</loc>`))
+      const redirected = await fetch(`${path}.html`, { redirect: 'manual' })
+      assert.equal(redirected.status, 301)
+    }
+    assert.equal((await fetch('/locationsalledemariage/departements/99')).status, 404)
+    const regionalDirectory = await (await fetch('/wedding-directory-idf.html')).text()
+    for (const path of ['/blog', '/blog/prix-moyen-d-un-mariage-en-france-en-2025']) {
+      const response = await fetch(path)
+      assert.equal(response.status, 200)
+      const html = await response.text()
+      const footer = html.match(/<!-- WEDDING_DIRECTORY_START -->([\s\S]*?)<!-- WEDDING_DIRECTORY_END -->/)[1]
+      assert.ok(footer.includes(regionalDirectory))
+      assert.match(footer, /Zone de location de salle de mariage/)
+      assert.match(footer, /href="\/locationsalledemariage\/departements\/77"/)
+      const cityLinks = [...footer.matchAll(/href="\/locationsalledemariage\/([a-z0-9-]+)"/g)].map((match) => match[1])
+      assert.ok(cityLinks.length > 0)
+      assert.ok(cityLinks.every((slug) => ['75', '77', '78', '91', '92', '93', '94', '95'].includes(getCityBySlug(slug).deptCode)))
+      for (const code of ['02', '27', '28', '45', '51', '60', '76', '89']) {
+        assert.ok(!footer.includes(`/departements/${code}`))
+      }
+    }
+    const home = await (await fetch('/')).text()
+    assert.match(home, /href="\/locationsalledemariage\/departements\/02"/, 'Homepage retains its full directory')
+    assert.deepEqual(await (await fetch('/wedding-departments.json')).json(), WEDDING_DEPARTMENTS.map(({ code }) => code))
+    requests.length = 0
+    await publication.publishWeddingPages(options)
+    assert.equal(requests.filter(({ action }) => ['department', 'page', 'city-directory'].includes(action)).length, 0, 'No unchanged HTML is rewritten')
+    const post = (body) => fetch('/api/static-publish.php', {
+      method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Admin-Pin': pin }, body: JSON.stringify(body),
+    })
+    const inspection = await (await post({ action: 'inspect', slugs: Object.keys(pages), aliases: {} })).json()
+    const html = await readFile(join(site, 'locationsalledemariage/departements/75.html'), 'utf8')
+    assert.equal((await post({ action: 'department', code: '../75', html, expectedHash: 'missing' })).status, 400)
+    assert.equal((await post({ action: 'department', code: '75', html, expectedHash: 'missing' })).status, 409)
+    assert.equal((await post({ action: 'department', code: '75', html, expectedHash: inspection.departments['75'] })).status, 200)
+    assert.equal(await readFile(join(site, 'locationsalledemariage/departements/75.html'), 'utf8'), html)
+  } finally {
+    globalThis.fetch = nativeFetch
+  }
+}
+
 test('publication migrates legacy directories and writes updated city links into HTML', async () => {
   const nativeFetch = globalThis.fetch
   const requests = []
@@ -467,7 +549,7 @@ test('publication migrates legacy directories and writes updated city links into
   try {
     const options = { ...fixture, origin, onProgress() {} }
     await publication.publishWeddingPages(options)
-    const file = join(site, 'locationsalledemariage', 'meaux.html')
+    const file = join(site, 'locationsalledemariage', 'meaux-77100.html')
     const original = await readFile(file, 'utf8')
     assert.match(original, /<!-- CITY_DIRECTORY_START -->/)
     const block = original.match(/<!-- CITY_DIRECTORY_START -->([\s\S]*?)<!-- CITY_DIRECTORY_END -->/)[0]
@@ -490,51 +572,287 @@ test('publication migrates legacy directories and writes updated city links into
     assert.equal(requests.filter((request) => request.action === 'city-directory').length, 1)
     assert.equal(requests.filter((request) => request.action === 'page').length, 0)
 
-    const withNewCity = { ...fixture.pages, bobigny: { content: 'Nouvelle page Bobigny', generatedAt: '2026-02-01T12:00:00Z' } }
+    const withNewCity = { ...fixture.pages, 'bobigny-93000': { content: 'Nouvelle page Bobigny', generatedAt: '2026-02-01T12:00:00Z', travel } }
     requests.length = 0
     const addition = await publication.publishWeddingPages({ ...options, pages: withNewCity })
     assert.deepEqual(addition, { total: 3, published: 1, unchanged: 0, upgraded: 2 })
     const withDirectory = await readFile(file, 'utf8')
     const visibleDirectory = withDirectory.match(/<!-- CITY_DIRECTORY_START -->([\s\S]*?)<!-- CITY_DIRECTORY_END -->/)[1]
-    assert.match(visibleDirectory, /href="\/locationsalledemariage\/bobigny"/)
+    assert.match(visibleDirectory, /href="\/locationsalledemariage\/bobigny-93000"/)
     assert.match(visibleDirectory, /Location salle de mariage près de Meaux/)
     assert.notEqual(withDirectory, migrated)
     const updatedBlock = withDirectory.match(/<!-- CITY_DIRECTORY_START -->[\s\S]*?<!-- CITY_DIRECTORY_END -->/)[0]
     const migratedBlock = migrated.match(/<!-- CITY_DIRECTORY_START -->[\s\S]*?<!-- CITY_DIRECTORY_END -->/)[0]
     assert.equal(withDirectory.replace(updatedBlock, migratedBlock), migrated, 'Only the directory block may change')
-    assert.deepEqual(requests.filter((request) => request.action === 'page').map((request) => request.slug), ['bobigny'])
-    assert.match(await (await fetch('/wedding-directory.html')).text(), /locationsalledemariage\/bobigny/)
-    assert.doesNotMatch(original, /href="\/locationsalledemariage\/bobigny"/)
-    assert.match(await (await fetch('/locationsalledemariage/meaux')).text(), /<!-- CITY_DIRECTORY_START -->[\s\S]*href="\/locationsalledemariage\/bobigny"/)
-    assert.match(await readFile(join(site, 'locationsalledemariage', 'bobigny.html'), 'utf8'), /Location salle de mariage près de Bobigny/)
+    assert.deepEqual(requests.filter((request) => request.action === 'page').map((request) => request.slug), ['bobigny-93000'])
+    assert.match(await (await fetch('/wedding-directory.html')).text(), /locationsalledemariage\/bobigny-93000/)
+    assert.doesNotMatch(original, /href="\/locationsalledemariage\/bobigny-93000"/)
+    assert.match(await (await fetch('/locationsalledemariage/meaux-77100')).text(), /<!-- CITY_DIRECTORY_START -->[\s\S]*href="\/locationsalledemariage\/bobigny-93000"/)
+    assert.match(await readFile(join(site, 'locationsalledemariage', 'bobigny-93000.html'), 'utf8'), /Location salle de mariage près de Bobigny/)
 
     requests.length = 0
-    const subset = await publication.publishWeddingPages({ ...options, pages: { meaux: fixture.pages.meaux } })
+    const subset = await publication.publishWeddingPages({ ...options, pages: { 'meaux-77100': fixture.pages['meaux-77100'] } })
     assert.deepEqual(subset, { total: 3, published: 0, unchanged: 3, upgraded: 0 })
     assert.equal(await readFile(file, 'utf8'), withDirectory)
     assert.deepEqual(requests.filter((request) => request.action === 'page' || request.action === 'city-directory'), [])
-    assert.match(await (await fetch('/sitemap.xml')).text(), /locationsalledemariage\/bobigny/)
-    assert.match(await (await fetch('/wedding-directory.html')).text(), /locationsalledemariage\/nanteuil-les-meaux/)
+    assert.match(await (await fetch('/sitemap.xml')).text(), /locationsalledemariage\/bobigny-93000/)
+    assert.match(await (await fetch('/wedding-directory.html')).text(), /locationsalledemariage\/nanteuil-les-meaux-77100/)
 
     requests.length = 0
-    const forced = await publication.publishWeddingPages({ ...options, pages: { meaux: fixture.pages.meaux }, updateTemplate: true })
+    const forced = await publication.publishWeddingPages({ ...options, pages: { 'meaux-77100': fixture.pages['meaux-77100'] }, updateTemplate: true })
     assert.deepEqual(forced, { total: 3, published: 1, unchanged: 2, upgraded: 0 })
-    assert.deepEqual(requests.filter((request) => request.action === 'page').map((request) => request.slug), ['meaux'])
+    assert.deepEqual(requests.filter((request) => request.action === 'page').map((request) => request.slug), ['meaux-77100'])
     const updated = await readFile(file, 'utf8')
     assert.match(updated, /<h2 id="wedding-directory-heading">Location salle de mariage près de Meaux<\/h2>/)
 
     const post = (body) => fetch('/api/static-publish.php', {
       method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Admin-Pin': pin }, body: JSON.stringify(body),
     })
-    const race = await post({ action: 'city-directory', slug: 'meaux', directory: visibleDirectory, styles: '.wedding-directory{}', expectedHash: '0'.repeat(64) })
+
+    const race = await post({ action: 'city-directory', slug: 'meaux-77100', directory: visibleDirectory, styles: '.wedding-directory{}', expectedHash: '0'.repeat(64) })
     assert.equal(race.status, 409)
     assert.equal(await readFile(file, 'utf8'), updated)
-    const oldClient = await post({ action: 'page', slug: 'meaux', html: updated })
+    const oldClient = await post({ action: 'page', slug: 'meaux-77100', html: updated })
     assert.equal(oldClient.status, 409)
-    const conflict = await post({ action: 'page', slug: 'meaux', html: updated, expectedHash: '0'.repeat(64) })
+    const conflict = await post({ action: 'page', slug: 'meaux-77100', html: updated, expectedHash: '0'.repeat(64) })
     assert.equal(conflict.status, 409)
     assert.equal(await readFile(file, 'utf8'), updated)
   } finally {
     globalThis.fetch = nativeFetch
   }
+})
+
+test('incremental PHP storage saves bounded requests and backs up large collections on the server', async () => {
+  const nativeFetch = globalThis.fetch
+  const key = 'paradise_city_pages_reception'
+  const path = join(site, 'storage-data', `${key}.json`)
+  const backupPath = join(site, 'storage-data', 'paradise_city_pages_backup_reception.json')
+  const existing = Object.fromEntries(Array.from({ length: 70 }, (_, index) => [
+    `city-${index}`, { content: 'Texte conservé. '.repeat(1100), generatedAt: '2026-01-01T00:00:00Z', travel },
+  ]))
+  const sizes = []
+  await writeFile(path, JSON.stringify(existing))
+  assert.ok(Buffer.byteLength(JSON.stringify(existing)) > 1024 * 1024)
+  globalThis.fetch = (url, options) => {
+    if (options?.method === 'POST') {
+      sizes.push(Buffer.byteLength(options.body))
+      if (sizes.at(-1) > 128 * 1024) return Promise.resolve(new Response('Request too large', { status: 413 }))
+    }
+    return nativeFetch(new URL(url, origin), options)
+  }
+  try {
+    const { makePageTypeStorage } = await vite.ssrLoadModule('/src/utils/cityPageStorage.js')
+    const api = makePageTypeStorage('reception')
+    const page = { content: 'Page ajoutée', generatedAt: '2026-02-01T00:00:00Z', template: { version: 1, seed: 42 } }
+    const vauxPage = generateWeddingPage({ slug: 'vaux-sur-lunain-77710', seed: 42, travel })
+    await api.backupPages({ requireServer: true })
+    await api.savePage('meaux-77100', page)
+    await api.savePage('vaux-sur-lunain-77710', vauxPage)
+    assert.ok(sizes.every((size) => size < 128 * 1024), 'Neither saving nor backing up may upload the full collection')
+    const saved = JSON.parse(await readFile(path, 'utf8'))
+    assert.deepEqual(saved, { ...existing, 'meaux-77100': page, 'vaux-sur-lunain-77710': vauxPage })
+    const backups = JSON.parse(await readFile(backupPath, 'utf8'))
+    assert.deepEqual(backups[0].snapshot, existing)
+    for (let i = 0; i < 5; i++) await api.backupPages({ requireServer: true })
+    assert.equal(JSON.parse(await readFile(backupPath, 'utf8')).length, 5)
+    await assert.rejects(api.savePage('../invalid', page), /HTTP 400/)
+    assert.deepEqual(JSON.parse(await readFile(path, 'utf8')), saved)
+    await writeFile(path, '{invalid JSON')
+    await assert.rejects(api.savePage('meaux-77100', page), /HTTP 409.*Aucun fichier/)
+    assert.equal(await readFile(path, 'utf8'), '{invalid JSON')
+    await assert.rejects(api.backupPages({ requireServer: true }), /HTTP 409/)
+    assert.equal(JSON.parse(await readFile(backupPath, 'utf8')).length, 5)
+  } finally {
+    globalThis.fetch = nativeFetch
+  }
+})
+
+test('all sixteen departments publish real HTML pages and regional directories remain scoped', testDepartments)
+
+test('postcode identities preserve homonymous towns and migrate historical URLs without deletion', async () => {
+  const { canonicalCityPages, ungeneratedCitySlugs, legacyCityAliases } = await vite.ssrLoadModule('/src/utils/cityPageIdentity.js')
+  const { DEPARTMENTS } = await vite.ssrLoadModule('/src/data/idf-cities.js')
+  assert.equal(new Set(ALL_CITIES.map((city) => city.slug)).size, ALL_CITIES.length)
+  assert.ok(ALL_CITIES.every((city) => city.slug.endsWith(`-${city.postalCode}`)))
+  assert.equal(getCityBySlug('villeroy-77410').deptCode, '77')
+  assert.equal(getCityBySlug('villeroy-89100').deptCode, '89')
+  assert.equal(getCityBySlug('villeroy').slug, 'villeroy-77410', 'Historical lookup keeps its original department')
+  const oldPage = { content: 'Ancien texte conservé', generatedAt: '2026-01-01T00:00:00Z', travel }
+  const secondPage = { ...oldPage, content: 'Texte Yonne distinct' }
+  assert.deepEqual(canonicalCityPages({ villeroy: oldPage, 'villeroy-89100': secondPage }), {
+    'villeroy-77410': oldPage, 'villeroy-89100': secondPage,
+  })
+  const taggedPage = { ...secondPage, city: { slug: 'villeroy-89100' } }
+  assert.deepEqual(canonicalCityPages({ villeroy: taggedPage }), { 'villeroy-89100': taggedPage })
+  assert.deepEqual(canonicalCityPages({ villeroy: oldPage, 'villeroy-77410': secondPage }), { 'villeroy-77410': secondPage })
+  const department = DEPARTMENTS.find(({ code }) => code === '77')
+  const missing = ungeneratedCitySlugs(department, { meaux: oldPage, villeroy: oldPage })
+  assert.ok(!missing.includes('meaux-77100') && !missing.includes('villeroy-77410'))
+  assert.ok(missing.includes('chessy-77700'))
+  assert.ok(!missing.includes('villeroy-89100'))
+  const nativeFetch = globalThis.fetch
+  globalThis.fetch = (url, options) => nativeFetch(new URL(url, origin), options)
+  try {
+    const { makePageTypeStorage } = await vite.ssrLoadModule('/src/utils/cityPageStorage.js')
+    const api = makePageTypeStorage('anniversaire')
+    const storagePath = join(site, 'storage-data/paradise_city_pages_anniversaire.json')
+    await writeFile(storagePath, JSON.stringify({ villeroy: oldPage }))
+    await api.migratePageKeys()
+    await api.savePage('villeroy-89100', secondPage)
+    const stored = JSON.parse(await readFile(storagePath, 'utf8'))
+    assert.deepEqual(stored, { 'villeroy-77410': oldPage, 'villeroy-89100': secondPage })
+    const backups = await api.getBackups()
+    assert.deepEqual(backups[0].snapshot.villeroy, oldPage)
+
+    const snapshot = publication.makeCitySnapshot({ ...fixture, slug: 'villeroy-77410', pages: { 'villeroy-77410': oldPage } })
+    const canonicalHtml = publication.renderCityDocument({ template, snapshot, settings: fixture.settings, origin })
+    const oldHtml = canonicalHtml.replaceAll('villeroy-77410', 'villeroy')
+    await writeFile(join(site, 'locationsalledemariage/villeroy.html'), oldHtml)
+    const registryPath = join(site, 'wedding-pages.json')
+    const registry = JSON.parse(await readFile(registryPath, 'utf8'))
+    await writeFile(registryPath, JSON.stringify([...registry, 'villeroy']))
+    // Simulate a restored backup that omits this already-published city.
+    await publication.publishWeddingPages({ ...fixture, origin, onProgress() {} })
+    const migrated = await readFile(join(site, 'locationsalledemariage/villeroy-77410.html'), 'utf8')
+    assert.ok(migrated.includes(oldPage.content))
+    assert.ok(migrated.includes(`<link rel="canonical" href="${origin}/locationsalledemariage/villeroy-77410"`))
+    assert.equal(await readFile(join(site, 'locationsalledemariage/villeroy.html'), 'utf8'), oldHtml)
+    const redirect = await fetch('/locationsalledemariage/villeroy', { redirect: 'manual' })
+    assert.equal(redirect.status, 301)
+    assert.ok(redirect.headers.get('location').endsWith('/locationsalledemariage/villeroy-77410'))
+    for (const type of Object.values(PAGE_TYPES_BY_ID)) {
+      for (const suffix of ['', '.html', '/']) {
+        const response = await fetch(`${type.basePath}/villeroy${suffix}`, { redirect: 'manual' })
+        assert.equal(response.status, 301)
+        assert.ok(response.headers.get('location').endsWith(`${type.basePath}/villeroy-77410`))
+      }
+    }
+    assert.equal((await fetch('/locationsalledemariage/villeroy-77410')).status, 200)
+    assert.ok(!(await (await fetch('/sitemap.xml')).text()).includes(`${origin}/locationsalledemariage/villeroy</loc>`))
+    assert.deepEqual(JSON.parse(await readFile(join(site, 'wedding-city-aliases.json'), 'utf8')).villeroy, legacyCityAliases.villeroy)
+    await publication.publishWeddingPages({ ...fixture, pages: { ...fixture.pages, 'villeroy-89100': secondPage }, origin, onProgress() {} })
+    assert.ok((await (await fetch('/locationsalledemariage/villeroy-89100')).text()).includes(secondPage.content))
+    assert.ok((await (await fetch('/locationsalledemariage/villeroy-77410')).text()).includes(oldPage.content))
+    const preserved = await readFile(join(site, 'locationsalledemariage/villeroy-77410.html'), 'utf8')
+    await publication.publishWeddingPages({ ...fixture, pages: { ...fixture.pages, 'villeroy-89100': secondPage }, origin, onProgress() {} })
+    assert.equal(await readFile(join(site, 'locationsalledemariage/villeroy-77410.html'), 'utf8'), preserved)
+  } finally {
+    globalThis.fetch = nativeFetch
+  }
+})
+
+test('maintenance gates static pages and APIs, renamed administration stays accessible, and purges persist', async () => {
+  const request = (path, data, cookie) => fetch(new URL(path, origin), {
+    ...(data ? { method: 'POST', body: JSON.stringify(data) } : {}),
+    headers: { 'Content-Type': 'application/json', ...(cookie ? { Cookie: cookie } : {}) },
+    redirect: 'manual',
+  })
+  assert.equal((await request('/api/site-admin.php')).status, 403)
+  assert.equal((await request('/api/data-purge.php', { type: 'all', confirmation: 'PURGER' })).status, 403)
+  const publicSettings = await (await request('/api/storage.php?key=paradise_settings')).json()
+  assert.ok(!Object.hasOwn(publicSettings, 'pin'))
+  assert.equal((await request('/api/storage.php?key=paradise_settings', { pin: 'changed' })).status, 403)
+  const login = await request('/api/site-admin.php', { action: 'login', pin })
+  assert.equal(login.status, 200)
+  const cookie = login.headers.get('set-cookie').split(';')[0]
+  assert.equal((await request('/api/site-admin.php', { action: 'save', adminSlug: '../invalid' }, cookie)).status, 400)
+  const renamed = await request('/api/site-admin.php', { action: 'save', adminSlug: 'gestion-paradise-test' }, cookie)
+  assert.equal(renamed.status, 200)
+  assert.equal((await request('/admin')).status, 404)
+  assert.equal((await request('/dashboard')).status, 404)
+  const customLogin = await request('/gestion-paradise-test')
+  assert.equal(customLogin.status, 200)
+  assert.ok((await customLogin.text()).includes('"dashboard":"/gestion-paradise-test/dashboard"'))
+  assert.ok(!(await (await request('/')).text()).includes('gestion-paradise-test'))
+  assert.equal((await request('/api/site-admin.php', { action: 'save', maintenance: true }, cookie)).status, 200)
+  assert.equal((await request('/')).status, 200)
+  for (const path of ['/blog', '/devis', '/locationsalledemariage/meaux-77100', '/locationsalledemariage/meaux-77100.html', '/locationsalledemariage/departements/77', '/sitemap.xml']) {
+    const blocked = await request(path)
+    assert.equal(blocked.status, 503, path)
+    assert.equal(blocked.headers.get('retry-after'), '3600')
+  }
+  assert.equal((await request('/gestion-paradise-test/dashboard', null, cookie)).status, 200)
+  assert.equal((await request('/api/storage.php?key=paradise_clients')).status, 503)
+  assert.equal((await request('/api/storage.php?key=paradise_clients', null, cookie)).status, 200)
+  assert.equal((await request('/api/storage.php?key=paradise_settings')).status, 200)
+  assert.equal((await request('/api/site-admin.php', { action: 'save', maintenance: false }, cookie)).status, 200)
+  assert.equal((await request('/locationsalledemariage/meaux-77100')).status, 200)
+
+  const json = async (key) => JSON.parse(await readFile(join(site, `storage-data/${key}.json`), 'utf8'))
+  const store = async (key, value) => writeFile(join(site, `storage-data/${key}.json`), JSON.stringify(value))
+  const client = { id: 'test', nom: 'Conservé', dateEvenement: '2027-05-15', status: 'validé_admin',
+    payments: [{ montant: 100 }], paymentReceipts: [{ id: 'receipt' }], assignedStaff: ['staff'] }
+  await store('paradise_clients', [client])
+  await store('paradise_receipts_test', { receipt: 'private' })
+  await store('paradise_cal_manual_events', [{ id: 'event' }])
+  const purge = (type, confirmation = 'PURGER') => request('/api/data-purge.php', { type, confirmation }, cookie)
+  assert.equal((await purge('all', 'incorrect')).status, 400)
+  assert.equal((await purge('compta')).status, 200)
+  const accountant = (await json('paradise_clients'))[0]
+  assert.equal(accountant.nom, client.nom)
+  assert.equal(accountant.dateEvenement, client.dateEvenement)
+  assert.deepEqual(accountant.payments, [])
+  assert.deepEqual(accountant.paymentReceipts, [])
+  assert.equal(accountant.accountingExcluded, true)
+  assert.deepEqual(await json('paradise_receipts_test'), {})
+  assert.equal((await purge('calendar')).status, 200)
+  assert.equal((await json('paradise_clients'))[0].calendarExcluded, true)
+  assert.equal((await json('paradise_clients'))[0].dateEvenement, client.dateEvenement)
+  assert.deepEqual(await json('paradise_cal_manual_events'), [])
+  const { default: ComptabiliteTab } = await vite.ssrLoadModule('/src/components/Dashboard/tabs/ComptabiliteTab.jsx')
+  const { default: CalendarTab } = await vite.ssrLoadModule('/src/components/Dashboard/tabs/CalendarTab.jsx')
+  const storage = await vite.ssrLoadModule('/src/utils/storage.js')
+  const nativeFetch = globalThis.fetch
+  globalThis.fetch = (url, options) => nativeFetch(new URL(url, origin), { ...options, headers: { ...options?.headers, Cookie: cookie } })
+  try {
+    await storage.initStorage({ names: ['clients', 'calOverrides', 'calStaff', 'calManualEvents', 'staff', 'ingredients', 'matieresPremieresRecettes'], reload: true, persistDefaults: false, paced: false })
+    assert.ok(!renderToStaticMarkup(createElement(ComptabiliteTab)).includes('Conservé'))
+    assert.ok(!renderToStaticMarkup(createElement(CalendarTab)).includes('Conservé'))
+  } finally { globalThis.fetch = nativeFetch }
+  for (const [type, keys] of [
+    ['staff', ['paradise_staff']], ['stock', ['paradise_stock_sec', 'paradise_stock_matiere', 'paradise_stock_boisson']],
+    ['matieres', ['paradise_ingredients', 'paradise_matieres_recettes']], ['formules', ['paradise_formules']],
+    ['menus', ['paradise_menus']], ['gateaux', ['paradise_gateaux']], ['prestations', ['paradise_prestations']],
+  ]) {
+    for (const key of keys) await store(key, [{ id: 'delete-me' }])
+    assert.equal((await purge(type)).status, 200, type)
+    for (const key of keys) assert.deepEqual(await json(key), [])
+    assert.equal((await json('paradise_clients'))[0].nom, client.nom)
+  }
+  await store('paradise_city_pages', fixture.pages)
+  await store('paradise_city_pages_backup', [{ snapshot: fixture.pages }])
+  assert.equal((await purge('pages-mariage')).status, 200)
+  assert.deepEqual(await json('paradise_city_pages'), {})
+  assert.deepEqual(await json('paradise_city_pages_backup'), [])
+  assert.equal((await request('/locationsalledemariage/meaux-77100')).status, 404)
+  assert.equal((await request('/locationsalledemariage/meaux-77100.html')).status, 404)
+  assert.equal((await request('/locationsalledemariage/villeroy')).status, 404)
+  assert.equal((await request('/locationsalledemariage/departements/77')).status, 404)
+  assert.ok(!(await (await request('/sitemap.xml')).text()).includes('/locationsalledemariage/'))
+  assert.ok(!(await (await request('/')).text()).includes('/locationsalledemariage/meaux-77100'))
+  await mkdir(join(site, 'storage-data/quote-followups'), { recursive: true })
+  await writeFile(join(site, 'storage-data/quote-followups/flow-test.json'), '{}')
+  await store('paradise_docs_test', { document: 'private' })
+  await store('paradise_blog_articles', fixture.blogArticles)
+  await store('paradise_blog_backup', [{ articles: fixture.blogArticles }])
+  assert.equal((await purge('all')).status, 200)
+  assert.deepEqual(await json('paradise_clients'), [])
+  assert.deepEqual(await json('paradise_docs_test'), {})
+  assert.deepEqual(await json('paradise_blog_articles'), {})
+  assert.deepEqual(await json('paradise_blog_backup'), [])
+  assert.deepEqual(await json('paradise_settings'), fixture.settings)
+  assert.equal((await json('site-controls')).adminSlug, 'gestion-paradise-test')
+  assert.equal((await request('/api/site-admin.php', null, cookie)).status, 200)
+  assert.equal((await request('/')).status, 200)
+  const newSettings = { ...fixture.settings, pin: 'changed-test-pin' }
+  assert.equal((await request('/api/storage.php?key=paradise_settings', newSettings, cookie)).status, 200)
+  assert.equal((await request('/api/site-admin.php', null, cookie)).status, 200, 'Changing PIN retains the authenticated session')
+  assert.equal((await request('/api/site-admin.php', { action: 'logout' }, cookie)).status, 200)
+  assert.equal((await request('/api/site-admin.php', null, cookie)).status, 403)
+  for (let count = 0; count < 3; count++) {
+    assert.equal((await request('/api/site-admin.php', { action: 'login', pin: 'incorrect' })).status, 403)
+  }
+  const throttled = await request('/api/site-admin.php', { action: 'login', pin: newSettings.pin })
+  assert.equal(throttled.status, 429)
+  assert.equal(throttled.headers.get('X-RateLimit-Scope'), 'admin-login')
 })

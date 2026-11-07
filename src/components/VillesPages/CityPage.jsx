@@ -2,7 +2,7 @@ import { siteFetch as fetch } from '../../utils/siteFetch'
 import { useEffect, useState } from 'react'
 import { useParams, Link as RouterLink } from 'react-router-dom'
 import { makePageTypeStorage, getCityPagesConfig } from '../../utils/cityPageStorage'
-import { getCityBySlug, getNearbyCities, haversineKm } from '../../data/idf-cities'
+import { getCityBySlug, getNearbyCities } from '../../data/idf-cities'
 import { PAGE_TYPES } from '../../data/pageTypes'
 import { getBlogArticles } from '../../utils/blogStorage'
 import WizardForm from '../Wizard/WizardForm'
@@ -14,15 +14,13 @@ import { normalizeCityName } from '../../utils/cityNames'
 import { resolveWeddingSourceLayout } from '../../utils/weddingSourceLayout'
 import WeddingSourceSections from './WeddingSourceSections'
 import PublicHeader from '../PublicHeader'
-import { normalizeWeddingDisplayText } from '../../utils/weddingDisplayText'
+import { normalizeWeddingDisplayText, withoutTestimonials } from '../../utils/weddingDisplayText'
+import { PARADISE_ADDRESS, PARADISE_COORDS, validateWeddingTravel } from '../../utils/weddingTravel'
 
 function Link(props) {
   return <RouterLink {...props} reloadDocument />
 }
 
-// ── Paradise 77 location (5 avenue Fridingen, 77100 Nanteuil-lès-Meaux) ──────
-const PARADISE_LAT = 48.9617
-const PARADISE_LNG = 2.8985
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -30,11 +28,8 @@ function cityVariant(name, n = 3) {
   return name.split('').reduce((acc, c) => acc + c.charCodeAt(0), 0) % n
 }
 
-function getTravelInfo(city) {
-  const km = haversineKm({ lat: city.lat, lng: city.lng }, { lat: PARADISE_LAT, lng: PARADISE_LNG })
-  const roadKm = Math.round(km * 1.35)
-  const driveMin = Math.max(10, Math.round(roadKm / 80 * 60))
-  return { km: Math.round(km), roadKm, driveMin }
+function drivingDuration(city) {
+  return city.travel ? `en environ ${city.travel.minutes} minutes en voiture` : 'en voiture'
 }
 
 // Clean AI-generated text before rendering:
@@ -120,8 +115,8 @@ function Section({ id, title, children, style }) {
 function CityMap({ city, apiKey }) {
   if (!city) return null
   const src = apiKey
-    ? `https://www.google.com/maps/embed/v1/place?key=${encodeURIComponent(apiKey)}&q=${encodeURIComponent('Le Paradise, 5 avenue Fridingen, 77100 Nanteuil-lès-Meaux, France')}&zoom=14`
-    : `https://www.google.com/maps?q=${PARADISE_LAT},${PARADISE_LNG}&output=embed`
+    ? `https://www.google.com/maps/embed/v1/place?key=${encodeURIComponent(apiKey)}&q=${encodeURIComponent(PARADISE_ADDRESS)}&center=${PARADISE_COORDS.lat},${PARADISE_COORDS.lng}&zoom=16`
+    : `https://maps.google.com/maps?q=${encodeURIComponent(PARADISE_ADDRESS)}&ll=${PARADISE_COORDS.lat},${PARADISE_COORDS.lng}&z=16&output=embed`
   return (
     <div style={{ borderRadius: '12px', overflow: 'hidden', border: '2px solid var(--gold)', boxShadow: 'var(--shadow-md)' }}>
       <iframe
@@ -399,9 +394,12 @@ function SectionReviews({ page }) {
             <h2 id="google-reviews-heading">Avis Google sur Le Paradise</h2>
             <p>Extraits d’avis reproduits à partir des captures fournies, sans attribution à une ville particulière.</p>
             {reviews.map((review) => (
-              <figure key={review.id} style={{ margin: '20px 0', padding: '16px', borderLeft: '3px solid var(--gold)', background: 'var(--bg-light)' }}>
-                <blockquote style={{ margin: '0 0 12px', overflowWrap: 'anywhere' }}>« {review.excerpt} »</blockquote>
-                <figcaption>{review.author} — {review.rating}/5 sur Google (extrait)</figcaption>
+              <figure key={review.id} style={{ margin: '20px 0', padding: '24px', border: '1px solid #e3e5e8', borderRadius: '12px', background: '#fff', color: '#202124', boxShadow: '0 2px 6px rgba(0,0,0,0.06)' }}>
+                <figcaption style={{ fontWeight: 600, marginBottom: '8px' }}>{review.author}</figcaption>
+                <p style={{ marginBottom: '12px' }}>
+                  {review.rating}/5 sur Google (extrait) <span aria-label={`${review.rating} étoiles sur 5`} style={{ color: '#fbbc04', letterSpacing: '2px' }}>{'★'.repeat(review.rating)}</span>
+                </p>
+                <blockquote style={{ margin: 0, lineHeight: 1.7, overflowWrap: 'anywhere' }}>« {review.excerpt} »</blockquote>
               </figure>
             ))}
             <a href={WEDDING_REVIEW_SOURCE} target="_blank" rel="noopener noreferrer">Consulter la fiche Google de Le Paradise</a>
@@ -415,7 +413,7 @@ function SectionIntro({ city, businessName, page }) {
   return (
     <Section id="intro" title={page.template?.version === 2 ? undefined : `${businessName} — votre réception depuis ${city.name}`}>
       <div style={{ fontSize: '15px', color: 'var(--text)', lineHeight: 1.8 }}>
-        {renderContent(normalizeWeddingDisplayText(page.content, getCityBySlug(city.slug)))}
+        {renderContent(withoutTestimonials(normalizeWeddingDisplayText(page.content, getCityBySlug(city.slug))))}
         <SectionReviews page={page} />
       </div>
     </Section>
@@ -425,17 +423,17 @@ function SectionIntro({ city, businessName, page }) {
 // ── 2. Section Pourquoi choisir Le Paradise 77 ────────────────────────────────
 
 function SectionWhyChoose({ city, businessName }) {
-  const travel = getTravelInfo(city)
+  const travel = city.travel
   const v = cityVariant(city.name)
 
   const intros = [
-    `Les habitants de ${city.name} qui souhaitent organiser un mariage ou une réception d'exception connaissent bien ${businessName}. Situé à seulement ${travel.driveMin} minutes en voiture depuis le centre de ${city.name}, notre salle de mariage et de réception allie prestige, accessibilité et services complets. Voici pourquoi des centaines de couples de ${city.name} nous font confiance chaque année.`,
-    `Depuis ${city.name}, rejoindre ${businessName} ne prend que ${travel.driveMin} minutes en voiture — une distance raisonnable pour une salle de mariage d'exception. Notre établissement s'est imposé comme la référence incontournable pour les résidents de ${city.name} qui veulent célébrer leur mariage ou leur réception dans un cadre luxueux et sans compromis.`,
-    `Vous planifiez votre mariage ou votre réception depuis ${city.name} ? ${businessName} est votre allié le plus proche pour un événement inoubliable. En seulement ${travel.driveMin} minutes depuis ${city.name}, vous accédez à une salle de mariage pouvant accueillir jusqu'à 300 invités, avec tous les services nécessaires pour faire de votre journée un souvenir impérissable.`,
+    `Les habitants de ${city.name} qui souhaitent organiser un mariage ou une réception d'exception connaissent bien ${businessName}. Accessible ${drivingDuration(city)} depuis le centre de ${city.name}, notre salle de mariage et de réception allie prestige, accessibilité et services complets. Voici pourquoi des centaines de couples de ${city.name} nous font confiance chaque année.`,
+    `Depuis ${city.name}, vous pouvez rejoindre ${businessName} ${drivingDuration(city)}. Notre établissement s'est imposé comme la référence incontournable pour les résidents de ${city.name} qui veulent célébrer leur mariage ou leur réception dans un cadre luxueux et sans compromis.`,
+    `Vous planifiez votre mariage ou votre réception depuis ${city.name} ? ${businessName} est votre allié pour un événement inoubliable. Depuis ${city.name}, vous accédez ${drivingDuration(city)} à une salle de mariage pouvant accueillir jusqu'à 300 invités, avec tous les services nécessaires pour faire de votre journée un souvenir impérissable.`,
   ]
 
   const cards = [
-    { icon: '⏱', title: 'Temps de trajet', value: `≈ ${travel.driveMin} min en voiture`, desc: `${travel.roadKm} km depuis ${city.name}` },
+    { icon: '⏱', title: 'Temps de trajet', value: travel ? `≈ ${travel.minutes} min en voiture` : 'Consulter l’itinéraire', desc: travel ? `${travel.km} km depuis ${city.name}` : `Depuis ${city.name}` },
     { icon: '🅿', title: 'Parking gratuit', value: '∼ 60 places', desc: 'Surveillé par agent de sécurité' },
     { icon: '🛣', title: 'Accès autoroute', value: 'A4 · A104 · N3', desc: 'A140 · A1 · A3 à proximité' },
     { icon: '🚉', title: 'Gare à proximité', value: 'Gare de Meaux', desc: '15 min en voiture' },
@@ -605,7 +603,7 @@ function SectionReservation({ city, businessName }) {
     },
     {
       n: '02', emoji: '👀', title: 'Visite de la salle',
-      desc: `Rien ne vaut une visite en personne pour se projeter ! Nous vous invitons à découvrir ${businessName} sur rendez-vous. Depuis ${city.name}, un trajet de ${getTravelInfo(city).driveMin} minutes vous permet de visualiser la salle, les équipements, la cuisine et le parking. Notre équipe vous accueille et répond à toutes vos questions lors de cette visite conviviale et sans pression.`,
+      desc: `Rien ne vaut une visite en personne pour se projeter ! Nous vous invitons à découvrir ${businessName} sur rendez-vous. Depuis ${city.name}, rejoignez-nous ${drivingDuration(city)} pour visualiser la salle, les équipements, la cuisine et le parking. Notre équipe vous accueille et répond à toutes vos questions lors de cette visite conviviale et sans pression.`,
     },
     {
       n: '03', emoji: '🖊', title: 'Signature du contrat',
@@ -646,7 +644,7 @@ function SectionReservation({ city, businessName }) {
 function SectionCapacite({ city, businessName }) {
   const v = cityVariant(city.name, 2)
   const intros = [
-    `${businessName} est l'une des salles de réception les plus spacieuses et les mieux équipées d'Île-de-France. Depuis ${city.name}, accédez en ${getTravelInfo(city).driveMin} minutes à un espace capable d'accueillir jusqu'à 300 invités dans des conditions optimales de confort et d'élégance.`,
+    `${businessName} est l'une des salles de réception les plus spacieuses et les mieux équipées d'Île-de-France. Depuis ${city.name}, accédez ${drivingDuration(city)} à un espace capable d'accueillir jusqu'à 300 invités dans des conditions optimales de confort et d'élégance.`,
     `Avec une capacité maximale de 300 personnes, ${businessName} est la salle de réception de référence pour les grands événements depuis ${city.name}. Que vous soyez 80 ou 300 invités, notre espace modulable s'adapte à la taille de votre réunion pour un résultat toujours impeccable.`,
   ]
   const specs = [
@@ -879,7 +877,7 @@ export function getWeddingFaqs({ city, businessName }) {
     },
     {
       q: 'Peut-on visiter la salle avant de réserver ?',
-      a: `Oui, les visites de ${businessName} sont possibles sur rendez-vous. Depuis ${city.name}, rejoignez notre salle en seulement ${getTravelInfo(city).driveMin} minutes pour découvrir en personne nos espaces, nos équipements et notre cuisine professionnelle. Notre équipe vous accueille chaleureusement et répond à toutes vos questions sans engagement.`,
+      a: `Oui, les visites de ${businessName} sont possibles sur rendez-vous. Depuis ${city.name}, rejoignez notre salle ${drivingDuration(city)} pour découvrir en personne nos espaces, nos équipements et notre cuisine professionnelle. Notre équipe vous accueille chaleureusement et répond à toutes vos questions sans engagement.`,
     },
     {
       q: 'La salle est-elle climatisée ?',
@@ -1131,7 +1129,7 @@ export default function CityPage({ pageType }) {
       ...allTypeStorages.map((s) => s.getPages()),
       getPublishedWeddingSlugs(),
     ]).then(([pages, gal, cfg, blogArticlesMap, ...typePagesArr]) => {
-      setPage(pages?.[citySlug] || null)
+      setPage(pages?.[getCityBySlug(citySlug)?.slug] || null)
       setGallery(gal || [])
       setConfig(cfg)
       // Pick up to 3 published blog articles relevant to the current page type
@@ -1190,7 +1188,7 @@ export default function CityPage({ pageType }) {
 }
 
 export function CityPageContent({ citySlug, pageType, page, gallery, config, allTypePages, blogArticles, published = false }) {
-  const sourceCity = getCityBySlug(citySlug)
+  const sourceCity = { ...getCityBySlug(citySlug), travel: validateWeddingTravel(page.travel) }
   const city = { ...sourceCity, name: normalizeCityName(sourceCity.name) }
   const basePath = pageType?.basePath || '/locationsalledemariage'
   const businessName      = config?.businessName || 'Le Paradise 77'
@@ -1252,7 +1250,7 @@ export function CityPageContent({ citySlug, pageType, page, gallery, config, all
         </div>
         <h1 style={{ fontFamily: 'var(--font-heading)', fontSize: 'clamp(2rem, 5vw, 3.5rem)', fontWeight: '700', color: 'white', marginBottom: '12px', letterSpacing: '0.03em' }}>
           {pageType?.id === 'mariage'
-            ? `Location salle de mariage ${citySlug === 'nanteuil-les-meaux' ? 'à' : 'près de'} ${city.name} — ${businessName}`
+            ? `Location salle de mariage ${sourceCity.legacySlug === 'nanteuil-les-meaux' ? 'à' : 'près de'} ${city.name} — ${businessName}`
             : `${pageType?.label.replace(/^Pages /, '') || 'Salle de réception'} près de ${city.name} — ${businessName}`}
         </h1>
         <p style={{ fontSize: '1.1rem', color: 'rgba(255,255,255,0.7)', maxWidth: '680px', margin: '0 auto 8px' }}>
@@ -1283,10 +1281,10 @@ export function CityPageContent({ citySlug, pageType, page, gallery, config, all
           <p>
             Vous recherchez une location de salle de mariage pour vos invités de {city.name} ({city.deptName}) ?
             Notre établissement est situé au 5 avenue Fridingen, 77100 Nanteuil les Meaux
-            {citySlug !== 'nanteuil-les-meaux' && `, et non à ${city.name}`}.
+            {sourceCity.legacySlug !== 'nanteuil-les-meaux' && `, et non à ${city.name}`}.
           </p>
           <p style={{ marginTop: '12px' }}>
-            <a href={`https://www.google.com/maps/dir/?api=1&origin=${encodeURIComponent(`${city.name}, ${city.deptName}, France`)}&destination=${PARADISE_LAT},${PARADISE_LNG}`}
+            <a href={`https://www.google.com/maps/dir/?api=1&origin=${encodeURIComponent(`${city.name}, ${city.deptName}, France`)}&destination=${encodeURIComponent(PARADISE_ADDRESS)}`}
               target="_blank" rel="noreferrer noopener" title={`Itinéraire depuis ${city.name} vers Le Paradise à Nanteuil les Meaux`}>
               Consulter l’itinéraire depuis {city.name}
             </a>. Pour connaître les disponibilités, les prestations et le tarif correspondant à votre projet,

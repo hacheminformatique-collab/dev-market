@@ -23,8 +23,20 @@ test('public header exposes working access routes without admin links and home r
       assert.ok(html.includes(text))
     }
     assert.doesNotMatch(html, /\/admin|\/dashboard/)
+    assert.doesNotMatch(html, /href="\/blog"/)
     const home = await readFile(new URL('../src/components/HomePage.jsx', import.meta.url), 'utf8')
     assert.doesNotMatch(home, /navigate\('\/admin'\)|navigate\('\/dashboard'\)/)
+    const { default: HomePage } = await vite.ssrLoadModule('/src/components/HomePage.jsx')
+    const { MemoryRouter } = await import('react-router-dom')
+    const homeHtml = renderToStaticMarkup(createElement(MemoryRouter, {}, createElement(HomePage)))
+    const header = homeHtml.match(/<header[\s\S]*?<\/header>/)[0]
+    assert.match(header, /ESPACE STAFF<\/a><a href="\/blog" class="btn btn-outline">BLOG<\/a>/)
+    const hero = homeHtml.match(/class="video-hero video-hero-home"([\s\S]*?)<\/video>([\s\S]*?)<\/button>/)[0]
+    assert.doesNotMatch(hero, /Demander un devis|Espace client|Espace staff|Blog/)
+    assert.match(homeHtml, /👶/)
+    assert.doesNotMatch(homeHtml, /🕊/)
+    assert.match(homeHtml, /class="home-event-grid"/)
+    assert.equal((homeHtml.match(/Mariages &amp; Fiançailles|Anniversaires|Baptêmes|Séminaires/g) || []).length, 4)
     const entry = await readFile(new URL('../src/static-city.jsx', import.meta.url), 'utf8')
     assert.doesNotMatch(entry, /initStorage/)
   } finally {

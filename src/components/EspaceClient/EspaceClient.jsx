@@ -231,7 +231,7 @@ export default function EspaceClient() {
     if (!pendingSignatureData) return
     const sigData = pendingSignatureData
     const updated = clients.map((c) =>
-      (c.id === devisId || c.devisNumber === devisId) ? { ...c, signature: sigData, status: 'signé_client', signedAt: new Date().toISOString() } : c
+      (c.id === devisId || c.devisNumber === devisId) ? { ...c, calendarExcluded: false, accountingExcluded: false, signature: sigData, status: 'signé_client', signedAt: new Date().toISOString() } : c
     )
     saveClients(updated)
     const signedDevis = updated.find((c) => c.id === devis?.id) || updated.find((c) => c.devisNumber === devis?.devisNumber)

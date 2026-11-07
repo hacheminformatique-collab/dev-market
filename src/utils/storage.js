@@ -82,6 +82,11 @@ export function offDataRefresh(callback) {
  * Safe to call at any time – if the server is unreachable the cache is kept as-is.
  */
 let refreshInFlight = null
+let refreshNames = Object.keys(KEYS)
+export function setRefreshStorageNames(names) {
+  if (names.some((name) => !Object.hasOwn(KEYS, name))) throw new Error('Clé de rafraîchissement inconnue.')
+  refreshNames = [...names]
+}
 export function refreshFromServer() {
   if (!refreshInFlight) {
     refreshInFlight = refreshStorage().finally(() => { refreshInFlight = null })
@@ -92,12 +97,14 @@ export function refreshFromServer() {
 async function refreshStorage() {
   let changed = false
   await Promise.all(
-    Object.entries(KEYS).map(async ([, key]) => {
+    refreshNames.map(async (name) => {
+      const key = KEYS[name]
       try {
-        const res = await fetch(`/api/storage.php?key=${encodeURIComponent(key)}`, { paced: true })
+        const res = await fetch(`/api/storage.php?key=${encodeURIComponent(key)}`, { paced: true, ...(name === 'settings' ? { cache: 'no-store' } : {}) })
         if (!res.ok) return
         const data = await res.json()
         if (data === null || data === undefined) return
+        keyLoadTimes.set(key, Date.now())
         if (JSON.stringify(_cache[key]) !== JSON.stringify(data)) {
           _cache[key] = data
           try { localStorage.setItem(key, JSON.stringify(data)) } catch { /* ignore */ }
@@ -222,29 +229,30 @@ const DEFAULTS = {
   settings: {
     nom: 'LE PARADISE',
     pin: '2205',
-    siteUrl: '',
+    siteUrl: 'https://www.leparadise77.fr',
     logo: '',
+    // Bank details are entered in Mes Infos only: never commit them to this public repository.
     bankInfo: {
       iban: '',
       bic: '',
       titulaire: '',
     },
-    whatsapp: '',
+    whatsapp: '+33782821582',
     legalInfo: {
-      raisonSociale: '',
-      enseigne: '',
-      formeJuridique: '',
-      capital: '',
+      raisonSociale: 'SARL AFM',
+      enseigne: 'LE PARADISE',
+      formeJuridique: 'SARL',
+      capital: '7500,00€',
       siret: '',
-      siren: '',
-      tva: '',
-      rcs: '',
+      siren: '904543816',
+      tva: 'FR06904543816',
+      rcs: 'MEAUX',
       dateImmatriculation: '',
-      ape: '',
-      gerant: '',
-      adresse: '',
-      email: '',
-      telephone: '',
+      ape: '68.20B',
+      gerant: 'HACHEM MOHAMED',
+      adresse: '5 avenue Fridingen, 77100 Nanteuil-lès-Meaux',
+      email: 'contact@leparadise77.fr',
+      telephone: '+33782821582',
     },
   },
   formules: [
@@ -305,6 +313,7 @@ function _get(key) {
 // Write to cache, persist to localStorage as backup, and async-POST to server with retry
 function _save(key, data) {
   _cache[key] = data
+  keyLoadTimes.set(key, Date.now())
   try { localStorage.setItem(key, JSON.stringify(data)) } catch { /* localStorage may be unavailable */ }
   _updateSyncStatus({ pending: _syncStatus.pending + 1 })
   return _postWithRetry(key, data, 0)
@@ -317,30 +326,36 @@ function _save(key, data) {
  */
 let initialization = null
 const keyInitializations = new Map()
+const keyLoadTimes = new Map()
+const serverLoadedKeys = new Set()
+const serverMissingKeys = new Set()
 export function initStorage(options) {
   if (options) return initializeStorage(options)
   if (!initialization) initialization = initializeStorage()
   return initialization
 }
 
-async function initializeStorage({ names = Object.keys(KEYS), paced = true, persistDefaults = true } = {}) {
+async function initializeStorage({ names = Object.keys(KEYS), paced = true, persistDefaults = true, reload = false, maxAge = Infinity } = {}) {
   if (names.some((name) => !Object.hasOwn(KEYS, name))) throw new Error('Clé de stockage inconnue.')
   await Promise.all(
     names.map((name) => {
       const key = KEYS[name]
-      if (keyInitializations.has(key)) return keyInitializations.get(key)
+      const fresh = !reload && (!keyLoadTimes.has(key) || Date.now() - keyLoadTimes.get(key) <= maxAge)
+      if (fresh && keyInitializations.has(key)) return keyInitializations.get(key)
       const load = (async () => {
         let serverConfirmedMissing = false
         // 1. Try server
         try {
-          const res = await fetch(`/api/storage.php?key=${encodeURIComponent(key)}`, { paced })
+          const res = await fetch(`/api/storage.php?key=${encodeURIComponent(key)}`, { paced, ...(!fresh || name === 'settings' ? { cache: 'no-store' } : {}) })
           if (res.ok) {
             const data = await res.json()
+            serverLoadedKeys.add(key)
             if (data !== null && data !== undefined) {
               _cache[key] = data
               return
             }
             serverConfirmedMissing = true
+            serverMissingKeys.add(key)
           } else {
             console.warn(`[storage] Lecture de ${key} refusée (HTTP ${res.status}), utilisation de la copie locale.`)
           }
@@ -359,12 +374,24 @@ async function initializeStorage({ names = Object.keys(KEYS), paced = true, pers
 
         // 3. Nothing found – initialise with defaults and persist them
         _cache[key] = DEFAULTS[name]
-        if (serverConfirmedMissing && persistDefaults) _save(key, DEFAULTS[name])
-      })()
+        if (serverConfirmedMissing && persistDefaults) {
+          serverMissingKeys.delete(key)
+          _save(key, DEFAULTS[name])
+        }
+      })().finally(() => { keyLoadTimes.set(key, Date.now()) })
       keyInitializations.set(key, load)
       return load
     })
   )
+
+  if (persistDefaults && names.includes('settings') && serverLoadedKeys.has(KEYS.settings)) {
+    const saved = _cache[KEYS.settings]
+    const merged = withSettingsDefaults(saved)
+    if (serverMissingKeys.has(KEYS.settings) || (Object.hasOwn(saved || {}, 'pin') && JSON.stringify(merged) !== JSON.stringify(saved))) {
+      serverMissingKeys.delete(KEYS.settings)
+      _save(KEYS.settings, merged)
+    }
+  }
 
   // One-time migration: strip any embedded base64 documents from client records.
   // Previously, EspaceClient stored the full base64 data URL inside the client record,
@@ -403,8 +430,46 @@ export function initDefaults() {
   // No-op: data initialisation is now handled by initStorage() in App.jsx
 }
 
-export const getSettings = () => _get(KEYS.settings) || DEFAULTS.settings
+const filled = (value, fallback) => (typeof value === 'string' && value.trim() === '') || value == null ? fallback : value
+
+// Saved values always win; only missing or empty company fields receive the defaults.
+export function withSettingsDefaults(data) {
+  const saved = data && typeof data === 'object' ? data : {}
+  const defaults = DEFAULTS.settings
+  const legalInfo = { ...defaults.legalInfo, ...(saved.legalInfo || {}) }
+  for (const field of Object.keys(defaults.legalInfo)) legalInfo[field] = filled(legalInfo[field], defaults.legalInfo[field])
+  return {
+    ...defaults,
+    ...saved,
+    nom: filled(saved.nom, defaults.nom),
+    pin: filled(saved.pin, defaults.pin),
+    siteUrl: filled(saved.siteUrl, defaults.siteUrl),
+    whatsapp: filled(saved.whatsapp, defaults.whatsapp),
+    bankInfo: { ...defaults.bankInfo, ...(saved.bankInfo || {}) },
+    legalInfo,
+  }
+}
+
+export const getSettings = () => withSettingsDefaults(_get(KEYS.settings))
 export const saveSettings = (data) => _save(KEYS.settings, data)
+
+export async function saveSettingsConfirmed(data) {
+  _updateSyncStatus({ pending: _syncStatus.pending + 1 })
+  try {
+    const response = await fetch(`/api/storage.php?key=${KEYS.settings}`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data),
+    })
+    const result = await response.json()
+    if (!response.ok || !result.ok) throw new Error(result.error || `Réglages non enregistrés (HTTP ${response.status}).`)
+    _saveRetryQueue(_loadRetryQueue().filter((item) => item.key !== KEYS.settings))
+    _cache[KEYS.settings] = data
+    keyLoadTimes.set(KEYS.settings, Date.now())
+    try { localStorage.setItem(KEYS.settings, JSON.stringify(data)) } catch { /* local backup may be unavailable */ }
+    _updateSyncStatus({ synced: _syncStatus.synced + 1 })
+  } finally {
+    _updateSyncStatus({ pending: Math.max(0, _syncStatus.pending - 1) })
+  }
+}
 
 export const getFormules = () => _get(KEYS.formules) || DEFAULTS.formules
 export const saveFormules = (data) => _save(KEYS.formules, data)

@@ -46,6 +46,7 @@ export function generateWeddingPage({ slug, businessName = 'Le Paradise', seed, 
   const reviewIds = shuffle(WEDDING_REVIEWS, random).slice(0, 2).map((review) => review.id)
   return {
     content,
+    city: { slug: city.slug, name: city.name, postalCode: city.postalCode, deptCode: city.deptCode },
     generatedAt: new Date().toISOString(),
     template: { version: WEDDING_TEMPLATE_VERSION, familyId: model.id, seed: chosenSeed, reviewIds },
     ...(checkedTravel ? { travel: checkedTravel } : {}),

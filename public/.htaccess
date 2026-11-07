@@ -81,7 +81,7 @@ DirectoryIndex index.html
     RewriteRule ^api/ - [L]
 
     # A missing publication manifest must return 404, not the SPA shell.
-    RewriteRule ^(?:wedding-pages\.json|wedding-departments\.json|wedding-directory(?:-idf)?\.html)$ - [L]
+    RewriteRule ^(?:wedding-pages\.json|wedding-city-aliases\.json|wedding-departments\.json|wedding-directory(?:-idf)?\.html)$ - [L]
 
     # Blog pages receive the regional directory in their initial HTML.
     RewriteRule ^blog(?:/.*)?$ api/blog-shell.php [L]
@@ -94,6 +94,10 @@ DirectoryIndex index.html
     RewriteRule ^locationsalledemariage/departements/ - [L]
 
     # Keep the existing extensionless canonical URLs for published city files.
+    # Historical city names redirect to the postcode URL only after publication.
+    RewriteCond %{REQUEST_URI} !-[0-9]{5}(?:\.html|/)?$
+    RewriteCond %{DOCUMENT_ROOT}/wedding-city-aliases.json -f
+    RewriteRule ^(locationsalle[a-z]+)/([a-z0-9-]+)(?:\.html|/)?$ api/city-redirect.php?type=$1&slug=$2 [L]
     RewriteCond %{THE_REQUEST} \s/+locationsalledemariage/([a-z0-9-]+)(?:\.html|/)(?:[?\s]) [NC]
     RewriteRule ^locationsalledemariage/([a-z0-9-]+)(?:\.html|/)$ /locationsalledemariage/$1 [R=301,L]
 

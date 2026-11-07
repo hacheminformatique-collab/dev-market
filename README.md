@@ -1,5 +1,43 @@
 # React + Vite
 
+## Identifiants postaux et prospects
+
+Toutes les pages villes utilisent désormais `ville-codepostal`, par exemple
+`meaux-77100`. Les homonymes restent distincts : `villeroy-77410` (77) et
+`villeroy-89100` (89). Les liens, canonical, sitemap, fichiers mariage et clés
+de stockage suivent cette identité dans les six familles de pages.
+Les anciennes sauvegardes restent importables : les clés sont normalisées
+sans modifier leurs textes. Une copie déjà enregistrée sous une clé postale
+est prioritaire sur la copie historique du même identifiant.
+
+Après déploiement complet de `dist/`, lancer **Publier les pages en HTML statique**.
+La génération et la publication sauvegardent les collections à migrer, puis renomment leurs clés
+côté serveur par lots de 250 correspondances, sans retransmettre les contenus.
+Les anciens HTML absents d'une sauvegarde restaurée sont copiés à leur nouvelle
+adresse en conservant leur contenu ; les fichiers historiques ne sont pas supprimés.
+Les fichiers postaux existants restent protégés contre l'écrasement concurrent.
+Le registre `wedding-city-aliases.json` et `api/city-redirect.php` redirigent
+les anciennes adresses en HTTP 301 après publication. Préserver ce registre,
+les HTML et les anciens assets lors des déploiements suivants.
+Sans métadonnées permettant de distinguer un homonyme, une ancienne clé seule
+désigne sa commune historique, c'est-à-dire la première occurrence du catalogue.
+Un contenu déjà écrasé avant ce correctif ne peut être récupéré que depuis
+une sauvegarde qui le contient.
+
+Dans la sélection d'un département, **Pages non générée** choisit seulement
+les villes sans contenu généré, sans changer les sélections des autres départements.
+L'onglet **Prospect** liste uniquement les nouveaux suivis ayant validé les
+coordonnées et l'événement (étapes 1 et 2), mais pas la formule (étape 3).
+Un devis finalisé est exclu ; un retour arrière ne réintroduit pas une demande
+plus avancée. Ces demandes peuvent être encore en cours, sans délai d'abandon
+supposé. Les anciens journaux ne permettent pas de reconstruire les coordonnées.
+`api/prospects.php` exige le PIN enregistré et ne met pas les résultats en cache ;
+les dossiers restent dans le stockage privé `storage-data/quote-followups/`.
+
+Le formulaire intégré réinitialise sa couleur de texte pour éviter l'héritage
+blanc des sections villes, notamment pour DJ. Utiliser **Mettre à jour le modèle
+des pages** pour fournir ce nouveau code aux HTML sauvegardés avec d'anciens assets.
+
 ## Protection contre les rafales LWS
 
 Les écritures et les appels des lots de génération/publication passent par une

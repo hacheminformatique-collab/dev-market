@@ -210,7 +210,7 @@ export default function WizardForm({ inline = false }) {
 
   if (inline) {
     return (
-      <div style={{ background: '#f8f5f0', borderRadius: '12px', overflow: 'hidden' }}>
+      <div className="quote-wizard" style={{ background: '#f8f5f0', color: '#2c2c2c', borderRadius: '12px', overflow: 'hidden' }}>
         {/* Progress bar */}
         <div style={{ background: 'white', padding: '16px 24px', borderBottom: '1px solid #eee' }}>
           <div style={{ display: 'flex', gap: '4px', marginBottom: '8px' }}>
@@ -242,7 +242,7 @@ export default function WizardForm({ inline = false }) {
             {step === 4 && <Step4Menu data={formData} onChange={updateField} onNext={() => advanceValidatedSection(5, 4)} onBack={() => setStep(3)} />}
             {step === 5 && <Step5Gateau data={formData} onChange={updateField} onNext={() => advanceValidatedSection(6, 5)} onBack={() => setStep(4)} />}
             {step === 6 && <Step6Options data={formData} onChange={updateField} onNext={() => advanceValidatedSection(7, 6)} onBack={prevStep} />}
-            {step === 7 && <Suspense fallback={<p role="status">Chargement du récapitulatif…</p>}><Step7Summary data={formData} onBack={() => setStep(6)} onSubmit={handleQuoteSubmitted} /></Suspense>}
+            {step === 7 && <Suspense fallback={<p role="status">Chargement du récapitulatif…</p>}><Step7Summary data={{ ...formData, quoteFlowId: flowId }} onBack={() => setStep(6)} onSubmit={handleQuoteSubmitted} /></Suspense>}
           </div>
         </div>
 
@@ -301,7 +301,7 @@ export default function WizardForm({ inline = false }) {
           {step === 4 && <Step4Menu data={formData} onChange={updateField} onNext={() => advanceValidatedSection(5, 4)} onBack={() => setStep(3)} />}
           {step === 5 && <Step5Gateau data={formData} onChange={updateField} onNext={() => advanceValidatedSection(6, 5)} onBack={() => setStep(4)} />}
           {step === 6 && <Step6Options data={formData} onChange={updateField} onNext={() => advanceValidatedSection(7, 6)} onBack={prevStep} />}
-          {step === 7 && <Suspense fallback={<p role="status">Chargement du récapitulatif…</p>}><Step7Summary data={formData} onBack={() => setStep(6)} onSubmit={handleQuoteSubmitted} /></Suspense>}
+          {step === 7 && <Suspense fallback={<p role="status">Chargement du récapitulatif…</p>}><Step7Summary data={{ ...formData, quoteFlowId: flowId }} onBack={() => setStep(6)} onSubmit={handleQuoteSubmitted} /></Suspense>}
         </div>
       </div>
 

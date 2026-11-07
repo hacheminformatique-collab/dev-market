@@ -1,4 +1,5 @@
 import { siteFetch as fetch } from './siteFetch'
+import { canonicalCityPages, legacyCityAliases } from './cityPageIdentity'
 /**
  * Storage helpers for the "Pages Client" feature.
  *
@@ -121,11 +122,11 @@ export async function saveCityPagesConfig(config) {
  * Returns the map of generated pages:  { [citySlug]: { content, generatedAt } }
  */
 export async function getCityPages() {
-  return (await _get(KEY_PAGES)) || {}
+  return canonicalCityPages((await _get(KEY_PAGES)) || {})
 }
 
 export async function saveCityPages(pages) {
-  await _set(KEY_PAGES, pages)
+  await _set(KEY_PAGES, canonicalCityPages(pages))
 }
 
 // ── Photo gallery ──────────────────────────────────────────────────────────
@@ -194,15 +195,30 @@ export function makePageTypeStorage(typeId) {
   }
 
   async function getPages({ requireServer = false } = {}) {
-    return (await _get(kPages, requireServer)) || {}
+    return canonicalCityPages((await _get(kPages, requireServer)) || {})
   }
 
   async function savePages(pages, { requireServer = false } = {}) {
-    await _set(kPages, pages, requireServer)
+    await _set(kPages, canonicalCityPages(pages), requireServer)
   }
 
   async function savePage(slug, page) {
-    await pageOperation(kPages, 'save-page', { slug, page })
+    const [canonical] = Object.keys(canonicalCityPages({ [slug]: page }))
+    const legacySlug = Object.keys(legacyCityAliases).find((key) => legacyCityAliases[key] === canonical)
+    await pageOperation(kPages, 'save-page', { slug: canonical, page, legacySlug })
+  }
+
+  async function migratePageKeys() {
+    const raw = (await _get(kPages, true)) || {}
+    const moves = Object.entries(raw).flatMap(([slug, page]) => {
+      const [canonical] = Object.keys(canonicalCityPages({ [slug]: page }))
+      return canonical !== slug ? [[slug, canonical]] : []
+    })
+    if (!moves.length) return
+    await backupPages({ requireServer: true })
+    for (let i = 0; i < moves.length; i += 250) {
+      await pageOperation(kPages, 'migrate-pages', { aliases: Object.fromEntries(moves.slice(i, i + 250)) })
+    }
   }
 
   async function getGallery() {
@@ -229,7 +245,7 @@ export function makePageTypeStorage(typeId) {
     return (await _get(kBackup)) || []
   }
 
-  return { getConfig, saveConfig, getPages, savePages, savePage, getGallery, saveGallery, backupPages, getBackups }
+  return { getConfig, saveConfig, getPages, savePages, savePage, migratePageKeys, getGallery, saveGallery, backupPages, getBackups }
 }
 
 export function generateLocalCityContent(cityName, deptName, keywords, businessName, businessType, mainKeyword) {

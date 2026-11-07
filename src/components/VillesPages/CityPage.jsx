@@ -1129,7 +1129,7 @@ export default function CityPage({ pageType }) {
       ...allTypeStorages.map((s) => s.getPages()),
       getPublishedWeddingSlugs(),
     ]).then(([pages, gal, cfg, blogArticlesMap, ...typePagesArr]) => {
-      setPage(pages?.[citySlug] || null)
+      setPage(pages?.[getCityBySlug(citySlug)?.slug] || null)
       setGallery(gal || [])
       setConfig(cfg)
       // Pick up to 3 published blog articles relevant to the current page type
@@ -1250,7 +1250,7 @@ export function CityPageContent({ citySlug, pageType, page, gallery, config, all
         </div>
         <h1 style={{ fontFamily: 'var(--font-heading)', fontSize: 'clamp(2rem, 5vw, 3.5rem)', fontWeight: '700', color: 'white', marginBottom: '12px', letterSpacing: '0.03em' }}>
           {pageType?.id === 'mariage'
-            ? `Location salle de mariage ${citySlug === 'nanteuil-les-meaux' ? 'à' : 'près de'} ${city.name} — ${businessName}`
+            ? `Location salle de mariage ${sourceCity.legacySlug === 'nanteuil-les-meaux' ? 'à' : 'près de'} ${city.name} — ${businessName}`
             : `${pageType?.label.replace(/^Pages /, '') || 'Salle de réception'} près de ${city.name} — ${businessName}`}
         </h1>
         <p style={{ fontSize: '1.1rem', color: 'rgba(255,255,255,0.7)', maxWidth: '680px', margin: '0 auto 8px' }}>
@@ -1281,7 +1281,7 @@ export function CityPageContent({ citySlug, pageType, page, gallery, config, all
           <p>
             Vous recherchez une location de salle de mariage pour vos invités de {city.name} ({city.deptName}) ?
             Notre établissement est situé au 5 avenue Fridingen, 77100 Nanteuil les Meaux
-            {citySlug !== 'nanteuil-les-meaux' && `, et non à ${city.name}`}.
+            {sourceCity.legacySlug !== 'nanteuil-les-meaux' && `, et non à ${city.name}`}.
           </p>
           <p style={{ marginTop: '12px' }}>
             <a href={`https://www.google.com/maps/dir/?api=1&origin=${encodeURIComponent(`${city.name}, ${city.deptName}, France`)}&destination=${encodeURIComponent(PARADISE_ADDRESS)}`}

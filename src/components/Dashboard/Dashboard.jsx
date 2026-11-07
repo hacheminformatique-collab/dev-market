@@ -9,6 +9,7 @@ import MenuTab from './tabs/MenuTab'
 import GateauTab from './tabs/GateauTab'
 import PrestationTab from './tabs/PrestationTab'
 import ClientsTab from './tabs/ClientsTab'
+import ProspectsTab from './tabs/ProspectsTab'
 import CalendarTab from './tabs/CalendarTab'
 import StaffTab from './tabs/StaffTab'
 import StockTab from './tabs/StockTab'
@@ -21,6 +22,7 @@ import { PAGE_TYPES } from '../../data/pageTypes'
 
 const TABS = [
   { id: 'clients',    icon: '👥', label: 'Clients & Devis' },
+  { id: 'prospects',  icon: '📋', label: 'Prospect' },
   { id: 'calendar',   icon: '📅', label: 'Calendrier' },
   { id: 'compta',     icon: '📊', label: 'Comptabilité' },
   { id: 'staff',      icon: '👷', label: 'Staff' },
@@ -63,6 +65,7 @@ export default function Dashboard() {
   function renderTab() {
     switch (activeTab) {
       case 'clients':     return <ClientsTab key={refreshKey} />
+      case 'prospects':   return <ProspectsTab key={refreshKey} />
       case 'calendar':    return <CalendarTab key={refreshKey} />
       case 'compta':      return <ComptabiliteTab key={refreshKey} />
       case 'staff':       return <StaffTab key={refreshKey} />

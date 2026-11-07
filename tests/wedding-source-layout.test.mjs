@@ -41,7 +41,7 @@ function renderSource(page, city) {
 }
 
 test('twenty exact source DOM layouts retain all cards, icons, headings, lists and five steps', () => {
-  const city = cities.getCityBySlug('meaux')
+  const city = cities.getCityBySlug('meaux-77100')
   for (const model of templates.WEDDING_SOURCE_MODELS) {
     const page = templates.generateWeddingPage({ slug: city.slug, familyId: model.id, seed: 42, travel })
     const layout = layoutUtils.resolveWeddingSourceLayout(page, city)
@@ -72,7 +72,7 @@ test('twenty exact source DOM layouts retain all cards, icons, headings, lists a
 })
 
 test('all twenty FAQs keep fourteen original questions in order and SSR includes every known answer', () => {
-  const city = cities.getCityBySlug('meaux')
+  const city = cities.getCityBySlug('meaux-77100')
   for (const model of templates.WEDDING_SOURCE_MODELS) {
     const page = templates.generateWeddingPage({ slug: city.slug, familyId: model.id, seed: 42, travel })
     const html = renderSource(page, city)
@@ -98,7 +98,7 @@ test('all twenty FAQs keep fourteen original questions in order and SSR includes
 })
 
 test('old accented V2 saves upgrade without losing block-level customized prose', () => {
-  const city = cities.getCityBySlug('chatenay-malabry')
+  const city = cities.getCityBySlug('chatenay-malabry-92290')
   for (const model of templates.WEDDING_SOURCE_MODELS) {
     const page = templates.generateWeddingPage({ slug: city.slug, familyId: model.id, seed: 42, travel })
     const oldContent = model.sections.map((section) => layoutUtils.injectWeddingSource(section.content, city, true)).join('\n\n')
@@ -121,11 +121,11 @@ test('old accented V2 saves upgrade without losing block-level customized prose'
 })
 
 test('complete SSR puts devis immediately after breadcrumb, preserves V1 and rejects unsupported V2 before publishing', async () => {
-  const page = templates.generateWeddingPage({ slug: 'meaux', seed: 42, travel })
+  const page = templates.generateWeddingPage({ slug: 'meaux-77100', seed: 42, travel })
   const config = { businessName: 'Le Paradise' }
   const snapshot = publication.makeCitySnapshot({
-    slug: 'meaux', pages: { meaux: page }, config, gallery: [],
-    allTypePages: { mariage: { meaux: page } }, blogArticles: {},
+    slug: 'meaux-77100', pages: { 'meaux-77100': page }, config, gallery: [],
+    allTypePages: { mariage: { 'meaux-77100': page } }, blogArticles: {},
   })
   const compiled = await readFile(resolve(root, 'dist/static-city.html'), 'utf8')
   const html = publication.renderCityDocument({ template: compiled, snapshot, settings: {}, origin: 'https://example.com' })
@@ -147,12 +147,12 @@ test('complete SSR puts devis immediately after breadcrumb, preserves V1 and rej
 })
 
 test('normalization is restricted to public known town names, preserving French prose, regions and URLs', () => {
-  const city = cities.getCityBySlug('saint-denis')
+  const city = cities.getCityBySlug('saint-denis-93200')
   const text = `Saint-Denis — ${city.deptName} : réception élégante à Nanteuil-lès-Meaux. https://example.com/Saint-Denis?city=Nanteuil-lès-Meaux`
   const displayed = normalizeWeddingDisplayText(text, city)
   assert.equal(displayed, `Saint Denis — ${city.deptName} : réception élégante à Nanteuil les Meaux. https://example.com/Saint-Denis?city=Nanteuil-lès-Meaux`)
   const snapshot = {
-    citySlug: 'chatenay-malabry', pageType: { id: 'mariage' },
+    citySlug: 'chatenay-malabry-92290', pageType: { id: 'mariage' },
     page: { content: 'Texte personnalisé pour Châtenay-Malabry, réception élégante.', generatedAt: new Date().toISOString(), travel },
     config: {}, gallery: [], allTypePages: {}, blogArticles: [],
   }

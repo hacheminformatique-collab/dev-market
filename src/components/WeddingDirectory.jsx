@@ -5,7 +5,7 @@ import { departmentPath } from '../utils/weddingDepartments'
 
 export default function WeddingDirectory({ slugs, businessName = 'Le Paradise', cityName = '', departmentCode, region }) {
   // Resolve each URL exactly as CityPage does, including legacy duplicate slugs.
-  const published = [...new Set(slugs)].map(getCityBySlug).filter(Boolean)
+  const published = [...new Map(slugs.map(getCityBySlug).filter(Boolean).map((city) => [city.slug, city])).values()]
   const departments = DEPARTMENTS.map((department) => ({
     ...department,
     cities: published.filter((city) => city.deptCode === department.code)

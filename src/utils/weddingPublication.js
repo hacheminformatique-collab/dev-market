@@ -29,5 +29,5 @@ export async function getPublishedWeddingSlugs() {
   if (!Array.isArray(slugs) || slugs.some((slug) => typeof slug !== 'string' || !getCityBySlug(slug))) {
     throw new Error('Liste des villes publiées invalide.')
   }
-  return [...new Set(slugs)]
+  return [...new Set(slugs.map((slug) => getCityBySlug(slug).slug))]
 }

@@ -256,6 +256,15 @@ if ($notificationType === 'quote_followup') {
     $protectFile = $followupDir . '/.htaccess';
     if (!is_file($protectFile)) @file_put_contents($protectFile, "Require all denied\n", LOCK_EX);
 
+    try {
+        quote_followup_save_progress($followupDir, $followup);
+    } catch (RuntimeException $error) {
+        error_log('[quote-followup] ' . $error->getMessage());
+        http_response_code(503);
+        echo json_encode(['ok' => false, 'error' => 'L’enregistrement de votre demande a échoué. Veuillez réessayer.']);
+        exit;
+    }
+
     $summaryJson = json_encode($followup['summary'], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
     $dedupeKey = hash('sha256', $followup['flowId'] . ':' . $followup['stage'] . ':' . $summaryJson);
     $recordFile = $followupDir . '/' . $dedupeKey . '.json';

@@ -1,5 +1,39 @@
 <?php
 
+function quote_followup_save_progress($directory, $followup)
+{
+    $path = $directory . '/flow-' . $followup['flowId'] . '.json';
+    $lock = fopen($path . '.lock', 'c+');
+    if (!$lock || !flock($lock, LOCK_EX)) throw new RuntimeException('Verrou du suivi indisponible.');
+    try {
+        $previous = null;
+        if (is_file($path)) {
+            $raw = file_get_contents($path);
+            $previous = $raw === false ? null : json_decode($raw, true);
+            if (!is_array($previous)) throw new RuntimeException('Suivi existant illisible. Aucun remplacement effectué.');
+        }
+        if ($previous && $previous['stage'] > $followup['stage']) return;
+        $record = [
+            'flowId' => $followup['flowId'],
+            'stage' => $followup['stage'],
+            'summary' => $followup['summary'],
+            'acceptedConditions' => true,
+            'createdAt' => $previous['createdAt'] ?? gmdate('c'),
+            'updatedAt' => gmdate('c'),
+        ];
+        $json = json_encode($record, JSON_UNESCAPED_UNICODE);
+        $tmp = tempnam($directory, '.progress-');
+        if ($tmp === false) throw new RuntimeException('Fichier temporaire du suivi indisponible.');
+        if ($json === false || file_put_contents($tmp, $json) !== strlen($json) || !chmod($tmp, 0640) || !rename($tmp, $path)) {
+            unlink($tmp);
+            throw new RuntimeException('Enregistrement du suivi impossible.');
+        }
+    } finally {
+        flock($lock, LOCK_UN);
+        fclose($lock);
+    }
+}
+
 function quote_followup_text($value, $maxLength = 500)
 {
     if (!is_string($value) && !is_numeric($value)) return '';

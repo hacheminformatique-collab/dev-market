@@ -73,6 +73,7 @@ test('notify HTTP sends one accepted step, deduplicates retry, and sends cumulat
     await mkdir(storage, { recursive: true })
     await cp(path.join(root, 'public/api/notify.php'), path.join(api, 'notify.php'))
     await cp(phpHelper, path.join(api, 'quote_followup.php'))
+    await cp(path.join(root, 'public/api/prospects.php'), path.join(api, 'prospects.php'))
     await writeFile(fakeSendmail, `#!/usr/bin/env node
 const fs = require('node:fs')
 let message = ''
@@ -87,6 +88,7 @@ process.stdin.on('end', () => {
     await chmod(fakeSendmail, 0o755)
     await writeFile(failMarker, 'fail')
     const settings = {
+      pin: 'test-prospects-pin',
       legalInfo: { email: 'owner@example.test' },
     }
     await writeFile(settingsFile, JSON.stringify(settings))
@@ -161,6 +163,26 @@ process.stdin.on('end', () => {
     assert.equal(delivered.split('---MAIL---').length - 1, 2)
     assert.match(delivered, /Événement : Mariage/)
     assert.match(delivered, /Participants : 140 \(120 adultes, 20 enfants\)/)
+    const prospectEndpoint = `http://127.0.0.1:${httpPort}/api/prospects.php`
+    const getProspects = () => fetch(prospectEndpoint, { headers: { 'X-Admin-Pin': settings.pin } }).then((response) => response.json())
+    assert.equal((await fetch(prospectEndpoint)).status, 403)
+    assert.equal((await fetch(prospectEndpoint, { headers: { 'X-Admin-Pin': 'wrong' } })).status, 403)
+    let prospects = await getProspects()
+    assert.equal(prospects.prospects.length, 1)
+    assert.equal(prospects.prospects[0].flowId, nextSection.flowId)
+    assert.equal(prospects.prospects[0].summary.email, 'alice@example.fr')
+    assert.equal(prospects.prospects[0].stage, 2)
+    // Returning to coordinates must not lower the highest validated section.
+    await post(initial)
+    assert.equal((await getProspects()).prospects.length, 1)
+    await writeFile(path.join(storage, 'paradise_clients.json'), JSON.stringify([{ quoteFlowId: nextSection.flowId, email: 'alice@example.fr', dateEvenement: '2099-06-12' }]))
+    assert.equal((await getProspects()).prospects.length, 0, 'Finalized quotes are excluded')
+    await writeFile(path.join(storage, 'paradise_clients.json'), '[]')
+    const progressed = basePayload({ stage: 3, summary: { ...nextSection.summary, formule: 'Location sèche' } })
+    assert.equal((await post(progressed)).status, 200)
+    assert.equal((await getProspects()).prospects.length, 0, 'Validating the formula removes the prospect')
+    await post(nextSection)
+    assert.equal((await getProspects()).prospects.length, 0, 'Back navigation cannot reclassify an advanced quote')
 
     const rejectedConsent = await post(basePayload({ acceptedConditions: false }))
     assert.equal(rejectedConsent.status, 400)
@@ -168,7 +190,7 @@ process.stdin.on('end', () => {
     const rejectedData = await post(basePayload({ summary: { email: 'invalid' } }))
     assert.equal(rejectedData.status, 400)
     assert.equal((await rejectedData.json()).ok, false)
-    assert.equal((await readFile(mailCapture, 'utf8')).split('---MAIL---').length - 1, 2)
+    assert.equal((await readFile(mailCapture, 'utf8')).split('---MAIL---').length - 1, 3)
 
     await writeFile(failMarker, 'fail')
     const newFlow = basePayload({ flowId: 'abcdef0123456789abcdef0123456789' })
@@ -178,7 +200,7 @@ process.stdin.on('end', () => {
     await rm(failMarker)
     const retryAfterFailure = await post(newFlow)
     assert.deepEqual(await retryAfterFailure.json(), { ok: true, duplicate: false })
-    assert.equal((await readFile(mailCapture, 'utf8')).split('---MAIL---').length - 1, 3)
+    assert.equal((await readFile(mailCapture, 'utf8')).split('---MAIL---').length - 1, 4)
   } finally {
     if (phpServer) {
       const exited = once(phpServer, 'exit')

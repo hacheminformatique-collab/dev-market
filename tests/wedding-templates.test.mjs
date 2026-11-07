@@ -28,7 +28,7 @@ test('twenty whole source models generate without network calls and replay saved
   try {
     assert.equal(templates.WEDDING_TEMPLATE_FAMILIES.length, 20)
     for (const family of templates.WEDDING_TEMPLATE_FAMILIES) {
-      const page = templates.generateWeddingPage({ slug: 'meaux', familyId: family.id, seed: 42 })
+      const page = templates.generateWeddingPage({ slug: 'meaux-77100', familyId: family.id, seed: 42 })
       assert.equal(page.template.familyId, family.id)
       assert.equal(page.template.reviewIds.length, 2)
       assert.equal(new Set(page.template.reviewIds).size, 2)
@@ -38,13 +38,13 @@ test('twenty whole source models generate without network calls and replay saved
       assert.ok(page.content.includes('Meaux'))
       assert.ok(page.content.includes('Seine-et-Marne'))
       assert.ok(!page.content.includes('{{'))
-      const replay = templates.generateWeddingPage({ slug: 'meaux', familyId: page.template.familyId, seed: page.template.seed })
+      const replay = templates.generateWeddingPage({ slug: 'meaux-77100', familyId: page.template.familyId, seed: page.template.seed })
       assert.equal(replay.content, page.content)
       assert.deepEqual(replay.template, page.template)
     }
-    const automatic = templates.generateWeddingPage({ slug: 'meaux', seed: 1234 })
-    assert.equal(templates.generateWeddingPage({ slug: 'meaux', ...automatic.template }).content, automatic.content)
-    const unseeded = Array.from({ length: 20 }, () => templates.generateWeddingPage({ slug: 'meaux' }))
+    const automatic = templates.generateWeddingPage({ slug: 'meaux-77100', seed: 1234 })
+    assert.equal(templates.generateWeddingPage({ slug: 'meaux-77100', ...automatic.template }).content, automatic.content)
+    const unseeded = Array.from({ length: 20 }, () => templates.generateWeddingPage({ slug: 'meaux-77100' }))
     assert.equal(new Set(unseeded.map((page) => page.template.seed)).size, 20)
     assert.ok(new Set(unseeded.map((page) => page.content)).size > 1)
   } finally {
@@ -58,7 +58,7 @@ test('random generation selects one of exactly twenty complete models without re
   assert.equal(new Set(models.map((model) => model.sourceFile)).size, 20)
   const selected = new Set()
   for (let seed = 0; seed < 500; seed++) {
-    const page = templates.generateWeddingPage({ slug: 'meaux', seed })
+    const page = templates.generateWeddingPage({ slug: 'meaux-77100', seed })
     const model = models.find((item) => item.id === page.template.familyId)
     const expected = model.sections.map((section) => section.content.replace(/xxxx|yyyy|\$\{businessName\}/g, (marker) => marker === 'xxxx' ? 'Meaux' : marker === 'yyyy' ? 'Seine-et-Marne' : 'Le Paradise 77')).join('\n\n')
     assert.equal(page.content, expected)
@@ -82,10 +82,10 @@ test('every supported city produces valid local content while invalid input is e
     assert.ok(!page.content.includes('{{'))
   }
   for (const input of [
-    { slug: 'unknown' }, { slug: 'meaux', seed: -1 }, { slug: 'meaux', seed: 1.5 },
-    { slug: 'meaux', seed: 0x100000000 }, { slug: 'meaux', familyId: 'missing' }, { slug: 'meaux', businessName: ' ' },
+    { slug: 'unknown' }, { slug: 'meaux-77100', seed: -1 }, { slug: 'meaux-77100', seed: 1.5 },
+    { slug: 'meaux-77100', seed: 0x100000000 }, { slug: 'meaux-77100', familyId: 'missing' }, { slug: 'meaux-77100', businessName: ' ' },
   ]) assert.throws(() => templates.generateWeddingPage(input))
-  const escaped = templates.generateWeddingPage({ slug: 'meaux', businessName: 'Salle\n## <script>**test**', seed: 1 })
+  const escaped = templates.generateWeddingPage({ slug: 'meaux-77100', businessName: 'Salle\n## <script>**test**', seed: 1 })
   assert.ok(!escaped.content.includes('<script>'))
   assert.ok(!escaped.content.includes('\n## <'))
 })
@@ -93,9 +93,9 @@ test('every supported city produces valid local content while invalid input is e
 test('review excerpts are attributed, selected once, and included in published HTML', async () => {
   assert.equal(reviews.WEDDING_REVIEWS.length, 7)
   assert.equal(reviews.WEDDING_REVIEWS.find((review) => review.id === 'florine').excerpt, 'Le gérant de l’établissement est très professionnel et à l’écoute.')
-  const page = templates.generateWeddingPage({ slug: 'meaux', seed: 15, travel })
+  const page = templates.generateWeddingPage({ slug: 'meaux-77100', seed: 15, travel })
   const config = { businessName: 'Le Paradise', githubToken: 'private-old-token' }
-  const params = { slug: 'meaux', pages: { meaux: page }, config, gallery: [], allTypePages: { mariage: { meaux: page } }, blogArticles: {} }
+  const params = { slug: 'meaux-77100', pages: { 'meaux-77100': page }, config, gallery: [], allTypePages: { mariage: { 'meaux-77100': page } }, blogArticles: {} }
   const snapshot = publication.makeCitySnapshot(params)
   assert.deepEqual(snapshot.page.template.reviewIds, page.template.reviewIds)
   assert.ok(!JSON.stringify(snapshot).includes('private-old-token'))
@@ -122,11 +122,11 @@ test('review excerpts are attributed, selected once, and included in published H
   const legacyTemplate = { version: 1, familyId: 'presentation', seed: 15, reviewIds: page.template.reviewIds }
   assert.deepEqual(templates.validateWeddingTemplate(legacyTemplate), legacyTemplate)
   const old = { content: 'Ancien texte conservé', generatedAt: page.generatedAt, travel }
-  const oldSnapshot = publication.makeCitySnapshot({ ...params, pages: { meaux: old } })
+  const oldSnapshot = publication.makeCitySnapshot({ ...params, pages: { 'meaux-77100': old } })
   assert.equal(oldSnapshot.page.content, old.content)
   assert.equal(oldSnapshot.page.template, undefined)
   assert.throws(() => publication.makeCitySnapshot({
-    ...params, pages: { meaux: { ...page, template: { ...page.template, reviewIds: ['unknown', 'florine'] } } },
+    ...params, pages: { 'meaux-77100': { ...page, template: { ...page.template, reviewIds: ['unknown', 'florine'] } } },
   }), /avis invalide/)
 })
 
@@ -157,26 +157,26 @@ test('generation storage preserves unselected pages and restored variants, and e
     const api = storage.makePageTypeStorage('mariage')
     const existing = await api.getPages({ requireServer: true })
     await api.backupPages({ requireServer: true })
-    const page = templates.generateWeddingPage({ slug: 'meaux', seed: 15 })
-    await api.savePage('meaux', page)
+    const page = templates.generateWeddingPage({ slug: 'meaux-77100', seed: 15 })
+    await api.savePage('meaux-77100', page)
     assert.deepEqual(JSON.parse(incrementalBodies[0]), {}, 'Backup must not upload existing snapshots')
-    assert.deepEqual(JSON.parse(incrementalBodies[1]), { slug: 'meaux', page })
+    assert.deepEqual(JSON.parse(incrementalBodies[1]), { slug: 'meaux-77100', page, legacySlug: 'meaux' })
     assert.ok(!incrementalBodies[1].includes('Unselected content'))
     assert.deepEqual((await api.getPages()).old, existing.old)
     await api.backupPages({ requireServer: true })
     const [backup] = await api.getBackups()
     await api.savePages({ old: existing.old }, { requireServer: true })
     await api.savePages(backup.snapshot, { requireServer: true })
-    assert.deepEqual((await api.getPages()).meaux, page)
+    assert.deepEqual((await api.getPages())['meaux-77100'], page)
     globalThis.fetch = async () => new Response(JSON.stringify({ ok: false }), { status: 500 })
-    await assert.rejects(api.savePage('meaux', page), /Enregistrement serveur impossible.*HTTP 500/)
-    await assert.rejects(api.savePages({ meaux: page }, { requireServer: true }), /Enregistrement serveur impossible/)
+    await assert.rejects(api.savePage('meaux-77100', page), /Enregistrement serveur impossible.*HTTP 500/)
+    await assert.rejects(api.savePages({ 'meaux-77100': page }, { requireServer: true }), /Enregistrement serveur impossible/)
     await assert.rejects(api.getPages({ requireServer: true }), /Lecture du stockage/)
     await assert.rejects(api.backupPages({ requireServer: true }), /Enregistrement serveur impossible/)
     globalThis.fetch = async () => new Response(JSON.stringify({ error: 'Espace disque insuffisant' }), { status: 500 })
-    await assert.rejects(api.savePage('meaux', page), /HTTP 500.*Espace disque insuffisant/)
+    await assert.rejects(api.savePage('meaux-77100', page), /HTTP 500.*Espace disque insuffisant/)
     globalThis.fetch = async () => new Response('<html>Too large</html>', { status: 413 })
-    await assert.rejects(api.savePage('meaux', page), /HTTP 413.*limite de taille/)
+    await assert.rejects(api.savePage('meaux-77100', page), /HTTP 413.*limite de taille/)
   } finally {
     globalThis.fetch = nativeFetch
     if (originalLocalStorage === undefined) delete globalThis.localStorage
@@ -186,21 +186,21 @@ test('generation storage preserves unselected pages and restored variants, and e
 
 test('road travel replaces every model figure and is required for publication', async () => {
   const { applyWeddingTravel, fetchWeddingTravel, PARADISE_COORDS } = await vite.ssrLoadModule('/src/utils/weddingTravel.js')
-  const city = cities.getCityBySlug('chessy')
+  const city = cities.getCityBySlug('chessy-77700')
   const shell = await readFile(resolve(root, 'dist/static-city.html'), 'utf8')
   const figure = /(≈ \d+ min en voiture|\d+ km depuis|(?:ne prend que|à seulement|un trajet de|accédez en|En seulement) \d+ minutes)/g
   for (const model of templates.WEDDING_SOURCE_MODELS) {
-    const page = templates.generateWeddingPage({ slug: 'chessy', familyId: model.id, seed: 3, travel })
+    const page = templates.generateWeddingPage({ slug: 'chessy-77700', familyId: model.id, seed: 3, travel })
     const figures = page.content.match(figure) || []
     assert.ok(figures.length >= 3, model.id)
     for (const value of figures) assert.match(value, /(^≈ 20 min|^16 km| 20 minutes$)/, `${model.id}: ${value}`)
     assert.match(page.content, /15 min en voiture/, 'Gare de Meaux inchangée')
     assert.deepEqual(page.travel, travel)
-    const old = templates.generateWeddingPage({ slug: 'chessy', familyId: model.id, seed: 3 })
-    assert.throws(() => publication.makeCitySnapshot({ slug: 'chessy', pages: { chessy: old }, config: {}, gallery: [], allTypePages: {}, blogArticles: {} }), /Trajet routier non calculé/)
+    const old = templates.generateWeddingPage({ slug: 'chessy-77700', familyId: model.id, seed: 3 })
+    assert.throws(() => publication.makeCitySnapshot({ slug: 'chessy-77700', pages: { 'chessy-77700': old }, config: {}, gallery: [], allTypePages: {}, blogArticles: {} }), /Trajet routier non calculé/)
     const updated = { ...old, content: applyWeddingTravel(old.content, travel), travel }
     assert.equal(updated.content, page.content)
-    const snapshot = publication.makeCitySnapshot({ slug: 'chessy', pages: { chessy: updated }, config: {}, gallery: [], allTypePages: {}, blogArticles: {} })
+    const snapshot = publication.makeCitySnapshot({ slug: 'chessy-77700', pages: { 'chessy-77700': updated }, config: {}, gallery: [], allTypePages: {}, blogArticles: {} })
     assert.deepEqual(snapshot.page.travel, travel)
     const html = publication.renderCityDocument({ template: shell, snapshot, settings: {}, origin: 'https://example.com' })
     const visible = html.split('<script id="city-page-data"')[0].replace(/<[^>]*>/g, '').replace(/\s+/g, ' ')

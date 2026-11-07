@@ -45,7 +45,7 @@ export function buildSitemapXml({ baseUrl, cityPages = {}, allTypePages = {}, bl
       const generatedAt = page?.generatedAt ? new Date(page.generatedAt) : null
       const validDate = generatedAt && !Number.isNaN(generatedAt.getTime())
       rows.push({
-        path: `${basePath}/${slug}`,
+        path: `${basePath}/${getCityBySlug(slug).slug}`,
         changefreq: 'monthly',
         priority: '0.7',
         lastmod: validDate ? generatedAt.toISOString().slice(0, 10) : today,

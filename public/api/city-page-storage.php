@@ -51,8 +51,8 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
 }
 $key = $_GET['key'] ?? '';
 $action = $_GET['action'] ?? '';
-if (!is_string($key) || !preg_match('/^paradise_city_pages(?:_(?:reception|anniversaire|bapteme|fiancailles|seminaire))?$/D', $key)
-    || !in_array($action, ['save-page', 'backup-pages'], true)) {
+if (!is_string($key) || !preg_match('/^paradise_city_pages(?:_(?:reception|anniversaire|bapteme|fiancaille|fiancailles|seminaire))?$/D', $key)
+    || !in_array($action, ['save-page', 'backup-pages', 'migrate-pages'], true)) {
     failCityStorage(400, 'Opération de stockage invalide.');
 }
 $body = file_get_contents('php://input');
@@ -63,7 +63,7 @@ if (json_last_error() !== JSON_ERROR_NONE || !is_object($input)) failCityStorage
 if ($action === 'save-page') {
     $slug = $input->slug ?? null;
     $page = $input->page ?? null;
-    if (!is_string($slug) || strlen($slug) > 120 || !preg_match('/^[a-z0-9]+(?:-[a-z0-9]+)*$/D', $slug)
+    if (!is_string($slug) || strlen($slug) > 120 || !preg_match('/^[a-z0-9]+(?:-[a-z0-9]+)*-[0-9]{5}$/D', $slug)
         || !is_object($page) || !is_string($page->content ?? null) || trim($page->content) === ''
         || !is_string($page->generatedAt ?? null) || strtotime($page->generatedAt) === false) {
         failCityStorage(400, 'Page ou identifiant de ville invalide.');
@@ -87,7 +87,28 @@ if (!is_dir($dataDir)) {
 $path = $dataDir . '/' . $key . '.json';
 $lock = lockCityStorage($path);
 $pages = readCityStorage($path, true);
-if ($action === 'save-page') {
+if ($action === 'migrate-pages') {
+    $aliases = $input->aliases ?? null;
+    if (!is_object($aliases) || count(get_object_vars($aliases)) > 250) failCityStorage(400, 'Migration de villes invalide.');
+    foreach ($aliases as $old => $new) {
+        if (!is_string($new) || !preg_match('/^[a-z0-9]+(?:-[a-z0-9]+)*$/D', $old)
+            || !preg_match('/^' . preg_quote($old, '/') . '-[0-9]{5}$/D', $new)) {
+            failCityStorage(400, 'Identifiant ville-code postal invalide.');
+        }
+        if (isset($pages->{$old})) {
+            if (!isset($pages->{$new})) $pages->{$new} = $pages->{$old};
+            unset($pages->{$old});
+        }
+    }
+    writeCityStorage($path, $pages);
+} elseif ($action === 'save-page') {
+    $legacySlug = $input->legacySlug ?? null;
+    if ($legacySlug !== null && (!is_string($legacySlug)
+        || !preg_match('/^[a-z0-9]+(?:-[a-z0-9]+)*$/D', $legacySlug)
+        || !preg_match('/^' . preg_quote($legacySlug, '/') . '-[0-9]{5}$/D', $slug))) {
+        failCityStorage(400, 'Ancien identifiant de ville invalide.');
+    }
+    if ($legacySlug !== null && $legacySlug !== $slug) unset($pages->{$legacySlug});
     $pages->{$slug} = $page;
     writeCityStorage($path, $pages);
 } elseif (count(get_object_vars($pages)) > 0) {

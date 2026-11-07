@@ -6,6 +6,7 @@ import {
 import { DEPARTMENTS, ALL_CITIES, getCityBySlug } from '../../../data/idf-cities'
 import { generateWeddingPage } from '../../../utils/weddingPageTemplates'
 import { applyWeddingTravel, fetchWeddingTravel } from '../../../utils/weddingTravel'
+import { ungeneratedCitySlugs } from '../../../utils/cityPageIdentity'
 import { PAGE_TYPES } from '../../../data/pageTypes'
 import { getSettings } from '../../../utils/storage'
 import { getBlogArticles } from '../../../utils/blogStorage'
@@ -134,6 +135,16 @@ export default function PagesClientTab({ pageType }) {
     setSelDepts((prev) => { const n = { ...prev }; delete n[code]; return n })
   }
 
+  function selectUngeneratedDept(department) {
+    const slugs = ungeneratedCitySlugs(department, pages)
+    setSelDepts((prev) => {
+      const next = { ...prev }
+      if (slugs.length) next[department.code] = new Set(slugs)
+      else delete next[department.code]
+      return next
+    })
+  }
+
   function toggleCity(deptCode, slug) {
     setSelDepts((prev) => {
       const cur = prev[deptCode]
@@ -213,6 +224,7 @@ export default function PagesClientTab({ pageType }) {
       const existing = await storage.getPages({ requireServer: true })
       const newlyReplaced = slugs.filter((slug) => existing[slug] && !pages[slug]).length
       if (newlyReplaced && !window.confirm(`${newlyReplaced} autres pages existent sur le serveur. Les remplacer après sauvegarde ?`)) return
+      await storage.migratePageKeys()
       await storage.backupPages({ requireServer: true })
       setBackups(await storage.getBackups())
       const updated = { ...existing }
@@ -259,6 +271,7 @@ export default function PagesClientTab({ pageType }) {
         return
       }
       if (!window.confirm(`Calculer le trajet routier réel de ${total} page(s) ? Une requête par ville sera envoyée, au rythme d’une par seconde maximum.`)) return
+      await storage.migratePageKeys()
       await storage.backupPages({ requireServer: true })
       setBackups(await storage.getBackups())
       const updated = { ...existing }
@@ -289,6 +302,7 @@ export default function PagesClientTab({ pageType }) {
     setPublishError('')
     setPublishProgress({ done: 0, total: Object.keys(pages).length, current: 'Préparation des pages' })
     try {
+      for (const pt of PAGE_TYPES) await makePageTypeStorage(pt.id).migratePageKeys()
       const [savedConfig, savedGallery, blogArticles, ...typePages] = await Promise.all([
         storage.getConfig(),
         storage.getGallery(),
@@ -486,7 +500,7 @@ export default function PagesClientTab({ pageType }) {
 
               {/* Toolbar: search + select-all (only when a dept is focused) */}
               {focusDeptObj && (
-                <div style={{ padding: '8px 12px', borderBottom: '1px solid var(--border-light)', display: 'flex', gap: '8px', alignItems: 'center', background: '#fafafa' }}>
+                <div style={{ padding: '8px 12px', borderBottom: '1px solid var(--border-light)', display: 'flex', flexWrap: 'wrap', gap: '8px', alignItems: 'center', background: '#fafafa' }}>
                   <input
                     type="text"
                     placeholder="🔍 Rechercher une ville…"
@@ -510,6 +524,9 @@ export default function PagesClientTab({ pageType }) {
                       </button>
                     )
                   })()}
+                  <button type="button" className="btn btn-outline" onClick={() => selectUngeneratedDept(focusDeptObj)} style={{ fontSize: '12px', padding: '6px 12px' }}>
+                    Pages non générée
+                  </button>
                 </div>
               )}
 
@@ -549,7 +566,7 @@ export default function PagesClientTab({ pageType }) {
                           onChange={() => toggleCity(focusDeptObj.code, city.slug)}
                           style={{ cursor: 'pointer', accentColor: 'var(--gold)' }}
                         />
-                        <span style={{ fontSize: '13px', color: 'var(--text)', flex: 1 }}>{city.name}</span>
+                        <span style={{ fontSize: '13px', color: 'var(--text)', flex: 1 }}>{city.name} ({city.postalCode})</span>
                         {pages[city.slug] && (
                           <span title={`Générée le ${new Date(pages[city.slug].generatedAt).toLocaleDateString('fr-FR')}`}
                             style={{ fontSize: '10px', background: '#e8f5e9', color: '#2e7d52', padding: '2px 6px', borderRadius: '4px' }}>

@@ -263,6 +263,10 @@ if (($data['action'] ?? '') === 'inspect') {
         failPublication(400, 'Sitemap ou robots.txt invalide.');
     }
     $directory = $data['directory'] ?? null;
+    $idfDirectory = $data['idfDirectory'] ?? null;
+    if (!is_string($idfDirectory) || ($idfDirectory !== '' && strpos($idfDirectory, '<section class="wedding-directory"') !== 0)) {
+        failPublication(400, 'Annuaire Île-de-France invalide.');
+    }
     $slugs = $data['slugs'] ?? null;
     $homeSeo = $data['homeSeo'] ?? null;
     $departmentCodes = $data['departmentCodes'] ?? [];
@@ -294,6 +298,12 @@ if (($data['action'] ?? '') === 'inspect') {
     if ($linkedSlugs !== $publishedSlugs) {
         failPublication(400, 'Les liens de l’annuaire ne correspondent pas aux pages publiées.');
     }
+    preg_match_all('~href="/locationsalledemariage/([a-z0-9-]+)"~', $idfDirectory, $idfLinks);
+    if (array_diff($idfLinks[1], $publishedSlugs)) failPublication(400, 'L’annuaire Île-de-France contient une ville non publiée.');
+    preg_match_all('~href="/locationsalledemariage/departements/([^"]+)"~', $idfDirectory, $idfDepartments);
+    if (array_diff($idfDepartments[1], ['75', '77', '78', '91', '92', '93', '94', '95'])) {
+        failPublication(400, 'L’annuaire du blog contient un département hors Île-de-France.');
+    }
     $start = '<!-- WEDDING_DIRECTORY_START -->';
     $end = '<!-- WEDDING_DIRECTORY_END -->';
     $seoStart = '<!-- HOME_SEO_START -->';
@@ -310,6 +320,7 @@ if (($data['action'] ?? '') === 'inspect') {
     $index = substr($index, 0, strpos($index, $seoStart)) . $seoStart . "\n" . $homeSeo . "\n"
         . substr($index, strpos($index, $seoEnd));
     writeIfChanged($root . '/wedding-directory.html', $directory);
+    writeIfChanged($root . '/wedding-directory-idf.html', $idfDirectory);
     writeIfChanged($root . '/wedding-pages.json', json_encode(array_values(array_unique($slugs))));
     writeIfChanged($root . '/wedding-departments.json', json_encode(array_values(array_unique($departmentCodes))));
     writeIfChanged($indexFile, $index);

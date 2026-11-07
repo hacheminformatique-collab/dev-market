@@ -501,6 +501,24 @@ async function testDepartments() {
       assert.equal(redirected.status, 301)
     }
     assert.equal((await fetch('/locationsalledemariage/departements/99')).status, 404)
+    const regionalDirectory = await (await fetch('/wedding-directory-idf.html')).text()
+    for (const path of ['/blog', '/blog/prix-moyen-d-un-mariage-en-france-en-2025']) {
+      const response = await fetch(path)
+      assert.equal(response.status, 200)
+      const html = await response.text()
+      const footer = html.match(/<!-- WEDDING_DIRECTORY_START -->([\s\S]*?)<!-- WEDDING_DIRECTORY_END -->/)[1]
+      assert.ok(footer.includes(regionalDirectory))
+      assert.match(footer, /Zone de location de salle de mariage/)
+      assert.match(footer, /href="\/locationsalledemariage\/departements\/77"/)
+      const cityLinks = [...footer.matchAll(/href="\/locationsalledemariage\/([a-z0-9-]+)"/g)].map((match) => match[1])
+      assert.ok(cityLinks.length > 0)
+      assert.ok(cityLinks.every((slug) => ['75', '77', '78', '91', '92', '93', '94', '95'].includes(getCityBySlug(slug).deptCode)))
+      for (const code of ['02', '27', '28', '45', '51', '60', '76', '89']) {
+        assert.ok(!footer.includes(`/departements/${code}`))
+      }
+    }
+    const home = await (await fetch('/')).text()
+    assert.match(home, /href="\/locationsalledemariage\/departements\/02"/, 'Homepage retains its full directory')
     assert.deepEqual(await (await fetch('/wedding-departments.json')).json(), WEDDING_DEPARTMENTS.map(({ code }) => code))
     requests.length = 0
     await publication.publishWeddingPages(options)

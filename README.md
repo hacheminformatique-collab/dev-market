@@ -285,6 +285,17 @@ page ne liste que les communes publiées de son propre département. Une page
 département liste également uniquement ses communes ; aucun lien vers une
 commune non publiée n'est ajouté.
 
+Le bandeau supérieur de l'accueil propose **BLOG** juste après **ESPACE STAFF** ;
+ce lien supplémentaire n'est pas ajouté aux bandeaux des autres pages.
+La liste du blog et tous ses articles affichent uniquement l'annuaire des
+départements et communes publiées d'Île-de-France. La publication crée
+`wedding-directory-idf.html` ; Apache sert les routes `/blog` et `/blog/...`
+via `api/blog-shell.php`, qui insère ce fragment dans le HTML initial.
+La navigation côté navigateur charge le même fragment régional.
+Déployer `.htaccess` et `api/blog-shell.php`, puis lancer une publication
+des pages mariage pour créer ou actualiser ce fragment. Aucune republication
+des fichiers ville inchangés n'est nécessaire pour cette modification du blog.
+
 Après une mise à jour du modèle du site, le bouton distinct **Mettre à jour le
 modèle des pages** demande confirmation avant de remplacer les fichiers des
 pages sauvegardées, même si leurs textes n'ont pas changé. Utilisez-le seulement

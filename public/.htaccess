@@ -81,7 +81,10 @@ DirectoryIndex index.html
     RewriteRule ^api/ - [L]
 
     # A missing publication manifest must return 404, not the SPA shell.
-    RewriteRule ^(?:wedding-pages\.json|wedding-departments\.json|wedding-directory\.html)$ - [L]
+    RewriteRule ^(?:wedding-pages\.json|wedding-departments\.json|wedding-directory(?:-idf)?\.html)$ - [L]
+
+    # Blog pages receive the regional directory in their initial HTML.
+    RewriteRule ^blog(?:/.*)?$ api/blog-shell.php [L]
 
     RewriteCond %{THE_REQUEST} \s/+locationsalledemariage/departements/([0-9]{2})(?:\.html|/)(?:[?\s]) [NC]
     RewriteRule ^locationsalledemariage/departements/([0-9]{2})(?:\.html|/)$ /locationsalledemariage/departements/$1 [R=301,L]

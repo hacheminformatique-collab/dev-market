@@ -267,9 +267,10 @@ export async function publishWeddingPages({ pages, config, gallery, allTypePages
   const sitemap = buildSitemapXml({ baseUrl: origin, allTypePages: { ...allTypePages, mariage: sitemapPages }, blogArticles, departmentCodes })
   const robots = buildRobotsTxt(origin)
   const directory = renderToStaticMarkup(<WeddingDirectory slugs={allSlugs} businessName={config.businessName || settings.nom} />)
+  const idfDirectory = renderToStaticMarkup(<WeddingDirectory slugs={allSlugs} businessName={config.businessName || settings.nom} region="Île-de-France" />)
   const homeSeo = renderSeoHead(buildSeoData('/', { ...settings, siteUrl: origin }, {}, null, null, null, origin))
-  await write({ action: 'seo', sitemap, robots, directory, slugs: allSlugs, departmentCodes, homeSeo, expectedRegistryHash: inspection.registryHash })
-  for (const [path, content] of [['/sitemap.xml', sitemap], ['/robots.txt', robots], ['/wedding-directory.html', directory], ['/wedding-pages.json', JSON.stringify(allSlugs)], ['/wedding-departments.json', JSON.stringify(departmentCodes)]]) {
+  await write({ action: 'seo', sitemap, robots, directory, idfDirectory, slugs: allSlugs, departmentCodes, homeSeo, expectedRegistryHash: inspection.registryHash })
+  for (const [path, content] of [['/sitemap.xml', sitemap], ['/robots.txt', robots], ['/wedding-directory.html', directory], ['/wedding-directory-idf.html', idfDirectory], ['/wedding-pages.json', JSON.stringify(allSlugs)], ['/wedding-departments.json', JSON.stringify(departmentCodes)]]) {
     const check = await fetch(path, { cache: 'no-store' })
     if (!check.ok || await check.text() !== content) throw new Error(`Le fichier ${path} a été écrit mais n'est pas accessible à son URL.`)
   }

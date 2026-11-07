@@ -3,14 +3,15 @@ import './WeddingDirectory.css'
 import { normalizeCityName } from '../utils/cityNames'
 import { departmentPath } from '../utils/weddingDepartments'
 
-export default function WeddingDirectory({ slugs, businessName = 'Le Paradise', cityName = '', departmentCode }) {
+export default function WeddingDirectory({ slugs, businessName = 'Le Paradise', cityName = '', departmentCode, region }) {
   // Resolve each URL exactly as CityPage does, including legacy duplicate slugs.
   const published = [...new Set(slugs)].map(getCityBySlug).filter(Boolean)
   const departments = DEPARTMENTS.map((department) => ({
     ...department,
     cities: published.filter((city) => city.deptCode === department.code)
       .sort((a, b) => a.name.localeCompare(b.name, 'fr')),
-  })).filter((department) => department.cities.length > 0 && (!departmentCode || department.code === departmentCode))
+  })).filter((department) => department.cities.length > 0
+    && (!departmentCode || department.code === departmentCode) && (!region || department.region === region))
   if (departments.length === 0) return null
 
   return (

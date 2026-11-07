@@ -10,7 +10,7 @@ export default function HomePage() {
 
   return (
     <div style={{ minHeight: '100vh', background: '#14142a', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-    <PublicHeader businessName={nomSalle} />
+    <PublicHeader businessName={nomSalle} showBlog />
     <VideoHero as="div" className="video-hero-home" style={{
       minHeight: '100vh',
       background: 'linear-gradient(160deg, #14142a 0%, #1c1c3a 55%, #10101e 100%)',

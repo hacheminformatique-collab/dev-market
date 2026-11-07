@@ -56,14 +56,39 @@ async function _set(key, data, requireServer = false) {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(data),
     })
-    if (requireServer && (!response.ok || !(await response.json())?.ok)) {
-      throw new Error(`Stockage serveur refusé (HTTP ${response.status}).`)
-    }
+    if (requireServer) await confirmStorage(response)
   } catch (error) {
     if (requireServer) {
       console.error('[CityPagesStorage]', error)
-      throw new Error('Enregistrement serveur impossible. Une copie locale a été tentée ; vérifiez le stockage PHP avant de continuer.', { cause: error })
+      throw new Error(`Enregistrement serveur impossible. ${error.message} Une copie locale a été tentée.`, { cause: error })
     }
+  }
+}
+
+async function confirmStorage(response, endpoint = 'api/storage.php') {
+  const text = await response.text()
+  let result
+  try { result = JSON.parse(text) } catch { /* Hosting error pages are not JSON. */ }
+  if (!response.ok || !result?.ok) {
+    const detail = typeof result?.error === 'string' ? result.error : (
+      response.status === 413 ? 'La requête dépasse la limite de taille de l’hébergement.' :
+        `Réponse de stockage invalide. Vérifiez le déploiement de ${endpoint} et les journaux PHP.`
+    )
+    throw new Error(`HTTP ${response.status} : ${detail}`)
+  }
+}
+
+async function pageOperation(key, action, payload) {
+  try {
+    const response = await fetch(`/api/city-page-storage.php?key=${encodeURIComponent(key)}&action=${action}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    })
+    await confirmStorage(response, 'api/city-page-storage.php')
+  } catch (error) {
+    console.error('[CityPagesStorage]', error)
+    throw new Error(`Enregistrement serveur impossible. ${error.message}`, { cause: error })
   }
 }
 
@@ -176,6 +201,10 @@ export function makePageTypeStorage(typeId) {
     await _set(kPages, pages, requireServer)
   }
 
+  async function savePage(slug, page) {
+    await pageOperation(kPages, 'save-page', { slug, page })
+  }
+
   async function getGallery() {
     return (await _get(KEY_GALLERY)) || []
   }
@@ -185,6 +214,10 @@ export function makePageTypeStorage(typeId) {
   }
 
   async function backupPages({ requireServer = false } = {}) {
+    if (requireServer) {
+      await pageOperation(kPages, 'backup-pages', {})
+      return
+    }
     const current = await getPages({ requireServer })
     if (!current || Object.keys(current).length === 0) return
     const existing = (await _get(kBackup, requireServer)) || []
@@ -196,7 +229,7 @@ export function makePageTypeStorage(typeId) {
     return (await _get(kBackup)) || []
   }
 
-  return { getConfig, saveConfig, getPages, savePages, getGallery, saveGallery, backupPages, getBackups }
+  return { getConfig, saveConfig, getPages, savePages, savePage, getGallery, saveGallery, backupPages, getBackups }
 }
 
 export function generateLocalCityContent(cityName, deptName, keywords, businessName, businessType, mainKeyword) {

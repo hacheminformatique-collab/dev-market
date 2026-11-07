@@ -526,6 +526,7 @@ test('publication migrates legacy directories and writes updated city links into
     const post = (body) => fetch('/api/static-publish.php', {
       method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Admin-Pin': pin }, body: JSON.stringify(body),
     })
+
     const race = await post({ action: 'city-directory', slug: 'meaux', directory: visibleDirectory, styles: '.wedding-directory{}', expectedHash: '0'.repeat(64) })
     assert.equal(race.status, 409)
     assert.equal(await readFile(file, 'utf8'), updated)
@@ -534,6 +535,51 @@ test('publication migrates legacy directories and writes updated city links into
     const conflict = await post({ action: 'page', slug: 'meaux', html: updated, expectedHash: '0'.repeat(64) })
     assert.equal(conflict.status, 409)
     assert.equal(await readFile(file, 'utf8'), updated)
+  } finally {
+    globalThis.fetch = nativeFetch
+  }
+})
+
+test('incremental PHP storage saves bounded requests and backs up large collections on the server', async () => {
+  const nativeFetch = globalThis.fetch
+  const key = 'paradise_city_pages_reception'
+  const path = join(site, 'storage-data', `${key}.json`)
+  const backupPath = join(site, 'storage-data', 'paradise_city_pages_backup_reception.json')
+  const existing = Object.fromEntries(Array.from({ length: 70 }, (_, index) => [
+    `city-${index}`, { content: 'Texte conservé. '.repeat(1100), generatedAt: '2026-01-01T00:00:00Z' },
+  ]))
+  const sizes = []
+  await writeFile(path, JSON.stringify(existing))
+  assert.ok(Buffer.byteLength(JSON.stringify(existing)) > 1024 * 1024)
+  globalThis.fetch = (url, options) => {
+    if (options?.method === 'POST') {
+      sizes.push(Buffer.byteLength(options.body))
+      if (sizes.at(-1) > 128 * 1024) return Promise.resolve(new Response('Request too large', { status: 413 }))
+    }
+    return nativeFetch(new URL(url, origin), options)
+  }
+  try {
+    const { makePageTypeStorage } = await vite.ssrLoadModule('/src/utils/cityPageStorage.js')
+    const api = makePageTypeStorage('reception')
+    const page = { content: 'Page ajoutée', generatedAt: '2026-02-01T00:00:00Z', template: { version: 1, seed: 42 } }
+    const vauxPage = generateWeddingPage({ slug: 'vaux-sur-lunain', seed: 42 })
+    await api.backupPages({ requireServer: true })
+    await api.savePage('meaux', page)
+    await api.savePage('vaux-sur-lunain', vauxPage)
+    assert.ok(sizes.every((size) => size < 128 * 1024), 'Neither saving nor backing up may upload the full collection')
+    const saved = JSON.parse(await readFile(path, 'utf8'))
+    assert.deepEqual(saved, { ...existing, meaux: page, 'vaux-sur-lunain': vauxPage })
+    const backups = JSON.parse(await readFile(backupPath, 'utf8'))
+    assert.deepEqual(backups[0].snapshot, existing)
+    for (let i = 0; i < 5; i++) await api.backupPages({ requireServer: true })
+    assert.equal(JSON.parse(await readFile(backupPath, 'utf8')).length, 5)
+    await assert.rejects(api.savePage('../invalid', page), /HTTP 400/)
+    assert.deepEqual(JSON.parse(await readFile(path, 'utf8')), saved)
+    await writeFile(path, '{invalid JSON')
+    await assert.rejects(api.savePage('meaux', page), /HTTP 409.*Aucun fichier/)
+    assert.equal(await readFile(path, 'utf8'), '{invalid JSON')
+    await assert.rejects(api.backupPages({ requireServer: true }), /HTTP 409/)
+    assert.equal(JSON.parse(await readFile(backupPath, 'utf8')).length, 5)
   } finally {
     globalThis.fetch = nativeFetch
   }

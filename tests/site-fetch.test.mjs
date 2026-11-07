@@ -74,6 +74,23 @@ test('509 and 429 suspend queued calls across tabs with no automatic retry', asy
   }
 })
 
+test('incremental page writes and server backups invalidate their storage read caches', async () => {
+  const { shared, starts } = fixture()
+  const fetch = createSiteFetch(shared)
+  const pages = '/api/storage.php?key=paradise_city_pages'
+  const backups = '/api/storage.php?key=paradise_city_pages_backup'
+  await fetch(pages)
+  await fetch(backups)
+  await fetch('/api/city-page-storage.php?key=paradise_city_pages&action=save-page', { method: 'POST', body: '{}' })
+  await fetch(pages)
+  await fetch(backups)
+  assert.equal(starts.filter(({ url }) => url === pages).length, 2)
+  assert.equal(starts.filter(({ url }) => url === backups).length, 1)
+  await fetch('/api/city-page-storage.php?key=paradise_city_pages&action=backup-pages', { method: 'POST', body: '{}' })
+  await fetch(backups)
+  assert.equal(starts.filter(({ url }) => url === backups).length, 2)
+})
+
 test('public reads dispatch immediately without waiting for a pending batch or reserving its slots', async () => {
   const { shared, starts } = fixture()
   let finishBatch

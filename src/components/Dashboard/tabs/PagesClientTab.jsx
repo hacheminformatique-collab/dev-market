@@ -218,13 +218,14 @@ export default function PagesClientTab({ pageType }) {
       for (const city of cities) {
         current = city.name
         setGenProgress({ done, total: slugs.length, current })
-        updated[city.slug] = pageType.id === 'mariage'
+        const page = pageType.id === 'mariage'
           ? generateWeddingPage({ slug: city.slug, businessName: config.businessName })
           : {
             content: generateLocalCityContent(city.name, city.deptName, config.keywords, config.businessName, config.businessType, pageType.mainKeyword),
             generatedAt: new Date().toISOString(),
           }
-        await storage.savePages(updated, { requireServer: true })
+        await storage.savePage(city.slug, page)
+        updated[city.slug] = page
         setPages({ ...updated })
         done++
         // Yield between local generations so progress and navigation can render.

@@ -108,6 +108,19 @@ est enregistrée immédiatement sur le serveur. Si la lecture, la sauvegarde ou
 l'écriture serveur échoue, un message explicite arrête le lot : les pages déjà
 enregistrées sont conservées. Les villes non sélectionnées ne sont pas modifiées.
 
+La génération envoie uniquement la ville courante à `api/city-page-storage.php`,
+qui fusionne la page sous verrou avec le fichier JSON existant. La taille des
+requêtes ne croît plus avec le nombre de villes. Les cinq dernières sauvegardes
+sont créées côté serveur, sans renvoyer leurs snapshots depuis le navigateur.
+Le format des fichiers et des restaurations reste compatible. Les appels
+conservent l'espacement de 650 ms et l'arrêt sur limitation de l'hébergement.
+Les erreurs affichent le statut HTTP et, si disponible, le détail PHP.
+Déployer ce nouvel endpoint avec le front-end et `api/storage.php`, puis
+recharger le dashboard. Le compte PHP doit pouvoir créer les verrous et fichiers
+temporaires dans `storage-data/`. Les gros fichiers JSON sont toujours lus et
+écrits côté serveur : vérifier aussi les quotas disque et mémoire PHP si une
+erreur persiste. Ce changement ne modifie pas les fichiers HTML déjà publiés.
+
 Après fusion, déployer tout `dist/`, puis générer et **republier les pages HTML**
 pour afficher les nouveaux textes et avis. Les anciens textes ne sont jamais
 réécrits automatiquement, y compris les témoignages éventuellement présents.

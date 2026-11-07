@@ -60,6 +60,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
 
 // ── POST ─────────────────────────────────────────────────────────────────────
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    $lock = fopen($file . '.lock', 'c+');
+    if (!$lock || !flock($lock, LOCK_EX)) {
+        http_response_code(500);
+        echo json_encode(['error' => 'Storage lock failed']);
+        exit;
+    }
     $body = file_get_contents('php://input');
 
     // Validate incoming payload is well-formed JSON
@@ -72,7 +78,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     // Atomic write: write to a temp file then rename to avoid partial reads
     $tmp = $file . '.tmp.' . getmypid();
-    if (file_put_contents($tmp, $body, LOCK_EX) === false) {
+    if (file_put_contents($tmp, $body, LOCK_EX) !== strlen($body)) {
+        @unlink($tmp);
         http_response_code(500);
         echo json_encode(['error' => 'Write failed']);
         exit;

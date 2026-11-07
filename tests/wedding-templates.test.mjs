@@ -131,10 +131,21 @@ test('generation storage preserves unselected pages and restored variants, and e
   const nativeFetch = globalThis.fetch
   const originalLocalStorage = globalThis.localStorage
   const data = new Map([['paradise_city_pages', { old: { content: 'Unselected content' } }]])
+  const incrementalBodies = []
   globalThis.localStorage = { setItem() {} }
   globalThis.fetch = async (url, options) => {
-    const key = new URL(url, 'http://localhost').searchParams.get('key')
-    if (options?.method === 'POST') data.set(key, JSON.parse(options.body))
+    const requestUrl = new URL(url, 'http://localhost')
+    const key = requestUrl.searchParams.get('key')
+    if (requestUrl.pathname === '/api/city-page-storage.php') {
+      const payload = JSON.parse(options.body)
+      incrementalBodies.push(options.body)
+      if (requestUrl.searchParams.get('action') === 'save-page') {
+        data.set(key, { ...data.get(key), [payload.slug]: payload.page })
+      } else {
+        const backupKey = key.replace('paradise_city_pages', 'paradise_city_pages_backup')
+        data.set(backupKey, [{ snapshot: structuredClone(data.get(key)) }, ...(data.get(backupKey) || [])].slice(0, 5))
+      }
+    } else if (options?.method === 'POST') data.set(key, JSON.parse(options.body))
     return new Response(JSON.stringify(options?.method === 'POST' ? { ok: true } : data.get(key) ?? null), {
       headers: { 'Content-Type': 'application/json' },
     })
@@ -144,7 +155,10 @@ test('generation storage preserves unselected pages and restored variants, and e
     const existing = await api.getPages({ requireServer: true })
     await api.backupPages({ requireServer: true })
     const page = templates.generateWeddingPage({ slug: 'meaux', seed: 15 })
-    await api.savePages({ ...existing, meaux: page }, { requireServer: true })
+    await api.savePage('meaux', page)
+    assert.deepEqual(JSON.parse(incrementalBodies[0]), {}, 'Backup must not upload existing snapshots')
+    assert.deepEqual(JSON.parse(incrementalBodies[1]), { slug: 'meaux', page })
+    assert.ok(!incrementalBodies[1].includes('Unselected content'))
     assert.deepEqual((await api.getPages()).old, existing.old)
     await api.backupPages({ requireServer: true })
     const [backup] = await api.getBackups()
@@ -152,9 +166,14 @@ test('generation storage preserves unselected pages and restored variants, and e
     await api.savePages(backup.snapshot, { requireServer: true })
     assert.deepEqual((await api.getPages()).meaux, page)
     globalThis.fetch = async () => new Response(JSON.stringify({ ok: false }), { status: 500 })
+    await assert.rejects(api.savePage('meaux', page), /Enregistrement serveur impossible.*HTTP 500/)
     await assert.rejects(api.savePages({ meaux: page }, { requireServer: true }), /Enregistrement serveur impossible/)
     await assert.rejects(api.getPages({ requireServer: true }), /Lecture du stockage/)
-    await assert.rejects(api.backupPages({ requireServer: true }), /Lecture du stockage/)
+    await assert.rejects(api.backupPages({ requireServer: true }), /Enregistrement serveur impossible/)
+    globalThis.fetch = async () => new Response(JSON.stringify({ error: 'Espace disque insuffisant' }), { status: 500 })
+    await assert.rejects(api.savePage('meaux', page), /HTTP 500.*Espace disque insuffisant/)
+    globalThis.fetch = async () => new Response('<html>Too large</html>', { status: 413 })
+    await assert.rejects(api.savePage('meaux', page), /HTTP 413.*limite de taille/)
   } finally {
     globalThis.fetch = nativeFetch
     if (originalLocalStorage === undefined) delete globalThis.localStorage

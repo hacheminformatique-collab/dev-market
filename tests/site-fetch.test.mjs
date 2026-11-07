@@ -151,6 +151,39 @@ test('external requests bypass hosting limiter; cancelled calls are not dispatch
   assert.equal(starts.length, 1)
 })
 
+test('company defaults persist only after entering administration and preserve saved settings', async () => {
+  const vite = await createServer({ root: new URL('../', import.meta.url).pathname, server: { middlewareMode: true } })
+  const originalFetch = globalThis.fetch
+  const originalStorage = globalThis.localStorage
+  const calls = []
+  const saved = { pin: 'existing-pin', siteUrl: '', legalInfo: { email: '', gerant: 'Gérant existant' } }
+  globalThis.localStorage = { getItem: () => null, setItem() {} }
+  globalThis.fetch = async (url, options) => {
+    calls.push({ url, options })
+    return new Response(JSON.stringify(url.includes('key=paradise_settings') ? saved : null), { headers: { 'Content-Type': 'application/json' } })
+  }
+  try {
+    const storage = await vite.ssrLoadModule('/src/utils/storage.js')
+    const { storageProfile } = await vite.ssrLoadModule('/src/utils/storageProfiles.js')
+    await storage.initStorage(storageProfile('/'))
+    assert.equal(calls.length, 1)
+    assert.equal(storage.getSettings().siteUrl, 'https://www.leparadise77.fr')
+    await storage.initStorage()
+    const writes = calls.filter((call) => call.options?.method === 'POST' && call.url.includes('key=paradise_settings'))
+    assert.equal(writes.length, 1)
+    const merged = JSON.parse(writes[0].options.body)
+    assert.equal(merged.pin, saved.pin)
+    assert.equal(merged.legalInfo.gerant, saved.legalInfo.gerant)
+    assert.equal(merged.legalInfo.email, 'contact@leparadise77.fr')
+    assert.deepEqual(merged.bankInfo, { iban: '', bic: '', titulaire: '' })
+  } finally {
+    globalThis.fetch = originalFetch
+    if (originalStorage === undefined) delete globalThis.localStorage
+    else globalThis.localStorage = originalStorage
+    await vite.close()
+  }
+})
+
 test('a quote-specific notification limit is reported without suspending the whole site', async () => {
   const { shared, starts } = fixture()
   const original = shared.transport

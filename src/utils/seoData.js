@@ -1,5 +1,6 @@
 import { getCityBySlug } from '../data/idf-cities'
 import { normalizeCityName as plainLocationName } from './cityNames'
+import { PARADISE_COORDS } from './weddingTravel'
 
 function normalizeSiteUrl(rawUrl, fallback = window.location.origin) {
   const input = (rawUrl || '').trim()
@@ -62,7 +63,7 @@ export function buildSeoData(pathname, settings, cityPages, detectedPageType, bl
             addressRegion: 'Seine-et-Marne',
             addressCountry: 'FR',
           },
-          geo: { '@type': 'GeoCoordinates', latitude: 48.9617, longitude: 2.8985 },
+          geo: { '@type': 'GeoCoordinates', latitude: PARADISE_COORDS.lat, longitude: PARADISE_COORDS.lng },
         },
       ],
     },

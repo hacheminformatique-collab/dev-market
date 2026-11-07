@@ -10,6 +10,7 @@ import WeddingDirectory from '../components/WeddingDirectory'
 import directoryStyles from '../components/WeddingDirectory.css?raw'
 import { validateWeddingTemplate } from './weddingPageTemplates'
 import { resolveWeddingSourceLayout } from './weddingSourceLayout'
+import { validateWeddingTravel } from './weddingTravel'
 
 function escapeHtml(value) {
   return String(value).replaceAll('&', '&amp;').replaceAll('<', '&lt;')
@@ -49,11 +50,15 @@ export function makeCitySnapshot({ slug, pages, config, gallery, allTypePages, b
   if (Number.isNaN(new Date(page.generatedAt).getTime())) {
     throw new Error(`Date de génération invalide : ${slug}`)
   }
+  if (!page.travel) {
+    throw new Error(`Trajet routier non calculé pour ${getCityBySlug(slug).name}. Cliquez sur « Mettre à jour les trajets » avant de publier.`)
+  }
+  const travel = validateWeddingTravel(page.travel)
   if (page.template?.version === 2) resolveWeddingSourceLayout(page, getCityBySlug(slug))
   return {
     citySlug: slug,
     pageType: PAGE_TYPES_BY_ID.mariage,
-    page: { content: page.content, generatedAt: page.generatedAt, ...(page.template === undefined ? {} : { template: validateWeddingTemplate(page.template) }) },
+    page: { content: page.content, generatedAt: page.generatedAt, travel, ...(page.template === undefined ? {} : { template: validateWeddingTemplate(page.template) }) },
     config: {
       businessName: config.businessName,
       googleMapsApiKey: config.googleMapsApiKey,

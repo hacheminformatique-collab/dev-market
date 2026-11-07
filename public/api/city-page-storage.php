@@ -68,6 +68,13 @@ if ($action === 'save-page') {
         || !is_string($page->generatedAt ?? null) || strtotime($page->generatedAt) === false) {
         failCityStorage(400, 'Page ou identifiant de ville invalide.');
     }
+    $travel = $page->travel ?? null;
+    if ($travel !== null && (!is_object($travel) || !is_int($travel->km ?? null) || $travel->km < 0 || $travel->km > 500
+        || !is_int($travel->minutes ?? null) || $travel->minutes < 1 || $travel->minutes > 600
+        || !is_string($travel->source ?? null) || trim($travel->source) === ''
+        || !is_string($travel->computedAt ?? null) || strtotime($travel->computedAt) === false)) {
+        failCityStorage(400, 'Trajet de la page invalide.');
+    }
 }
 $dataDir = realpath(__DIR__ . '/..') . '/storage-data';
 if (is_link($dataDir)) failCityStorage(409, 'Dossier de stockage invalide.');

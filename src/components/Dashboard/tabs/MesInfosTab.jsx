@@ -51,6 +51,7 @@ function resizeImageToSquare(file, size) {
 export default function MesInfosTab() {
   const [data, setData] = useState(getSettings())
   const [saved, setSaved] = useState(false)
+  const [editing, setEditing] = useState(false)
   const [seoBusy, setSeoBusy] = useState(false)
   const [seoMessage, setSeoMessage] = useState('')
   const [faviconBusy, setFaviconBusy] = useState(false)
@@ -118,8 +119,14 @@ export default function MesInfosTab() {
 
   function handleSave() {
     saveSettings(data)
+    setEditing(false)
     setSaved(true)
     setTimeout(() => setSaved(false), 2000)
+  }
+
+  function handleCancel() {
+    setData(getSettings())
+    setEditing(false)
   }
 
   async function handleGenerateSeoFiles() {
@@ -172,6 +179,12 @@ export default function MesInfosTab() {
     <div>
       <h3 style={{ marginBottom: '20px', color: '#1a1a2e' }}>Informations générales</h3>
       <div className="card" style={{ maxWidth: '600px' }}>
+        {!editing && (
+          <p style={{ color: '#777', fontSize: '13px', marginBottom: '16px' }}>
+            Ces informations sont utilisées par le site. Cliquez sur « Modifier » pour les changer.
+          </p>
+        )}
+        <fieldset disabled={!editing} style={{ border: 0, padding: 0, margin: 0, minWidth: 0 }}>
         <div className="form-group">
           <label>Nom de la salle</label>
           <input className="form-control" value={data.nom || ''} onChange={(e) => handleChange('nom', e.target.value)} />
@@ -321,14 +334,23 @@ export default function MesInfosTab() {
           <input className="form-control" value={data.bankInfo?.bic || ''} onChange={(e) => handleBankChange('bic', e.target.value)} />
         </div>
 
-        <button onClick={handleSave} className="btn btn-primary">
-          {saved ? '✅ Sauvegardé !' : '💾 Sauvegarder'}
-        </button>
+        </fieldset>
+
+        {editing ? (
+          <>
+            <button onClick={handleSave} className="btn btn-primary">💾 Sauvegarder</button>
+            <button onClick={handleCancel} className="btn btn-outline" style={{ marginLeft: '10px' }}>Annuler</button>
+          </>
+        ) : (
+          <button onClick={() => setEditing(true)} className="btn btn-primary">
+            {saved ? '✅ Sauvegardé !' : '✏️ Modifier'}
+          </button>
+        )}
         <button
           onClick={handleGenerateSeoFiles}
           className="btn btn-outline"
           style={{ marginLeft: '10px' }}
-          disabled={seoBusy}
+          disabled={seoBusy || editing}
         >
           {seoBusy ? '⏳ Génération...' : '🗺️ Générer sitemap.xml + robots.txt'}
         </button>

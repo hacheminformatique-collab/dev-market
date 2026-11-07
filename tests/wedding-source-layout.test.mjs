@@ -8,6 +8,8 @@ import { readFile, access } from 'node:fs/promises'
 import { execFileSync } from 'node:child_process'
 import { resolve } from 'node:path'
 
+const travel = { km: 16, minutes: 20, source: 'test', computedAt: '2026-01-01T00:00:00Z' }
+
 const root = resolve(import.meta.dirname, '..')
 let vite, templates, layoutUtils, cityModule, cities, SourceSections, publication
 let normalizeWeddingDisplayText
@@ -40,7 +42,7 @@ function renderSource(page, city) {
 test('twenty exact source DOM layouts retain all cards, icons, headings, lists and five steps', () => {
   const city = cities.getCityBySlug('meaux')
   for (const model of templates.WEDDING_SOURCE_MODELS) {
-    const page = templates.generateWeddingPage({ slug: city.slug, familyId: model.id, seed: 42 })
+    const page = templates.generateWeddingPage({ slug: city.slug, familyId: model.id, seed: 42, travel })
     const layout = layoutUtils.resolveWeddingSourceLayout(page, city)
     assert.deepEqual(layout.sections.map((s) => s.id), ['intro', 'pourquoi', 'prestations', 'reservation', 'capacite', 'lieux', 'conseils', 'faq'])
     const html = renderSource(page, city)
@@ -68,7 +70,7 @@ test('twenty exact source DOM layouts retain all cards, icons, headings, lists a
 test('all twenty FAQs keep fourteen original questions in order and SSR includes every known answer', () => {
   const city = cities.getCityBySlug('meaux')
   for (const model of templates.WEDDING_SOURCE_MODELS) {
-    const page = templates.generateWeddingPage({ slug: city.slug, familyId: model.id, seed: 42 })
+    const page = templates.generateWeddingPage({ slug: city.slug, familyId: model.id, seed: 42, travel })
     const html = renderSource(page, city)
     assert.equal((html.match(/<details /g) || []).length, 14)
     assert.equal((html.match(/<summary /g) || []).length, 14)
@@ -94,7 +96,7 @@ test('all twenty FAQs keep fourteen original questions in order and SSR includes
 test('old accented V2 saves upgrade without losing block-level customized prose', () => {
   const city = cities.getCityBySlug('chatenay-malabry')
   for (const model of templates.WEDDING_SOURCE_MODELS) {
-    const page = templates.generateWeddingPage({ slug: city.slug, familyId: model.id, seed: 42 })
+    const page = templates.generateWeddingPage({ slug: city.slug, familyId: model.id, seed: 42, travel })
     const oldContent = model.sections.map((section) => layoutUtils.injectWeddingSource(section.content, city, true)).join('\n\n')
     const legacy = { ...page, content: oldContent }
     assert.equal(renderSource(legacy, city), renderSource(page, city))
@@ -115,7 +117,7 @@ test('old accented V2 saves upgrade without losing block-level customized prose'
 })
 
 test('complete SSR puts devis immediately after breadcrumb, preserves V1 and rejects unsupported V2 before publishing', async () => {
-  const page = templates.generateWeddingPage({ slug: 'meaux', seed: 42 })
+  const page = templates.generateWeddingPage({ slug: 'meaux', seed: 42, travel })
   const config = { businessName: 'Le Paradise' }
   const snapshot = publication.makeCitySnapshot({
     slug: 'meaux', pages: { meaux: page }, config, gallery: [],
@@ -147,7 +149,7 @@ test('normalization is restricted to public known town names, preserving French 
   assert.equal(displayed, `Saint Denis — ${city.deptName} : réception élégante à Nanteuil les Meaux. https://example.com/Saint-Denis?city=Nanteuil-lès-Meaux`)
   const snapshot = {
     citySlug: 'chatenay-malabry', pageType: { id: 'mariage' },
-    page: { content: 'Texte personnalisé pour Châtenay-Malabry, réception élégante.', generatedAt: new Date().toISOString() },
+    page: { content: 'Texte personnalisé pour Châtenay-Malabry, réception élégante.', generatedAt: new Date().toISOString(), travel },
     config: {}, gallery: [], allTypePages: {}, blogArticles: [],
   }
   const html = renderToStaticMarkup(createElement(MemoryRouter, null, createElement(cityModule.CityPageContent, snapshot)))

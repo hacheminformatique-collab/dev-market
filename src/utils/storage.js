@@ -222,29 +222,30 @@ const DEFAULTS = {
   settings: {
     nom: 'LE PARADISE',
     pin: '2205',
-    siteUrl: '',
+    siteUrl: 'https://www.leparadise77.fr',
     logo: '',
+    // Bank details are entered in Mes Infos only: never commit them to this public repository.
     bankInfo: {
       iban: '',
       bic: '',
       titulaire: '',
     },
-    whatsapp: '',
+    whatsapp: '+33782821582',
     legalInfo: {
-      raisonSociale: '',
-      enseigne: '',
-      formeJuridique: '',
-      capital: '',
+      raisonSociale: 'SARL AFM',
+      enseigne: 'LE PARADISE',
+      formeJuridique: 'SARL',
+      capital: '7500,00€',
       siret: '',
-      siren: '',
-      tva: '',
-      rcs: '',
+      siren: '904543816',
+      tva: 'FR06904543816',
+      rcs: 'MEAUX',
       dateImmatriculation: '',
-      ape: '',
-      gerant: '',
-      adresse: '',
-      email: '',
-      telephone: '',
+      ape: '68.20B',
+      gerant: 'HACHEM MOHAMED',
+      adresse: '5 avenue Fridingen, 77100 Nanteuil-lès-Meaux',
+      email: 'contact@leparadise77.fr',
+      telephone: '+33782821582',
     },
   },
   formules: [
@@ -317,6 +318,8 @@ function _save(key, data) {
  */
 let initialization = null
 const keyInitializations = new Map()
+const serverLoadedKeys = new Set()
+const serverMissingKeys = new Set()
 export function initStorage(options) {
   if (options) return initializeStorage(options)
   if (!initialization) initialization = initializeStorage()
@@ -336,11 +339,13 @@ async function initializeStorage({ names = Object.keys(KEYS), paced = true, pers
           const res = await fetch(`/api/storage.php?key=${encodeURIComponent(key)}`, { paced })
           if (res.ok) {
             const data = await res.json()
+            serverLoadedKeys.add(key)
             if (data !== null && data !== undefined) {
               _cache[key] = data
               return
             }
             serverConfirmedMissing = true
+            serverMissingKeys.add(key)
           } else {
             console.warn(`[storage] Lecture de ${key} refusée (HTTP ${res.status}), utilisation de la copie locale.`)
           }
@@ -359,12 +364,24 @@ async function initializeStorage({ names = Object.keys(KEYS), paced = true, pers
 
         // 3. Nothing found – initialise with defaults and persist them
         _cache[key] = DEFAULTS[name]
-        if (serverConfirmedMissing && persistDefaults) _save(key, DEFAULTS[name])
+        if (serverConfirmedMissing && persistDefaults) {
+          serverMissingKeys.delete(key)
+          _save(key, DEFAULTS[name])
+        }
       })()
       keyInitializations.set(key, load)
       return load
     })
   )
+
+  if (persistDefaults && names.includes('settings') && serverLoadedKeys.has(KEYS.settings)) {
+    const saved = _cache[KEYS.settings]
+    const merged = withSettingsDefaults(saved)
+    if (serverMissingKeys.has(KEYS.settings) || JSON.stringify(merged) !== JSON.stringify(saved)) {
+      serverMissingKeys.delete(KEYS.settings)
+      _save(KEYS.settings, merged)
+    }
+  }
 
   // One-time migration: strip any embedded base64 documents from client records.
   // Previously, EspaceClient stored the full base64 data URL inside the client record,
@@ -403,7 +420,27 @@ export function initDefaults() {
   // No-op: data initialisation is now handled by initStorage() in App.jsx
 }
 
-export const getSettings = () => _get(KEYS.settings) || DEFAULTS.settings
+const filled = (value, fallback) => (typeof value === 'string' && value.trim() === '') || value == null ? fallback : value
+
+// Saved values always win; only missing or empty company fields receive the defaults.
+export function withSettingsDefaults(data) {
+  const saved = data && typeof data === 'object' ? data : {}
+  const defaults = DEFAULTS.settings
+  const legalInfo = { ...defaults.legalInfo, ...(saved.legalInfo || {}) }
+  for (const field of Object.keys(defaults.legalInfo)) legalInfo[field] = filled(legalInfo[field], defaults.legalInfo[field])
+  return {
+    ...defaults,
+    ...saved,
+    nom: filled(saved.nom, defaults.nom),
+    pin: filled(saved.pin, defaults.pin),
+    siteUrl: filled(saved.siteUrl, defaults.siteUrl),
+    whatsapp: filled(saved.whatsapp, defaults.whatsapp),
+    bankInfo: { ...defaults.bankInfo, ...(saved.bankInfo || {}) },
+    legalInfo,
+  }
+}
+
+export const getSettings = () => withSettingsDefaults(_get(KEYS.settings))
 export const saveSettings = (data) => _save(KEYS.settings, data)
 
 export const getFormules = () => _get(KEYS.formules) || DEFAULTS.formules

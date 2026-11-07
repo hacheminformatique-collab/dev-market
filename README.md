@@ -314,6 +314,38 @@ La canonical et le sitemap facilitent l'exploration, sans garantir l'indexation
 ni le classement par Google. Les pages des autres types et leurs données ne
 sont pas supprimées par le retrait des onglets.
 
+### Trajets routiers et informations de l'établissement
+
+La génération calcule un itinéraire routier OSRM entre le centre de la commune
+et Le Paradise, au **5 avenue Fridingen, 77100 Nanteuil-lès-Meaux**
+(48.937362, 2.882801). La distance et la durée arrondies sont enregistrées avec
+la page et reprises dans les textes, les cartes de présentation et les FAQ.
+Il s'agit d'un itinéraire automobile sans trafic en temps réel, pas d'une
+garantie de durée. Aucun calcul ni appel OSRM n'a lieu à l'ouverture d'une page.
+La carte Google Maps recherche explicitement l'établissement à son adresse ;
+les coordonnées des données structurées utilisent le même emplacement.
+
+Les requêtes de génération sont séquentielles, espacées d'au moins 1,1 seconde
+et limitées à 20 secondes. Une erreur du service arrête le lot sans enregistrer
+de chiffres inventés ; les pages déjà enregistrées sont conservées. Le service
+public OSRM exige une connexion Internet et peut être indisponible ou limiter
+les requêtes. Les tests automatisés simulent ses réponses.
+
+Pour les pages anciennes ou restaurées sans trajet enregistré, utiliser
+**Mettre à jour les trajets**, puis **Publier les pages en HTML statique**.
+La mise à jour sauvegarde les pages côté serveur, conserve leurs modèles et
+leurs textes personnalisés et ne calcule que les trajets manquants. La publication
+refuse les pages sans trajet : elle ne substitue pas une estimation géométrique.
+Les fichiers HTML existants restent inchangés jusqu'à la republication.
+
+**Mes Infos** affiche les informations de l'établissement préremplies et
+verrouillées. Cliquer sur **Modifier**, puis **Sauvegarder** après une modification.
+Les valeurs déjà enregistrées priment ; seuls les champs vides ou absents
+reçoivent les valeurs par défaut. Elles sont enregistrées lors de l'initialisation
+administrative, pas pendant une visite publique. Vérifier le domaine SEO avant
+publication. Le titulaire du compte, l'IBAN et le BIC restent vides dans le code
+du dépôt public et doivent être saisis manuellement dans Mes Infos.
+
 ### Vérification
 
 `npm test` compile le site puis contrôle la génération HTML, les erreurs, la

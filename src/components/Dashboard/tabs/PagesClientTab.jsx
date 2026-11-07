@@ -5,6 +5,7 @@ import {
 } from '../../../utils/cityPageStorage'
 import { DEPARTMENTS, ALL_CITIES, getCityBySlug } from '../../../data/idf-cities'
 import { generateWeddingPage } from '../../../utils/weddingPageTemplates'
+import { applyWeddingTravel, fetchWeddingTravel } from '../../../utils/weddingTravel'
 import { PAGE_TYPES } from '../../../data/pageTypes'
 import { getSettings } from '../../../utils/storage'
 import { getBlogArticles } from '../../../utils/blogStorage'
@@ -219,7 +220,7 @@ export default function PagesClientTab({ pageType }) {
         current = city.name
         setGenProgress({ done, total: slugs.length, current })
         const page = pageType.id === 'mariage'
-          ? generateWeddingPage({ slug: city.slug, businessName: config.businessName })
+          ? generateWeddingPage({ slug: city.slug, businessName: config.businessName, travel: await fetchWeddingTravel(city) })
           : {
             content: generateLocalCityContent(city.name, city.deptName, config.keywords, config.businessName, config.businessType, pageType.mainKeyword),
             generatedAt: new Date().toISOString(),
@@ -238,6 +239,46 @@ export default function PagesClientTab({ pageType }) {
     } finally {
       setGenerating(false)
       setGenProgress({ done, total: slugs.length, current: '' })
+    }
+  }
+
+  async function handleUpdateTravel() {
+    setGenerating(true)
+    setGenDone(false)
+    setGenError('')
+    setPublishMessage('')
+    let done = 0
+    let current = ''
+    let total = 0
+    try {
+      const existing = await storage.getPages({ requireServer: true })
+      const slugs = Object.keys(existing).filter((slug) => !existing[slug]?.travel && getCityBySlug(slug))
+      total = slugs.length
+      if (!total) {
+        setPublishMessage('✅ Toutes les pages ont déjà un trajet routier calculé.')
+        return
+      }
+      if (!window.confirm(`Calculer le trajet routier réel de ${total} page(s) ? Une requête par ville sera envoyée, au rythme d’une par seconde maximum.`)) return
+      await storage.backupPages({ requireServer: true })
+      setBackups(await storage.getBackups())
+      const updated = { ...existing }
+      for (const slug of slugs) {
+        const city = getCityBySlug(slug)
+        current = city.name
+        setGenProgress({ done, total, current })
+        const travel = await fetchWeddingTravel(city)
+        const page = { ...existing[slug], content: applyWeddingTravel(existing[slug].content, travel), travel }
+        await storage.savePage(slug, page)
+        updated[slug] = page
+        setPages({ ...updated })
+        done++
+      }
+      setPublishMessage(`✅ Trajets mis à jour pour ${done} page(s). Cliquez sur « Publier les pages en HTML statique » pour actualiser les fichiers publiés.`)
+    } catch (error) {
+      setGenError(`❌ Mise à jour du trajet impossible${current ? ` pour "${current}"` : ''} : ${error.message} Les pages déjà mises à jour restent conservées.`)
+    } finally {
+      setGenerating(false)
+      setGenProgress({ done, total, current: '' })
     }
   }
 
@@ -603,11 +644,21 @@ export default function PagesClientTab({ pageType }) {
                   >
                     Mettre à jour le modèle des pages
                   </button>
+                  <button
+                    type="button"
+                    className="btn btn-outline"
+                    disabled={publishing || generating || saving || restoringIdx !== null}
+                    onClick={handleUpdateTravel}
+                    style={{ marginLeft: '8px' }}
+                  >
+                    🚗 Mettre à jour les trajets
+                  </button>
                   <p style={{ fontSize: '13px', color: 'var(--text-light)', marginTop: '12px', lineHeight: 1.6 }}>
                     Publie les nouvelles pages et actualise celles dont le contenu, la galerie, la configuration ou les articles ont changé.
                     Les autres fichiers sont modifiés uniquement si leur annuaire doit être actualisé.
                     L’annuaire des pages publiées est inscrit directement dans leur HTML, sans nécessiter JavaScript.
                     Après une mise à jour du modèle du site, utilisez le second bouton si vous souhaitez l’appliquer aux pages enregistrées.
+                    Le bouton « Mettre à jour les trajets » calcule la distance et la durée routières réelles depuis Le Paradise pour les pages enregistrées avant ce calcul ; elles sont exigées pour publier.
                     Enregistrez la configuration et gardez cet onglet ouvert jusqu’à la fin.
                   </p>
                   <div aria-live="polite" style={{ fontSize: '13px', marginTop: '8px' }}>

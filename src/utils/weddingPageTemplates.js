@@ -3,6 +3,7 @@ import { WEDDING_REVIEWS } from '../data/weddingReviews'
 import sourceModels from '../data/weddingSourceModels.json'
 import { normalizeCityName } from './cityNames'
 import { normalizeWeddingDisplayText } from './weddingDisplayText'
+import { applyWeddingTravel, validateWeddingTravel } from './weddingTravel'
 
 export const WEDDING_TEMPLATE_VERSION = 2
 export const WEDDING_SOURCE_MODELS = sourceModels
@@ -29,23 +30,25 @@ function shuffle(values, random) {
   return result
 }
 
-export function generateWeddingPage({ slug, businessName = 'Le Paradise', seed, familyId }) {
+export function generateWeddingPage({ slug, businessName = 'Le Paradise', seed, familyId, travel }) {
   const city = getCityBySlug(slug)
   if (!city || !/^\d{5}$/.test(city.postalCode || '')) throw new Error(`Ville ou code postal invalide : ${slug}`)
   if (!businessName.trim()) throw new Error('Le nom de la salle doit être renseigné.')
   const chosenSeed = seed ?? crypto.getRandomValues(new Uint32Array(1))[0]
   if (!Number.isInteger(chosenSeed) || chosenSeed < 0 || chosenSeed > 0xFFFFFFFF) throw new Error('Graine de génération invalide.')
+  const checkedTravel = validateWeddingTravel(travel)
   const random = randomFromSeed(chosenSeed)
   const selectedModel = sourceModels[Math.floor(random() * sourceModels.length)]
   const model = familyId ? sourceModels.find((item) => item.id === familyId) : selectedModel
   if (!model) throw new Error(`Modèle inconnu : ${familyId}`)
-  const content = normalizeWeddingDisplayText(model.sections.map((section) => section.content
-    .replace(/xxxx|yyyy|\$\{businessName\}/g, (marker) => marker === 'xxxx' ? normalizeCityName(city.name) : marker === 'yyyy' ? city.deptName : 'Le Paradise 77')).join('\n\n'), city)
+  const content = applyWeddingTravel(normalizeWeddingDisplayText(model.sections.map((section) => section.content
+    .replace(/xxxx|yyyy|\$\{businessName\}/g, (marker) => marker === 'xxxx' ? normalizeCityName(city.name) : marker === 'yyyy' ? city.deptName : 'Le Paradise 77')).join('\n\n'), city), checkedTravel)
   const reviewIds = shuffle(WEDDING_REVIEWS, random).slice(0, 2).map((review) => review.id)
   return {
     content,
     generatedAt: new Date().toISOString(),
     template: { version: WEDDING_TEMPLATE_VERSION, familyId: model.id, seed: chosenSeed, reviewIds },
+    ...(checkedTravel ? { travel: checkedTravel } : {}),
   }
 }
 

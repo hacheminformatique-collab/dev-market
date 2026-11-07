@@ -10,6 +10,8 @@ import { once } from 'node:events'
 import { renderToStaticMarkup } from 'react-dom/server'
 import { normalizeCityName } from '../src/utils/cityNames.js'
 
+const travel = { km: 16, minutes: 20, source: 'test', computedAt: '2026-01-01T00:00:00Z' }
+
 const root = resolve(import.meta.dirname, '..')
 let vite, publication, directory, site, origin, template, shellTemplate
 let buildSeoData, PAGE_TYPES_BY_ID, getPublishedWeddingSlugs, isPublicPath
@@ -20,8 +22,8 @@ const processes = []
 const pin = 'publication-test-pin'
 const fixture = {
   pages: {
-    meaux: { content: '## Mariage à Meaux\nTexte unique $& et <script>non exécuté</script>.', generatedAt: '2026-01-10T12:00:00Z' },
-    'nanteuil-les-meaux': { content: 'Une salle pour votre mariage à Nanteuil.', generatedAt: '2026-01-11T12:00:00Z' },
+    meaux: { content: '## Mariage à Meaux\nTexte unique $& et <script>non exécuté</script>.', generatedAt: '2026-01-10T12:00:00Z', travel },
+    'nanteuil-les-meaux': { content: 'Une salle pour votre mariage à Nanteuil.', generatedAt: '2026-01-11T12:00:00Z', travel },
   },
   config: { businessName: 'Salle de test & mariage', githubToken: 'DO-NOT-PUBLISH-TOKEN', instagramPosts: [], tiktokPosts: [] },
   gallery: [],
@@ -148,7 +150,7 @@ test('the snapshot includes public data only', () => {
 })
 
 test('unsupported restored FAQ edits stop publication before any page write', async () => {
-  const generated = generateWeddingPage({ slug: 'nanteuil-les-meaux', seed: 12 })
+  const generated = generateWeddingPage({ slug: 'nanteuil-les-meaux', seed: 12, travel })
   const changed = {
     ...generated,
     content: generated.content.replace('Peut-on apporter son propre traiteur ?', 'Une question sans réponse connue ?'),
@@ -278,7 +280,7 @@ test('publishes physical files at extensionless URLs and republishes safely', as
     assert.deepEqual(await getPublishedWeddingSlugs(), ['meaux', 'nanteuil-les-meaux'])
     // Changing the source JSON must not change a published page until republication.
     await writeFile(join(site, 'storage-data/paradise_city_pages.json'), JSON.stringify({
-      meaux: { content: 'SOURCE-CHANGED-NOT-YET-PUBLISHED', generatedAt: '2026-01-12T12:00:00Z' },
+      meaux: { content: 'SOURCE-CHANGED-NOT-YET-PUBLISHED', generatedAt: '2026-01-12T12:00:00Z', travel },
     }))
     assert.ok(!(await (await fetch('/locationsalledemariage/meaux')).text()).includes('SOURCE-CHANGED-NOT-YET-PUBLISHED'))
     const changed = { ...fixture, pages: { ...fixture.pages, meaux: { ...fixture.pages.meaux, content: 'Contenu republié et fixe.' } } }
@@ -299,7 +301,7 @@ test('publishes saved local templates with the same reviews and keeps legacy pag
   const nativeFetch = globalThis.fetch
   globalThis.fetch = (url, options) => nativeFetch(new URL(url, origin), options)
   try {
-    const savedPage = generateWeddingPage({ slug: 'meaux', seed: 15 })
+    const savedPage = generateWeddingPage({ slug: 'meaux', seed: 15, travel })
     const pages = { ...fixture.pages, meaux: savedPage }
     const options = { ...fixture, pages, origin, onProgress() {} }
     await publication.publishWeddingPages(options)
@@ -490,7 +492,7 @@ test('publication migrates legacy directories and writes updated city links into
     assert.equal(requests.filter((request) => request.action === 'city-directory').length, 1)
     assert.equal(requests.filter((request) => request.action === 'page').length, 0)
 
-    const withNewCity = { ...fixture.pages, bobigny: { content: 'Nouvelle page Bobigny', generatedAt: '2026-02-01T12:00:00Z' } }
+    const withNewCity = { ...fixture.pages, bobigny: { content: 'Nouvelle page Bobigny', generatedAt: '2026-02-01T12:00:00Z', travel } }
     requests.length = 0
     const addition = await publication.publishWeddingPages({ ...options, pages: withNewCity })
     assert.deepEqual(addition, { total: 3, published: 1, unchanged: 0, upgraded: 2 })
@@ -546,7 +548,7 @@ test('incremental PHP storage saves bounded requests and backs up large collecti
   const path = join(site, 'storage-data', `${key}.json`)
   const backupPath = join(site, 'storage-data', 'paradise_city_pages_backup_reception.json')
   const existing = Object.fromEntries(Array.from({ length: 70 }, (_, index) => [
-    `city-${index}`, { content: 'Texte conservé. '.repeat(1100), generatedAt: '2026-01-01T00:00:00Z' },
+    `city-${index}`, { content: 'Texte conservé. '.repeat(1100), generatedAt: '2026-01-01T00:00:00Z', travel },
   ]))
   const sizes = []
   await writeFile(path, JSON.stringify(existing))
@@ -562,7 +564,7 @@ test('incremental PHP storage saves bounded requests and backs up large collecti
     const { makePageTypeStorage } = await vite.ssrLoadModule('/src/utils/cityPageStorage.js')
     const api = makePageTypeStorage('reception')
     const page = { content: 'Page ajoutée', generatedAt: '2026-02-01T00:00:00Z', template: { version: 1, seed: 42 } }
-    const vauxPage = generateWeddingPage({ slug: 'vaux-sur-lunain', seed: 42 })
+    const vauxPage = generateWeddingPage({ slug: 'vaux-sur-lunain', seed: 42, travel })
     await api.backupPages({ requireServer: true })
     await api.savePage('meaux', page)
     await api.savePage('vaux-sur-lunain', vauxPage)

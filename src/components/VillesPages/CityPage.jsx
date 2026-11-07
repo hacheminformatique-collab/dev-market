@@ -14,7 +14,7 @@ import { normalizeCityName } from '../../utils/cityNames'
 import { resolveWeddingSourceLayout } from '../../utils/weddingSourceLayout'
 import WeddingSourceSections from './WeddingSourceSections'
 import PublicHeader from '../PublicHeader'
-import { normalizeWeddingDisplayText } from '../../utils/weddingDisplayText'
+import { normalizeWeddingDisplayText, withoutTestimonials } from '../../utils/weddingDisplayText'
 import { PARADISE_ADDRESS, PARADISE_COORDS, validateWeddingTravel } from '../../utils/weddingTravel'
 
 function Link(props) {
@@ -394,9 +394,12 @@ function SectionReviews({ page }) {
             <h2 id="google-reviews-heading">Avis Google sur Le Paradise</h2>
             <p>Extraits d’avis reproduits à partir des captures fournies, sans attribution à une ville particulière.</p>
             {reviews.map((review) => (
-              <figure key={review.id} style={{ margin: '20px 0', padding: '16px', borderLeft: '3px solid var(--gold)', background: 'var(--bg-light)' }}>
-                <blockquote style={{ margin: '0 0 12px', overflowWrap: 'anywhere' }}>« {review.excerpt} »</blockquote>
-                <figcaption>{review.author} — {review.rating}/5 sur Google (extrait)</figcaption>
+              <figure key={review.id} style={{ margin: '20px 0', padding: '24px', border: '1px solid #e3e5e8', borderRadius: '12px', background: '#fff', color: '#202124', boxShadow: '0 2px 6px rgba(0,0,0,0.06)' }}>
+                <figcaption style={{ fontWeight: 600, marginBottom: '8px' }}>{review.author}</figcaption>
+                <p style={{ marginBottom: '12px' }}>
+                  {review.rating}/5 sur Google (extrait) <span aria-label={`${review.rating} étoiles sur 5`} style={{ color: '#fbbc04', letterSpacing: '2px' }}>{'★'.repeat(review.rating)}</span>
+                </p>
+                <blockquote style={{ margin: 0, lineHeight: 1.7, overflowWrap: 'anywhere' }}>« {review.excerpt} »</blockquote>
               </figure>
             ))}
             <a href={WEDDING_REVIEW_SOURCE} target="_blank" rel="noopener noreferrer">Consulter la fiche Google de Le Paradise</a>
@@ -410,7 +413,7 @@ function SectionIntro({ city, businessName, page }) {
   return (
     <Section id="intro" title={page.template?.version === 2 ? undefined : `${businessName} — votre réception depuis ${city.name}`}>
       <div style={{ fontSize: '15px', color: 'var(--text)', lineHeight: 1.8 }}>
-        {renderContent(normalizeWeddingDisplayText(page.content, getCityBySlug(city.slug)))}
+        {renderContent(withoutTestimonials(normalizeWeddingDisplayText(page.content, getCityBySlug(city.slug))))}
         <SectionReviews page={page} />
       </div>
     </Section>

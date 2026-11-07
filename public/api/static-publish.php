@@ -40,6 +40,19 @@ function cityFile(string $root, string $slug): string {
     return $root . '/locationsalledemariage/' . $slug . '.html';
 }
 
+function weddingDepartmentCodes(): array {
+    return ['75', '77', '78', '91', '92', '93', '94', '95', '02', '27', '28', '45', '51', '60', '76', '89'];
+}
+
+function departmentFolder(string $root): string {
+    $parent = $root . '/locationsalledemariage';
+    $folder = $parent . '/departements';
+    foreach ([$parent, $folder] as $path) {
+        if (is_link($path) || (file_exists($path) && !is_dir($path))) failPublication(409, 'Dossier des départements invalide.');
+    }
+    return $folder;
+}
+
 function readCityFile(string $path) {
     if (is_link($path)) failPublication(409, 'Un fichier de page est un lien symbolique ; publication arrêtée.');
     if (!file_exists($path)) return false;
@@ -156,7 +169,13 @@ if (($data['action'] ?? '') === 'inspect') {
             ];
         }
     }
-    echo json_encode(['ok' => true, 'pages' => $result, 'publishedSlugs' => $previous, 'registryHash' => $registryHash]);
+    $departments = [];
+    $departmentFolder = departmentFolder($root);
+    foreach (weddingDepartmentCodes() as $code) {
+        $html = readCityFile($departmentFolder . '/' . $code . '.html');
+        $departments[$code] = $html === false ? 'missing' : hash('sha256', $html);
+    }
+    echo json_encode(['ok' => true, 'pages' => $result, 'departments' => (object)$departments, 'publishedSlugs' => $previous, 'registryHash' => $registryHash]);
     exit;
 } elseif (($data['action'] ?? '') === 'city-directory') {
     $slug = $data['slug'] ?? '';
@@ -198,6 +217,20 @@ if (($data['action'] ?? '') === 'inspect') {
     if (readCityFile($path) !== $html) failPublication(500, 'Impossible de vérifier l’annuaire écrit sur le serveur.');
     echo json_encode(['ok' => true, 'directoryHash' => cityDirectoryHash($html)]);
     exit;
+} elseif (($data['action'] ?? '') === 'department') {
+    $code = $data['code'] ?? null;
+    $html = $data['html'] ?? null;
+    if (!is_string($code) || !in_array($code, weddingDepartmentCodes(), true)
+        || !is_string($html) || stripos(ltrim($html), '<!doctype html>') !== 0
+        || strpos($html, 'id="city-page-data"') === false
+        || !preg_match('~<link rel="canonical" href="https?://[^/"]+/locationsalledemariage/departements/' . preg_quote($code, '~') . '"\s*/?>~', $html)) {
+        failPublication(400, 'Département, document HTML ou canonical invalide.');
+    }
+    $folder = departmentFolder($root);
+    if (!is_dir($folder) && !mkdir($folder, 0755, true)) failPublication(500, 'Création du dossier des départements impossible.');
+    $path = $folder . '/' . $code . '.html';
+    assertUnchangedFile(readCityFile($path), $data['expectedHash'] ?? null);
+    writeIfChanged($path, $html);
 } elseif (($data['action'] ?? '') === 'page') {
     $slug = $data['slug'] ?? '';
     $html = $data['html'] ?? '';
@@ -232,6 +265,14 @@ if (($data['action'] ?? '') === 'inspect') {
     $directory = $data['directory'] ?? null;
     $slugs = $data['slugs'] ?? null;
     $homeSeo = $data['homeSeo'] ?? null;
+    $departmentCodes = $data['departmentCodes'] ?? [];
+    if (!is_array($departmentCodes) || count($departmentCodes) > 16) failPublication(400, 'Liste des départements invalide.');
+    foreach ($departmentCodes as $code) {
+        if (!is_string($code) || !in_array($code, weddingDepartmentCodes(), true)
+            || readCityFile(departmentFolder($root) . '/' . $code . '.html') === false) {
+            failPublication(400, 'Département non publié.');
+        }
+    }
     $indexFile = $root . '/index.html';
     $index = is_readable($indexFile) ? file_get_contents($indexFile) : false;
     if (!is_string($directory) || strpos($directory, '<section class="wedding-directory"') !== 0
@@ -270,6 +311,7 @@ if (($data['action'] ?? '') === 'inspect') {
         . substr($index, strpos($index, $seoEnd));
     writeIfChanged($root . '/wedding-directory.html', $directory);
     writeIfChanged($root . '/wedding-pages.json', json_encode(array_values(array_unique($slugs))));
+    writeIfChanged($root . '/wedding-departments.json', json_encode(array_values(array_unique($departmentCodes))));
     writeIfChanged($indexFile, $index);
     writeIfChanged($root . '/sitemap.xml', $sitemap);
     writeIfChanged($root . '/robots.txt', $robots);

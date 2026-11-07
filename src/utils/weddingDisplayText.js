@@ -1,5 +1,26 @@
 import { normalizeCityName } from './cityNames'
 
+export function testimonialBlockIndexes(blocks) {
+  const hidden = new Set()
+  let hiddenLevel = 0
+  blocks.forEach((block, index) => {
+    const heading = block.match(/^(#{2,3}) /)
+    if (heading) {
+      const level = heading[1].length
+      if (level <= hiddenLevel) hiddenLevel = 0
+      if (/^#{2,3} Témoignages\b/i.test(block)) hiddenLevel = level
+    }
+    if (hiddenLevel) hidden.add(index)
+  })
+  return hidden
+}
+
+export function withoutTestimonials(content) {
+  const blocks = content.split(/\n\s*\n/)
+  const hidden = testimonialBlockIndexes(blocks)
+  return blocks.filter((_, index) => !hidden.has(index)).join('\n\n')
+}
+
 export function normalizeWeddingDisplayText(text, city) {
   if (!text) return text
   const lower = text.toLowerCase()

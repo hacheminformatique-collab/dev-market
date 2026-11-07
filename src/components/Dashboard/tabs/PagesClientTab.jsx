@@ -657,6 +657,8 @@ export default function PagesClientTab({ pageType }) {
                     Publie les nouvelles pages et actualise celles dont le contenu, la galerie, la configuration ou les articles ont changé.
                     Les autres fichiers sont modifiés uniquement si leur annuaire doit être actualisé.
                     L’annuaire des pages publiées est inscrit directement dans leur HTML, sans nécessiter JavaScript.
+                    La publication crée aussi les 16 pages département et les actualise uniquement si leur HTML change.
+                    Hors Île-de-France, l’annuaire des villes ne contient que les communes publiées du même département.
                     Après une mise à jour du modèle du site, utilisez le second bouton si vous souhaitez l’appliquer aux pages enregistrées.
                     Le bouton « Mettre à jour les trajets » calcule la distance et la durée routières réelles depuis Le Paradise pour les pages enregistrées avant ce calcul ; elles sont exigées pour publier.
                     Enregistrez la configuration et gardez cet onglet ouvert jusqu’à la fin.

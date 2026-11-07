@@ -52,6 +52,12 @@
   outline-offset: 3px;
 }
 
+.wedding-directory h3 a {
+  font-size: inherit;
+  font-weight: inherit;
+  color: inherit;
+}
+
 #public-wedding-directory[hidden] {
   display: none;
 }

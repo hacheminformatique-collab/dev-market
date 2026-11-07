@@ -459,6 +459,66 @@ test('video and poster are deployed once with fast-start MP4 and bounded sizes',
   }
 })
 
+async function testDepartments() {
+  const { WEDDING_DEPARTMENTS, departmentPath } = await vite.ssrLoadModule('/src/utils/weddingDepartments.js')
+  assert.equal(WEDDING_DEPARTMENTS.length, 16)
+  const nativeFetch = globalThis.fetch
+  const requests = []
+  globalThis.fetch = (url, options) => {
+    if (url === '/api/static-publish.php') requests.push(JSON.parse(options.body))
+    return nativeFetch(new URL(url, origin), options)
+  }
+  try {
+    const pages = { ...fixture.pages }
+    for (const department of WEDDING_DEPARTMENTS) {
+      const city = department.cities.find((city) => getCityBySlug(city.slug)?.deptCode === department.code)
+      assert.ok(city)
+      pages[city.slug] = { content: `Présentation depuis ${city.name}`, generatedAt: '2026-01-01T00:00:00Z', travel }
+    }
+    const options = { ...fixture, pages, origin, onProgress() {} }
+    await publication.publishWeddingPages(options)
+    for (const department of WEDDING_DEPARTMENTS) {
+      const path = departmentPath(department.code)
+      const response = await fetch(path)
+      assert.equal(response.status, 200)
+      const html = await response.text()
+      assert.equal(html, await readFile(join(site, `${path}.html`), 'utf8'))
+      assert.ok(html.includes(`<link rel="canonical" href="${origin}${path}"`))
+      assert.ok(html.includes(`Location salle de mariage — ${department.name}`.replaceAll('&', '&amp;')))
+      const data = JSON.parse(html.match(/<script id="city-page-data" type="application\/json">([\s\S]*?)<\/script>/)[1])
+      assert.equal(data.departmentCode, department.code)
+      assert.ok(data.slugs.every((slug) => getCityBySlug(slug).deptCode === department.code))
+      assert.ok(!html.includes(pin))
+      const citySlug = Object.keys(pages).find((slug) => getCityBySlug(slug).deptCode === department.code)
+      const cityHtml = await (await fetch(`/locationsalledemariage/${citySlug}`)).text()
+      const directoryHtml = cityHtml.match(/<!-- CITY_DIRECTORY_START -->([\s\S]*?)<!-- CITY_DIRECTORY_END -->/)[1]
+      const links = [...directoryHtml.matchAll(/href="\/locationsalledemariage\/([a-z0-9-]+)"/g)].map((match) => match[1])
+      if (department.region !== 'Île-de-France') assert.ok(links.every((slug) => getCityBySlug(slug).deptCode === department.code))
+      else assert.ok(links.includes('meaux') && links.some((slug) => getCityBySlug(slug).deptCode === '02'))
+      assert.ok(directoryHtml.includes(`href="${path}"`))
+      assert.ok((await (await fetch('/sitemap.xml')).text()).includes(`${origin}${path}</loc>`))
+      const redirected = await fetch(`${path}.html`, { redirect: 'manual' })
+      assert.equal(redirected.status, 301)
+    }
+    assert.equal((await fetch('/locationsalledemariage/departements/99')).status, 404)
+    assert.deepEqual(await (await fetch('/wedding-departments.json')).json(), WEDDING_DEPARTMENTS.map(({ code }) => code))
+    requests.length = 0
+    await publication.publishWeddingPages(options)
+    assert.equal(requests.filter(({ action }) => ['department', 'page', 'city-directory'].includes(action)).length, 0, 'No unchanged HTML is rewritten')
+    const post = (body) => fetch('/api/static-publish.php', {
+      method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Admin-Pin': pin }, body: JSON.stringify(body),
+    })
+    const inspection = await (await post({ action: 'inspect', slugs: Object.keys(pages) })).json()
+    const html = await readFile(join(site, 'locationsalledemariage/departements/75.html'), 'utf8')
+    assert.equal((await post({ action: 'department', code: '../75', html, expectedHash: 'missing' })).status, 400)
+    assert.equal((await post({ action: 'department', code: '75', html, expectedHash: 'missing' })).status, 409)
+    assert.equal((await post({ action: 'department', code: '75', html, expectedHash: inspection.departments['75'] })).status, 200)
+    assert.equal(await readFile(join(site, 'locationsalledemariage/departements/75.html'), 'utf8'), html)
+  } finally {
+    globalThis.fetch = nativeFetch
+  }
+}
+
 test('publication migrates legacy directories and writes updated city links into HTML', async () => {
   const nativeFetch = globalThis.fetch
   const requests = []
@@ -586,3 +646,5 @@ test('incremental PHP storage saves bounded requests and backs up large collecti
     globalThis.fetch = nativeFetch
   }
 })
+
+test('all sixteen departments publish real HTML pages and regional directories remain scoped', testDepartments)

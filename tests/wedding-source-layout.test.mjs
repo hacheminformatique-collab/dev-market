@@ -13,6 +13,7 @@ const travel = { km: 16, minutes: 20, source: 'test', computedAt: '2026-01-01T00
 const root = resolve(import.meta.dirname, '..')
 let vite, templates, layoutUtils, cityModule, cities, SourceSections, publication
 let normalizeWeddingDisplayText
+let testimonialBlockIndexes
 
 before(async () => {
   vite = await createServer({ root, server: { middlewareMode: true } })
@@ -22,7 +23,7 @@ before(async () => {
   cities = await vite.ssrLoadModule('/src/data/idf-cities.js')
   ;({ default: SourceSections } = await vite.ssrLoadModule('/src/components/VillesPages/WeddingSourceSections.jsx'))
   publication = await vite.ssrLoadModule('/src/utils/staticCityPublication.jsx')
-  ;({ normalizeWeddingDisplayText } = await vite.ssrLoadModule('/src/utils/weddingDisplayText.js'))
+  ;({ normalizeWeddingDisplayText, testimonialBlockIndexes } = await vite.ssrLoadModule('/src/utils/weddingDisplayText.js'))
 })
 after(async () => { await vite?.close() })
 
@@ -49,7 +50,9 @@ test('twenty exact source DOM layouts retain all cards, icons, headings, lists a
     const visible = html.replace(/<[^>]*>/g, '')
     for (const section of layout.sections) {
       if (section.id === 'faq') continue
-      for (const block of section.blocks) {
+      const hidden = testimonialBlockIndexes(section.originals)
+      for (const [index, block] of section.blocks.entries()) {
+        if (hidden.has(index)) continue
         const text = block.replace(/^#{2,3} /, '').replaceAll('&', '&amp;').replaceAll("'", '&#x27;').replaceAll('"', '&quot;').replaceAll('<', '&lt;').replaceAll('>', '&gt;')
         assert.ok(visible.includes(text), `${model.id}: missing original prose ${text.slice(0, 70)}`)
       }
@@ -59,6 +62,7 @@ test('twenty exact source DOM layouts retain all cards, icons, headings, lists a
     assert.ok((html.match(/<li /g) || []).length >= 17)
     assert.ok((html.match(/✓/g) || []).length >= 17)
     assert.ok(!html.includes('xxxx') && !html.includes('yyyy') && !html.includes('${businessName}'))
+    assert.doesNotMatch(visible, /Témoignages —|Histoires de couples comblés/)
     assert.ok(!html.includes('localhost:5173'))
     assert.ok(!html.includes('<script') && !html.includes('onclick='))
     for (const node of layout.sections.flatMap((section) => walk(section.tree))) {

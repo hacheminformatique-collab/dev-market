@@ -81,7 +81,14 @@ DirectoryIndex index.html
     RewriteRule ^api/ - [L]
 
     # A missing publication manifest must return 404, not the SPA shell.
-    RewriteRule ^(?:wedding-pages\.json|wedding-directory\.html)$ - [L]
+    RewriteRule ^(?:wedding-pages\.json|wedding-departments\.json|wedding-directory\.html)$ - [L]
+
+    RewriteCond %{THE_REQUEST} \s/+locationsalledemariage/departements/([0-9]{2})(?:\.html|/)(?:[?\s]) [NC]
+    RewriteRule ^locationsalledemariage/departements/([0-9]{2})(?:\.html|/)$ /locationsalledemariage/departements/$1 [R=301,L]
+    RewriteCond %{DOCUMENT_ROOT}/locationsalledemariage/departements/$1.html -f
+    RewriteRule ^locationsalledemariage/departements/([0-9]{2})$ locationsalledemariage/departements/$1.html [L]
+    # Unpublished departments must not return the homepage with a 200 status.
+    RewriteRule ^locationsalledemariage/departements/ - [L]
 
     # Keep the existing extensionless canonical URLs for published city files.
     RewriteCond %{THE_REQUEST} \s/+locationsalledemariage/([a-z0-9-]+)(?:\.html|/)(?:[?\s]) [NC]

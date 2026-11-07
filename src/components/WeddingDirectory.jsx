@@ -1,15 +1,16 @@
 import { DEPARTMENTS, getCityBySlug } from '../data/idf-cities'
 import './WeddingDirectory.css'
 import { normalizeCityName } from '../utils/cityNames'
+import { departmentPath } from '../utils/weddingDepartments'
 
-export default function WeddingDirectory({ slugs, businessName = 'Le Paradise', cityName = '' }) {
+export default function WeddingDirectory({ slugs, businessName = 'Le Paradise', cityName = '', departmentCode }) {
   // Resolve each URL exactly as CityPage does, including legacy duplicate slugs.
   const published = [...new Set(slugs)].map(getCityBySlug).filter(Boolean)
   const departments = DEPARTMENTS.map((department) => ({
     ...department,
     cities: published.filter((city) => city.deptCode === department.code)
       .sort((a, b) => a.name.localeCompare(b.name, 'fr')),
-  })).filter((department) => department.cities.length > 0)
+  })).filter((department) => department.cities.length > 0 && (!departmentCode || department.code === departmentCode))
   if (departments.length === 0) return null
 
   return (
@@ -23,7 +24,7 @@ export default function WeddingDirectory({ slugs, businessName = 'Le Paradise', 
       <div className="wedding-directory-departments">
         {departments.map((department) => (
           <div key={department.code} className="wedding-directory-department">
-            <h3>{`${department.name} (${department.code})`}</h3>
+            <h3><a href={departmentPath(department.code)}>{`${department.name} (${department.code})`}</a></h3>
             <ul>
               {department.cities.map((city) => {
                 const label = `Location salle de mariage ${normalizeCityName(city.name)}`

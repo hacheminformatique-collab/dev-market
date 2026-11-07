@@ -78,30 +78,9 @@ export default function HomePage() {
           <div style={{ width: '60px', height: '1px', background: 'linear-gradient(to left, transparent, rgba(184,151,74,0.8))' }} />
         </div>
 
-        {/* Buttons */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '14px', alignItems: 'center' }}>
-
-          <button onClick={() => navigate('/devis')} className="btn btn-primary btn-lg" style={{ width: '100%', maxWidth: '300px', justifyContent: 'center', fontSize: '13px' }}>
-            Demander un devis
-          </button>
-
-          <button onClick={() => navigate('/espace-client')} className="btn btn-outline btn-lg" style={{ width: '100%', maxWidth: '300px', justifyContent: 'center', fontSize: '13px' }}>
-            Espace client
-          </button>
-
-          <button onClick={() => navigate('/espace-staff')} className="btn btn-outline btn-lg" style={{ width: '100%', maxWidth: '300px', justifyContent: 'center', fontSize: '13px' }}>
-            Espace staff
-          </button>
-
-          <button onClick={() => navigate('/blog')} className="btn btn-outline btn-lg" style={{ width: '100%', maxWidth: '300px', justifyContent: 'center', fontSize: '13px' }}>
-            📝 Blog
-          </button>
-
-        </div>
-
       </div>
     </VideoHero>
-    <div style={{ textAlign: 'center', color: 'white', maxWidth: '620px', width: '100%', padding: '0 16px' }}>
+    <div style={{ textAlign: 'center', color: 'white', maxWidth: '1280px', width: '100%', padding: '0 clamp(16px, 4vw, 40px)' }}>
         {/* Presentation section */}
         <div style={{ marginTop: 'clamp(40px, 6vw, 80px)', textAlign: 'center' }}>
           <p style={{
@@ -125,14 +104,11 @@ export default function HomePage() {
           </p>
 
           {/* Feature cards */}
-          <div style={{
-            display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))',
-            gap: '16px', textAlign: 'left',
-          }}>
+          <div className="home-event-grid">
             {[
               { icon: '💍', title: 'Mariages & Fiançailles', desc: 'Décoration somptueuse et coordination complète pour le plus beau jour de votre vie.' },
               { icon: '🎂', title: 'Anniversaires', desc: 'Célébrez chaque étape de la vie dans un espace chaleureux et personnalisé.' },
-              { icon: '🕊️', title: 'Baptêmes', desc: 'Accueillez vos proches dans une atmosphère sereine et lumineuse.' },
+              { icon: '👶', title: 'Baptêmes', desc: 'Accueillez vos proches dans une atmosphère sereine et lumineuse.' },
               { icon: '🤝', title: 'Séminaires', desc: 'Salles modulables et équipements professionnels pour vos événements d\'entreprise.' },
             ].map((item) => (
               <div key={item.title} style={{

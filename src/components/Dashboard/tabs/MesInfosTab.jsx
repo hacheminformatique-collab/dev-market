@@ -5,7 +5,7 @@ import { makePageTypeStorage } from '../../../utils/cityPageStorage'
 import { buildSitemapXml, buildRobotsTxt, downloadTextFile } from '../../../utils/seoFiles'
 import { PAGE_TYPES } from '../../../data/pageTypes'
 import { getBlogArticles } from '../../../utils/blogStorage'
-import { getPublishedWeddingSlugs } from '../../../utils/weddingPublication'
+import { getPublishedWeddingSlugs, getPublishedWeddingDepartments } from '../../../utils/weddingPublication'
 
 function resizeImageToDataUrl(file, maxW, maxH) {
   return new Promise((resolve, reject) => {
@@ -144,7 +144,7 @@ export default function MesInfosTab() {
       allTypePages.mariage = Object.fromEntries(Object.entries(allTypePages.mariage || {})
         .filter(([slug]) => published.has(slug)))
       totalPages = Object.values(allTypePages).reduce((count, pages) => count + Object.keys(pages).length, 0)
-      const sitemapXml = buildSitemapXml({ baseUrl: data.siteUrl, allTypePages, blogArticles: await getBlogArticles() })
+      const sitemapXml = buildSitemapXml({ baseUrl: data.siteUrl, allTypePages, blogArticles: await getBlogArticles(), departmentCodes: await getPublishedWeddingDepartments() })
       const robotsTxt = buildRobotsTxt(data.siteUrl)
 
       // Try to write files directly on the server

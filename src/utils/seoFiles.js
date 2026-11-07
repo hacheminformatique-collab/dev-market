@@ -1,5 +1,6 @@
 import { PAGE_TYPES } from '../data/pageTypes'
 import { getCityBySlug } from '../data/idf-cities'
+import { WEDDING_DEPARTMENTS, departmentPath } from './weddingDepartments'
 
 function normalizeBaseUrl(rawUrl) {
   const input = (rawUrl || '').trim() || window.location.origin
@@ -24,7 +25,7 @@ function xmlEscape(value) {
  * @param {object}  [opts.allTypePages]     – { [typeId]: { [slug]: { content, generatedAt } } }
  * @param {object}  [opts.blogArticles]     – { [slug]: Article } from blogStorage
  */
-export function buildSitemapXml({ baseUrl, cityPages = {}, allTypePages = {}, blogArticles = {} }) {
+export function buildSitemapXml({ baseUrl, cityPages = {}, allTypePages = {}, blogArticles = {}, departmentCodes = [] }) {
   const normalizedBase = normalizeBaseUrl(baseUrl)
   const today = new Date().toISOString().slice(0, 10)
 
@@ -32,6 +33,10 @@ export function buildSitemapXml({ baseUrl, cityPages = {}, allTypePages = {}, bl
     { path: '/', changefreq: 'weekly', priority: '1.0', lastmod: today },
     { path: '/blog', changefreq: 'daily', priority: '0.8', lastmod: today },
   ]
+  for (const code of departmentCodes) {
+    if (!WEDDING_DEPARTMENTS.some((department) => department.code === code)) throw new Error('Département du sitemap invalide.')
+    rows.push({ path: departmentPath(code), changefreq: 'monthly', priority: '0.8' })
+  }
 
   // Helper to add pages for a given basePath
   function addPageRows(basePath, pages) {
@@ -80,7 +85,7 @@ export function buildSitemapXml({ baseUrl, cityPages = {}, allTypePages = {}, bl
       return [
         '  <url>',
         `    <loc>${xmlEscape(absolute)}</loc>`,
-        `    <lastmod>${row.lastmod}</lastmod>`,
+        ...(row.lastmod ? [`    <lastmod>${row.lastmod}</lastmod>`] : []),
         `    <changefreq>${row.changefreq}</changefreq>`,
         `    <priority>${row.priority}</priority>`,
         '  </url>',

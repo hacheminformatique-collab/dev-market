@@ -11,6 +11,8 @@ import directoryStyles from '../components/WeddingDirectory.css?raw'
 import { validateWeddingTemplate } from './weddingPageTemplates'
 import { resolveWeddingSourceLayout } from './weddingSourceLayout'
 import { validateWeddingTravel } from './weddingTravel'
+import { WEDDING_DEPARTMENTS, departmentPath, directoryDepartmentCode } from './weddingDepartments'
+import DepartmentPage from '../components/VillesPages/DepartmentPage'
 
 function escapeHtml(value) {
   return String(value).replaceAll('&', '&amp;').replaceAll('<', '&lt;')
@@ -39,7 +41,31 @@ async function snapshotFingerprint(snapshot) {
 }
 
 function cityDirectory(slugs, slug, businessName) {
-  return renderToStaticMarkup(<WeddingDirectory slugs={slugs} businessName={businessName} cityName={getCityBySlug(slug).name} />)
+  const city = getCityBySlug(slug)
+  return renderToStaticMarkup(<WeddingDirectory slugs={slugs} businessName={businessName} cityName={city.name} departmentCode={directoryDepartmentCode(city)} />)
+}
+
+export function renderDepartmentDocument({ template, departmentCode, businessName, slugs, origin }) {
+  const department = WEDDING_DEPARTMENTS.find(({ code }) => code === departmentCode)
+  if (!department || !template.includes('<!-- CITY_SEO -->') || !template.includes('<!-- CITY_DATA -->')) {
+    throw new Error('Département ou modèle HTML invalide.')
+  }
+  const path = departmentPath(departmentCode)
+  const snapshot = { departmentCode, businessName, slugs }
+  const canonical = new URL(path, origin).href
+  const title = `Location salle de mariage — ${department.name} (${department.code}) | ${businessName}`
+  const description = `Préparez votre mariage depuis ${department.name} (${department.code}). ${businessName} vous accueille au 5 avenue Fridingen à Nanteuil les Meaux. Découvrez les communes et demandez votre devis.`
+  const head = renderSeoHead({
+    title, description, keywords: `location salle mariage ${department.name}`,
+    canonical, robots: 'index, follow', imageUrl: `${origin}/media/hero-paradise.jpg`,
+    jsonLd: { '@context': 'https://schema.org', '@type': 'CollectionPage', name: title, url: canonical, description, about: { '@type': 'AdministrativeArea', name: department.name } },
+  })
+  const body = renderToString(<DepartmentPage {...snapshot} />)
+  return template
+    .replace(/<meta name="robots" content="noindex, nofollow"\s*\/?>/, '')
+    .replace('<!-- CITY_SEO -->', () => head)
+    .replace('<div id="root"></div>', () => `<div id="root">${body}</div>`)
+    .replace('<!-- CITY_DATA -->', () => `<script id="city-page-data" type="application/json">${scriptJson(snapshot)}</script>`)
 }
 
 export function makeCitySnapshot({ slug, pages, config, gallery, allTypePages, blogArticles }) {
@@ -224,14 +250,26 @@ export async function publishWeddingPages({ pages, config, gallery, allTypePages
       }
     }
   }
+  const departmentCodes = WEDDING_DEPARTMENTS.map(({ code }) => code)
+  for (const code of departmentCodes) {
+    onProgress({ done: allSlugs.length, total: allSlugs.length, current: `Département : ${code}` })
+    const departmentSlugs = allSlugs.filter((slug) => getCityBySlug(slug).deptCode === code)
+    const html = renderDepartmentDocument({ template, departmentCode: code, businessName: config.businessName || settings.nom || 'Le Paradise', slugs: departmentSlugs, origin })
+    const expectedHash = inspection.departments?.[code] ?? 'missing'
+    if (expectedHash !== await hashText(html)) {
+      await write({ action: 'department', code, html, expectedHash })
+      const check = await fetch(departmentPath(code), { cache: 'no-store' })
+      if (!check.ok || await check.text() !== html) throw new Error(`La page du département ${code} n’est pas accessible. Vérifiez .htaccess.`)
+    }
+  }
   onProgress({ done: allSlugs.length, total: allSlugs.length, current: 'Publication de l’annuaire, du sitemap et de robots.txt' })
   const sitemapPages = Object.fromEntries(allSlugs.map((slug) => [slug, pages[slug] || { content: 'published', generatedAt: inspection.pages[slug].generatedAt }]))
-  const sitemap = buildSitemapXml({ baseUrl: origin, allTypePages: { ...allTypePages, mariage: sitemapPages }, blogArticles })
+  const sitemap = buildSitemapXml({ baseUrl: origin, allTypePages: { ...allTypePages, mariage: sitemapPages }, blogArticles, departmentCodes })
   const robots = buildRobotsTxt(origin)
   const directory = renderToStaticMarkup(<WeddingDirectory slugs={allSlugs} businessName={config.businessName || settings.nom} />)
   const homeSeo = renderSeoHead(buildSeoData('/', { ...settings, siteUrl: origin }, {}, null, null, null, origin))
-  await write({ action: 'seo', sitemap, robots, directory, slugs: allSlugs, homeSeo, expectedRegistryHash: inspection.registryHash })
-  for (const [path, content] of [['/sitemap.xml', sitemap], ['/robots.txt', robots], ['/wedding-directory.html', directory], ['/wedding-pages.json', JSON.stringify(allSlugs)]]) {
+  await write({ action: 'seo', sitemap, robots, directory, slugs: allSlugs, departmentCodes, homeSeo, expectedRegistryHash: inspection.registryHash })
+  for (const [path, content] of [['/sitemap.xml', sitemap], ['/robots.txt', robots], ['/wedding-directory.html', directory], ['/wedding-pages.json', JSON.stringify(allSlugs)], ['/wedding-departments.json', JSON.stringify(departmentCodes)]]) {
     const check = await fetch(path, { cache: 'no-store' })
     if (!check.ok || await check.text() !== content) throw new Error(`Le fichier ${path} a été écrit mais n'est pas accessible à son URL.`)
   }

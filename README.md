@@ -267,11 +267,41 @@ anciens fichiers vers cet annuaire HTML.
 Les pages déjà publiées absentes d'une sauvegarde restaurée restent dans le
 registre et l'annuaire tant que leur fichier existe.
 
+La publication crée également **16 pages département**, pour les huit
+départements d'Île-de-France et l'Aisne (02), l'Eure (27), l'Eure-et-Loir (28),
+le Loiret (45), la Marne (51), l'Oise (60), la Seine-Maritime (76) et l'Yonne (89).
+Elles sont enregistrées dans `locationsalledemariage/departements/<code>.html`
+et accessibles sans extension à `/locationsalledemariage/departements/<code>`.
+Leur contenu, leur canonical et leur liste de communes sont présents en HTML.
+Les titres département dans l'annuaire pointent vers ces pages et le sitemap
+les référence après publication. Le registre `wedding-departments.json` permet
+à Mes Infos de conserver ces URL lors d'une nouvelle génération du sitemap.
+Une page département inchangée n'est ni réécrite ni vérifiée par une nouvelle
+requête HTTP.
+
+L'annuaire général et celui des villes d'Île-de-France conservent toutes les
+communes publiées. Sur une page ville hors Île-de-France, l'annuaire de pied de
+page ne liste que les communes publiées de son propre département. Une page
+département liste également uniquement ses communes ; aucun lien vers une
+commune non publiée n'est ajouté.
+
 Après une mise à jour du modèle du site, le bouton distinct **Mettre à jour le
 modèle des pages** demande confirmation avant de remplacer les fichiers des
 pages sauvegardées, même si leurs textes n'ont pas changé. Utilisez-le seulement
 si vous souhaitez appliquer ce nouveau modèle aux anciennes pages. Les pages
 non présentes dans la sauvegarde ne sont pas remplacées.
+
+La vidéo des en-têtes occupe au moins une hauteur d'écran, comme sur l'accueil.
+Les boutons superposés de l'accueil sont retirés, mais les accès du bandeau
+supérieur restent disponibles. Les quatre thèmes de l'accueil s'affichent sur
+une ligne à partir de 1100 px, en deux lignes de deux entre 600 et 1099 px et
+sur une colonne en dessous. Le baptême utilise l'icône bébé.
+Les blocs génériques « Témoignages » des modèles ne sont plus affichés :
+les extraits d'avis Google conservés présentent le nom, la note, les étoiles
+jaunes et le texte dans une carte blanche. Ce ne sont pas des avis chargés
+en direct depuis Google.
+Pour appliquer ces changements visuels aux fichiers de villes existants,
+utiliser **Mettre à jour le modèle des pages** après le déploiement.
 
 Chaque ville possède un fichier physique
 `locationsalledemariage/<ville>.html`, servi à l'adresse existante

@@ -551,7 +551,7 @@ export default function CalendarTab() {
   // Combined events: client devis + manual events
   const events = [
     ...clients
-      .filter((c) => c.dateEvenement)
+      .filter((c) => c.dateEvenement && !c.calendarExcluded)
       .map((c) => ({
         id: c.id,
         date: c.dateEvenement,
@@ -597,7 +597,7 @@ export default function CalendarTab() {
       const newPrice = override?.customPrice != null
         ? override.customPrice
         : getPriceForDate(newDateStr, c.formule?.nomFormule)
-      return { ...c, dateEvenement: newDateStr, prixSalle: newPrice }
+      return { ...c, calendarExcluded: false, dateEvenement: newDateStr, prixSalle: newPrice }
     })
     saveClients(updated)
     setClients(updated)
@@ -752,4 +752,3 @@ export default function CalendarTab() {
     </div>
   )
 }
-

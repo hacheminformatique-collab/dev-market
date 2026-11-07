@@ -72,6 +72,8 @@ test('notify HTTP sends one accepted step, deduplicates retry, and sends cumulat
     await mkdir(api, { recursive: true })
     await mkdir(storage, { recursive: true })
     await cp(path.join(root, 'public/api/notify.php'), path.join(api, 'notify.php'))
+    await cp(path.join(root, 'public/api/site-guard.php'), path.join(api, 'site-guard.php'))
+    await cp(path.join(root, 'public/api/site-controls.php'), path.join(api, 'site-controls.php'))
     await cp(phpHelper, path.join(api, 'quote_followup.php'))
     await cp(path.join(root, 'public/api/prospects.php'), path.join(api, 'prospects.php'))
     await writeFile(fakeSendmail, `#!/usr/bin/env node

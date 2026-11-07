@@ -1,24 +1,26 @@
-import { useState, useEffect } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useState, useEffect, lazy, Suspense } from 'react'
 import { useIsMobile } from '../../hooks/useIsMobile'
-import { startAutoRefresh, stopAutoRefresh, onDataRefresh, offDataRefresh, refreshFromServer } from '../../utils/storage'
-import MesInfosTab from './tabs/MesInfosTab'
-import MotDePasseTab from './tabs/MotDePasseTab'
-import FormuleSalleTab from './tabs/FormuleSalleTab'
-import MenuTab from './tabs/MenuTab'
-import GateauTab from './tabs/GateauTab'
-import PrestationTab from './tabs/PrestationTab'
-import ClientsTab from './tabs/ClientsTab'
-import ProspectsTab from './tabs/ProspectsTab'
-import CalendarTab from './tabs/CalendarTab'
-import StaffTab from './tabs/StaffTab'
-import StockTab from './tabs/StockTab'
-import MatieresTab from './tabs/MatieresTab'
-import ComptabiliteTab from './tabs/ComptabiliteTab'
-import PagesClientTab from './tabs/PagesClientTab'
-import BlogTab from './tabs/BlogTab'
-import BackupTab from './tabs/BackupTab'
+import { startAutoRefresh, stopAutoRefresh, onDataRefresh, offDataRefresh, refreshFromServer, initStorage, setRefreshStorageNames } from '../../utils/storage'
+import { dashboardStorageNames } from '../../utils/storageProfiles'
+import { siteAdminRequest } from '../../utils/siteAdministration'
 import { PAGE_TYPES } from '../../data/pageTypes'
+
+const MesInfosTab = lazy(() => import('./tabs/MesInfosTab'))
+const MotDePasseTab = lazy(() => import('./tabs/MotDePasseTab'))
+const FormuleSalleTab = lazy(() => import('./tabs/FormuleSalleTab'))
+const MenuTab = lazy(() => import('./tabs/MenuTab'))
+const GateauTab = lazy(() => import('./tabs/GateauTab'))
+const PrestationTab = lazy(() => import('./tabs/PrestationTab'))
+const ClientsTab = lazy(() => import('./tabs/ClientsTab'))
+const ProspectsTab = lazy(() => import('./tabs/ProspectsTab'))
+const CalendarTab = lazy(() => import('./tabs/CalendarTab'))
+const StaffTab = lazy(() => import('./tabs/StaffTab'))
+const StockTab = lazy(() => import('./tabs/StockTab'))
+const MatieresTab = lazy(() => import('./tabs/MatieresTab'))
+const ComptabiliteTab = lazy(() => import('./tabs/ComptabiliteTab'))
+const PagesClientTab = lazy(() => import('./tabs/PagesClientTab'))
+const BlogTab = lazy(() => import('./tabs/BlogTab'))
+const BackupTab = lazy(() => import('./tabs/BackupTab'))
 
 const TABS = [
   { id: 'clients',    icon: '👥', label: 'Clients & Devis' },
@@ -43,14 +45,13 @@ export default function Dashboard() {
   const [activeTab, setActiveTab] = useState('clients')
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [refreshKey, setRefreshKey] = useState(0)
-  const navigate = useNavigate()
+  const [readyTab, setReadyTab] = useState('')
+  const [loadError, setLoadError] = useState('')
   const isMobile = useIsMobile()
 
   useEffect(() => {
     const handleRefresh = () => setRefreshKey((k) => k + 1)
     onDataRefresh(handleRefresh)
-    // Refresh immediately on mount so the UI is up-to-date without waiting for the first polling tick
-    refreshFromServer()
     startAutoRefresh()
     // Also refresh when the browser window regains focus (e.g. user switches back from phone)
     const handleFocus = () => refreshFromServer()
@@ -61,6 +62,27 @@ export default function Dashboard() {
       window.removeEventListener('focus', handleFocus)
     }
   }, [])
+
+  useEffect(() => {
+    let cancelled = false
+    const names = dashboardStorageNames(activeTab)
+    setRefreshStorageNames(names)
+    setLoadError('')
+    initStorage({ names, paced: true, persistDefaults: true, maxAge: 30_000 }).then(() => {
+      if (!cancelled) setReadyTab(activeTab)
+    }).catch((error) => { if (!cancelled) setLoadError(error.message) })
+    return () => { cancelled = true }
+  }, [activeTab])
+
+  async function logout() {
+    try {
+      await siteAdminRequest({ action: 'logout' })
+      sessionStorage.removeItem('adminAuth')
+      window.location.assign('/')
+    } catch (error) {
+      setLoadError(error.message)
+    }
+  }
 
   function renderTab() {
     switch (activeTab) {
@@ -141,7 +163,7 @@ export default function Dashboard() {
         </div>
 
         <button
-          onClick={() => { sessionStorage.removeItem('adminAuth'); navigate('/') }}
+          onClick={logout}
           className="btn btn-sm btn-ghost"
           style={{ letterSpacing: '0.08em' }}
         >
@@ -239,7 +261,9 @@ export default function Dashboard() {
               {activeTabDef?.icon} {activeTabDef?.label}
             </h2>
           </div>
-          {renderTab()}
+          {loadError ? <p role="alert">{loadError}</p> : readyTab !== activeTab
+            ? <p role="status">Chargement des données de cet onglet…</p>
+            : <Suspense fallback={<p role="status">Chargement de cet onglet…</p>}>{renderTab()}</Suspense>}
         </main>
       </div>
     </div>

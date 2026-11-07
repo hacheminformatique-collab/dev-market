@@ -1,4 +1,6 @@
 <?php
+require_once __DIR__ . '/site-guard.php';
+siteMaintenanceGuard('seo-write');
 /**
  * seo-write.php – Write sitemap.xml and robots.txt directly to the document root.
  *

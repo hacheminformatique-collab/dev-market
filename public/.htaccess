@@ -77,9 +77,13 @@ DirectoryIndex index.html
     RewriteEngine On
     RewriteBase /
 
+    RewriteRule ^(?:site-maintenance\.flag|api/site-(?:controls|guard)\.php)$ - [F,L]
     # Serve PHP files in api/ directly — do not rewrite them to index.html
     RewriteRule ^api/ - [L]
 
+    RewriteCond %{DOCUMENT_ROOT}/site-maintenance.flag -f
+    RewriteRule ^((?!assets/|media/|favicon[^/]*$|robots\.txt$|storage-data/).*)$ api/site-router.php?route=$1 [L]
+    RewriteRule ^((?:admin|dashboard)/?)$ api/site-router.php?route=$1 [L]
     # A missing publication manifest must return 404, not the SPA shell.
     RewriteRule ^(?:wedding-pages\.json|wedding-city-aliases\.json|wedding-departments\.json|wedding-directory(?:-idf)?\.html)$ - [L]
 
@@ -99,15 +103,17 @@ DirectoryIndex index.html
     RewriteCond %{DOCUMENT_ROOT}/wedding-city-aliases.json -f
     RewriteRule ^(locationsalle[a-z]+)/([a-z0-9-]+)(?:\.html|/)?$ api/city-redirect.php?type=$1&slug=$2 [L]
     RewriteCond %{THE_REQUEST} \s/+locationsalledemariage/([a-z0-9-]+)(?:\.html|/)(?:[?\s]) [NC]
+    RewriteCond %{DOCUMENT_ROOT}/locationsalledemariage/$1.html -f
     RewriteRule ^locationsalledemariage/([a-z0-9-]+)(?:\.html|/)$ /locationsalledemariage/$1 [R=301,L]
 
     RewriteCond %{DOCUMENT_ROOT}/locationsalledemariage/$1.html -f
     RewriteRule ^locationsalledemariage/([a-z0-9-]+)$ locationsalledemariage/$1.html [L]
+    RewriteRule ^(locationsalledemariage/[a-z0-9-]+)$ api/site-router.php?route=$1 [L]
 
     # Let static assets (js, css, images…) be served directly
     RewriteCond %{REQUEST_FILENAME} -f
     RewriteRule ^ - [L]
 
     # Fall back to index.html for all other routes (React Router SPA)
-    RewriteRule ^ index.html [L]
+    RewriteRule ^(.*)$ api/site-router.php?route=$1 [L]
 </IfModule>

@@ -263,7 +263,7 @@ export default function ClientsTab() {
 
   function handleAdminValidate(id) {
     if (!confirm('Valider et signer définitivement ce devis ? Une confirmation sera envoyée au client.')) return
-    const updated = clients.map((c) => c.id === id ? { ...c, status: 'validé_admin', adminValidatedAt: new Date().toISOString() } : c)
+    const updated = clients.map((c) => c.id === id ? { ...c, calendarExcluded: false, accountingExcluded: false, status: 'validé_admin', adminValidatedAt: new Date().toISOString() } : c)
     saveClients(updated)
     setClients(updated)
     const validated = updated.find((c) => c.id === id)
@@ -282,6 +282,7 @@ export default function ClientsTab() {
       c.id === selected.id ? {
         ...c,
         payments: [...(c.payments || []), payment],
+        accountingExcluded: false,
         paymentReceipts: [...(c.paymentReceipts || []), {
           id: receiptId,
           receiptNumber,

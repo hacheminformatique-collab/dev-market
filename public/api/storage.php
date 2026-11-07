@@ -1,4 +1,6 @@
 <?php
+require_once __DIR__ . '/site-guard.php';
+siteMaintenanceGuard('storage');
 /**
  * storage.php – Shared JSON key-value store for the Paradise application.
  *
@@ -48,7 +50,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
         // Validate the stored content is still valid JSON before sending it
         json_decode($raw);
         if (json_last_error() === JSON_ERROR_NONE) {
-            echo $raw;
+            if ($key === 'paradise_settings' && !siteAdminAuthenticated(false)) {
+                $settings = json_decode($raw, true);
+                if (is_array($settings)) unset($settings['pin']);
+                echo json_encode($settings, JSON_UNESCAPED_UNICODE);
+            } else {
+                echo $raw;
+            }
         } else {
             echo json_encode(null);
         }
@@ -60,6 +68,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
 
 // ── POST ─────────────────────────────────────────────────────────────────────
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    if ($key === 'paradise_settings' && is_file($file) && !siteAdminAuthenticated(false)) {
+        siteControlFail(403, 'Modification des réglages refusée. Reconnectez-vous.');
+    }
     $lock = fopen($file . '.lock', 'c+');
     if (!$lock || !flock($lock, LOCK_EX)) {
         http_response_code(500);
@@ -91,6 +102,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         exit;
     }
 
+    if ($key === 'paradise_settings' && session_status() === PHP_SESSION_ACTIVE && isset($_SESSION['siteAdmin'])) {
+        $saved = json_decode($body, true);
+        if (is_string($saved['pin'] ?? null)) $_SESSION['siteAdmin'] = hash('sha256', $saved['pin']);
+    }
     echo json_encode(['ok' => true]);
     exit;
 }

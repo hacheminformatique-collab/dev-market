@@ -1,4 +1,6 @@
 <?php
+require_once __DIR__ . '/site-guard.php';
+siteMaintenanceGuard('blog-shell');
 ini_set('display_errors', '0');
 ini_set('log_errors', '1');
 header('Content-Type: text/html; charset=utf-8');

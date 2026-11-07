@@ -129,9 +129,59 @@ test('public storage loads settings alone without writing defaults or initializi
     assert.equal(calls.length, 1)
     assert.match(calls[0].url, /key=paradise_settings$/)
     assert.equal(calls[0].options.paced, false)
-    assert.equal(storageProfile('/dashboard'), undefined)
+    assert.deepEqual(storageProfile('/dashboard'), { names: ['settings'], paced: false, persistDefaults: false })
     await storage.initStorage()
     assert.equal(calls.filter((call) => call.options?.method !== 'POST').length, 16)
+  } finally {
+    globalThis.fetch = originalFetch
+    if (originalStorage === undefined) delete globalThis.localStorage
+    else globalThis.localStorage = originalStorage
+    await vite.close()
+  }
+})
+
+test('administration loads only active-tab dependencies and refreshes that same profile', async () => {
+  const vite = await createServer({ root: new URL('../', import.meta.url).pathname, server: { middlewareMode: true } })
+  const originalFetch = globalThis.fetch
+  const originalStorage = globalThis.localStorage
+  const calls = []
+  globalThis.localStorage = { getItem: () => null, setItem() {} }
+  globalThis.fetch = async (url, options) => {
+    calls.push({ url, options })
+    return new Response(JSON.stringify(url.endsWith('paradise_settings') ? { nom: 'Test', pin: 'test-pin' } : []), { headers: { 'Content-Type': 'application/json' } })
+  }
+  try {
+    const storage = await vite.ssrLoadModule('/src/utils/storage.js')
+    const { storageProfile, dashboardStorageNames } = await vite.ssrLoadModule('/src/utils/storageProfiles.js')
+    const paths = { login: '/gestion-privee', dashboard: '/gestion-privee/dashboard' }
+    assert.deepEqual(storageProfile(paths.dashboard, paths).names, ['settings'])
+    const names = dashboardStorageNames('clients')
+    assert.equal(names.length, 5)
+    assert.ok(!names.includes('staff') && !names.includes('ingredients') && !names.includes('stockSec'))
+    await storage.initStorage({ names, persistDefaults: false, paced: true })
+    assert.equal(calls.length, 5, 'Initial dashboard no longer waits for all 16 storage keys')
+    assert.ok(calls.every(({ options }) => options.paced))
+    await storage.initStorage({ names: dashboardStorageNames('staff'), persistDefaults: false, paced: true })
+    assert.equal(calls.length, 6, 'Opening staff loads only its previously unloaded data')
+    storage.setRefreshStorageNames(dashboardStorageNames('staff'))
+    await storage.refreshFromServer()
+    assert.equal(calls.length, 8, 'Refresh is limited to settings and staff')
+    assert.match(calls.at(-1).url, /paradise_staff$/)
+    const originalNow = Date.now
+    try {
+      Date.now = () => originalNow() + 31_000
+      await storage.initStorage({ names: dashboardStorageNames('staff'), persistDefaults: false, paced: true, maxAge: 30_000 })
+      assert.equal(calls.length, 10, 'Stale data is refreshed when reopening an inactive tab')
+      assert.equal(calls.at(-1).options.cache, 'no-store')
+    } finally { Date.now = originalNow }
+    const savedSettings = storage.getSettings()
+    globalThis.fetch = async () => new Response(JSON.stringify({ error: 'Reconnectez-vous.' }), { status: 403, headers: { 'Content-Type': 'application/json' } })
+    await assert.rejects(storage.saveSettingsConfirmed({ ...savedSettings, pin: 'new-test-pin' }), /Reconnectez-vous/)
+    assert.equal(storage.getSettings().pin, savedSettings.pin, 'Rejected settings do not replace the cache')
+    assert.equal(storage.getSyncStatus().pending, 0)
+    globalThis.fetch = async () => new Response('{"ok":true}', { headers: { 'Content-Type': 'application/json' } })
+    await storage.saveSettingsConfirmed({ ...savedSettings, pin: 'new-test-pin' })
+    assert.equal(storage.getSettings().pin, 'new-test-pin')
   } finally {
     globalThis.fetch = originalFetch
     if (originalStorage === undefined) delete globalThis.localStorage

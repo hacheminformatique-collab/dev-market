@@ -8,6 +8,7 @@ import { createServer as createTcpServer } from 'node:net'
 import { spawn } from 'node:child_process'
 import { once } from 'node:events'
 import { renderToStaticMarkup } from 'react-dom/server'
+import { createElement } from 'react'
 import { normalizeCityName } from '../src/utils/cityNames.js'
 
 const travel = { km: 16, minutes: 20, source: 'test', computedAt: '2026-01-01T00:00:00Z' }
@@ -738,4 +739,120 @@ test('postcode identities preserve homonymous towns and migrate historical URLs 
   } finally {
     globalThis.fetch = nativeFetch
   }
+})
+
+test('maintenance gates static pages and APIs, renamed administration stays accessible, and purges persist', async () => {
+  const request = (path, data, cookie) => fetch(new URL(path, origin), {
+    ...(data ? { method: 'POST', body: JSON.stringify(data) } : {}),
+    headers: { 'Content-Type': 'application/json', ...(cookie ? { Cookie: cookie } : {}) },
+    redirect: 'manual',
+  })
+  assert.equal((await request('/api/site-admin.php')).status, 403)
+  assert.equal((await request('/api/data-purge.php', { type: 'all', confirmation: 'PURGER' })).status, 403)
+  const publicSettings = await (await request('/api/storage.php?key=paradise_settings')).json()
+  assert.ok(!Object.hasOwn(publicSettings, 'pin'))
+  assert.equal((await request('/api/storage.php?key=paradise_settings', { pin: 'changed' })).status, 403)
+  const login = await request('/api/site-admin.php', { action: 'login', pin })
+  assert.equal(login.status, 200)
+  const cookie = login.headers.get('set-cookie').split(';')[0]
+  assert.equal((await request('/api/site-admin.php', { action: 'save', adminSlug: '../invalid' }, cookie)).status, 400)
+  const renamed = await request('/api/site-admin.php', { action: 'save', adminSlug: 'gestion-paradise-test' }, cookie)
+  assert.equal(renamed.status, 200)
+  assert.equal((await request('/admin')).status, 404)
+  assert.equal((await request('/dashboard')).status, 404)
+  const customLogin = await request('/gestion-paradise-test')
+  assert.equal(customLogin.status, 200)
+  assert.ok((await customLogin.text()).includes('"dashboard":"/gestion-paradise-test/dashboard"'))
+  assert.ok(!(await (await request('/')).text()).includes('gestion-paradise-test'))
+  assert.equal((await request('/api/site-admin.php', { action: 'save', maintenance: true }, cookie)).status, 200)
+  assert.equal((await request('/')).status, 200)
+  for (const path of ['/blog', '/devis', '/locationsalledemariage/meaux-77100', '/locationsalledemariage/meaux-77100.html', '/locationsalledemariage/departements/77', '/sitemap.xml']) {
+    const blocked = await request(path)
+    assert.equal(blocked.status, 503, path)
+    assert.equal(blocked.headers.get('retry-after'), '3600')
+  }
+  assert.equal((await request('/gestion-paradise-test/dashboard', null, cookie)).status, 200)
+  assert.equal((await request('/api/storage.php?key=paradise_clients')).status, 503)
+  assert.equal((await request('/api/storage.php?key=paradise_clients', null, cookie)).status, 200)
+  assert.equal((await request('/api/storage.php?key=paradise_settings')).status, 200)
+  assert.equal((await request('/api/site-admin.php', { action: 'save', maintenance: false }, cookie)).status, 200)
+  assert.equal((await request('/locationsalledemariage/meaux-77100')).status, 200)
+
+  const json = async (key) => JSON.parse(await readFile(join(site, `storage-data/${key}.json`), 'utf8'))
+  const store = async (key, value) => writeFile(join(site, `storage-data/${key}.json`), JSON.stringify(value))
+  const client = { id: 'test', nom: 'Conservé', dateEvenement: '2027-05-15', status: 'validé_admin',
+    payments: [{ montant: 100 }], paymentReceipts: [{ id: 'receipt' }], assignedStaff: ['staff'] }
+  await store('paradise_clients', [client])
+  await store('paradise_receipts_test', { receipt: 'private' })
+  await store('paradise_cal_manual_events', [{ id: 'event' }])
+  const purge = (type, confirmation = 'PURGER') => request('/api/data-purge.php', { type, confirmation }, cookie)
+  assert.equal((await purge('all', 'incorrect')).status, 400)
+  assert.equal((await purge('compta')).status, 200)
+  const accountant = (await json('paradise_clients'))[0]
+  assert.equal(accountant.nom, client.nom)
+  assert.equal(accountant.dateEvenement, client.dateEvenement)
+  assert.deepEqual(accountant.payments, [])
+  assert.deepEqual(accountant.paymentReceipts, [])
+  assert.equal(accountant.accountingExcluded, true)
+  assert.deepEqual(await json('paradise_receipts_test'), {})
+  assert.equal((await purge('calendar')).status, 200)
+  assert.equal((await json('paradise_clients'))[0].calendarExcluded, true)
+  assert.equal((await json('paradise_clients'))[0].dateEvenement, client.dateEvenement)
+  assert.deepEqual(await json('paradise_cal_manual_events'), [])
+  const { default: ComptabiliteTab } = await vite.ssrLoadModule('/src/components/Dashboard/tabs/ComptabiliteTab.jsx')
+  const { default: CalendarTab } = await vite.ssrLoadModule('/src/components/Dashboard/tabs/CalendarTab.jsx')
+  const storage = await vite.ssrLoadModule('/src/utils/storage.js')
+  const nativeFetch = globalThis.fetch
+  globalThis.fetch = (url, options) => nativeFetch(new URL(url, origin), { ...options, headers: { ...options?.headers, Cookie: cookie } })
+  try {
+    await storage.initStorage({ names: ['clients', 'calOverrides', 'calStaff', 'calManualEvents', 'staff', 'ingredients', 'matieresPremieresRecettes'], reload: true, persistDefaults: false, paced: false })
+    assert.ok(!renderToStaticMarkup(createElement(ComptabiliteTab)).includes('Conservé'))
+    assert.ok(!renderToStaticMarkup(createElement(CalendarTab)).includes('Conservé'))
+  } finally { globalThis.fetch = nativeFetch }
+  for (const [type, keys] of [
+    ['staff', ['paradise_staff']], ['stock', ['paradise_stock_sec', 'paradise_stock_matiere', 'paradise_stock_boisson']],
+    ['matieres', ['paradise_ingredients', 'paradise_matieres_recettes']], ['formules', ['paradise_formules']],
+    ['menus', ['paradise_menus']], ['gateaux', ['paradise_gateaux']], ['prestations', ['paradise_prestations']],
+  ]) {
+    for (const key of keys) await store(key, [{ id: 'delete-me' }])
+    assert.equal((await purge(type)).status, 200, type)
+    for (const key of keys) assert.deepEqual(await json(key), [])
+    assert.equal((await json('paradise_clients'))[0].nom, client.nom)
+  }
+  await store('paradise_city_pages', fixture.pages)
+  await store('paradise_city_pages_backup', [{ snapshot: fixture.pages }])
+  assert.equal((await purge('pages-mariage')).status, 200)
+  assert.deepEqual(await json('paradise_city_pages'), {})
+  assert.deepEqual(await json('paradise_city_pages_backup'), [])
+  assert.equal((await request('/locationsalledemariage/meaux-77100')).status, 404)
+  assert.equal((await request('/locationsalledemariage/meaux-77100.html')).status, 404)
+  assert.equal((await request('/locationsalledemariage/villeroy')).status, 404)
+  assert.equal((await request('/locationsalledemariage/departements/77')).status, 404)
+  assert.ok(!(await (await request('/sitemap.xml')).text()).includes('/locationsalledemariage/'))
+  assert.ok(!(await (await request('/')).text()).includes('/locationsalledemariage/meaux-77100'))
+  await mkdir(join(site, 'storage-data/quote-followups'), { recursive: true })
+  await writeFile(join(site, 'storage-data/quote-followups/flow-test.json'), '{}')
+  await store('paradise_docs_test', { document: 'private' })
+  await store('paradise_blog_articles', fixture.blogArticles)
+  await store('paradise_blog_backup', [{ articles: fixture.blogArticles }])
+  assert.equal((await purge('all')).status, 200)
+  assert.deepEqual(await json('paradise_clients'), [])
+  assert.deepEqual(await json('paradise_docs_test'), {})
+  assert.deepEqual(await json('paradise_blog_articles'), {})
+  assert.deepEqual(await json('paradise_blog_backup'), [])
+  assert.deepEqual(await json('paradise_settings'), fixture.settings)
+  assert.equal((await json('site-controls')).adminSlug, 'gestion-paradise-test')
+  assert.equal((await request('/api/site-admin.php', null, cookie)).status, 200)
+  assert.equal((await request('/')).status, 200)
+  const newSettings = { ...fixture.settings, pin: 'changed-test-pin' }
+  assert.equal((await request('/api/storage.php?key=paradise_settings', newSettings, cookie)).status, 200)
+  assert.equal((await request('/api/site-admin.php', null, cookie)).status, 200, 'Changing PIN retains the authenticated session')
+  assert.equal((await request('/api/site-admin.php', { action: 'logout' }, cookie)).status, 200)
+  assert.equal((await request('/api/site-admin.php', null, cookie)).status, 403)
+  for (let count = 0; count < 3; count++) {
+    assert.equal((await request('/api/site-admin.php', { action: 'login', pin: 'incorrect' })).status, 403)
+  }
+  const throttled = await request('/api/site-admin.php', { action: 'login', pin: newSettings.pin })
+  assert.equal(throttled.status, 429)
+  assert.equal(throttled.headers.get('X-RateLimit-Scope'), 'admin-login')
 })

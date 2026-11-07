@@ -68,7 +68,7 @@ export default function ComptabiliteTab() {
   const today = new Date().toISOString().split('T')[0]
 
   const eventsData = clients
-    .filter((c) => c.status !== 'annulé' && c.dateEvenement)
+    .filter((c) => !c.accountingExcluded && c.status !== 'annulé' && c.dateEvenement)
     .filter((c) => {
       if (filter === 'upcoming') return c.dateEvenement >= today
       if (filter === 'past') return c.dateEvenement < today

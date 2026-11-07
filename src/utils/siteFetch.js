@@ -36,7 +36,7 @@ export function createSiteFetch({ transport, origin, now = Date.now, wait = (ms)
       else assertAvailable()
       options?.signal?.throwIfAborted()
       const response = await transport(input, options)
-      const quoteLimit = response.status === 429 && response.headers.get('X-RateLimit-Scope') === 'quote-followup'
+      const quoteLimit = response.status === 429 && ['quote-followup', 'admin-login'].includes(response.headers.get('X-RateLimit-Scope'))
       if ((response.status === 429 && !quoteLimit) || response.status === 509) {
         const retry = response.headers.get('retry-after')
         const seconds = Number(retry)

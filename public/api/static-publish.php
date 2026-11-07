@@ -1,4 +1,6 @@
 <?php
+require_once __DIR__ . '/site-guard.php';
+siteMaintenanceGuard('static-publish');
 // Publish only wedding HTML files and SEO files, using the saved admin PIN.
 ini_set('display_errors', '0');
 ini_set('log_errors', '1');

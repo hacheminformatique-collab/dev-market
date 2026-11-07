@@ -1,4 +1,6 @@
 <?php
+require_once __DIR__ . '/site-guard.php';
+siteMaintenanceGuard('favicon-write');
 /**
  * favicon-write.php – Generate and write favicon files to the document root.
  *

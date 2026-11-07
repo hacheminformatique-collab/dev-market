@@ -18,6 +18,7 @@ export default function PublicWeddingDirectory() {
   useEffect(() => {
     const container = document.getElementById('public-wedding-directory')
     if (!isPublicPath(pathname) || !container) return
+    if (pathname === '/' && document.getElementById('site-maintenance')) return
     let cancelled = false
     async function load() {
       try {

@@ -1,13 +1,15 @@
 import { useState } from 'react'
-import { getSettings, saveSettings } from '../../../utils/storage'
+import { getSettings, saveSettingsConfirmed } from '../../../utils/storage'
+import SiteAccessControls from '../SiteAccessControls'
 
 export default function MotDePasseTab() {
   const [current, setCurrent] = useState('')
   const [newPin, setNewPin] = useState('')
   const [confirm, setConfirm] = useState('')
   const [msg, setMsg] = useState(null)
+  const [busy, setBusy] = useState(false)
 
-  function handleSubmit(e) {
+  async function handleSubmit(e) {
     e.preventDefault()
     const settings = getSettings()
     if (current !== settings.pin) {
@@ -22,13 +24,21 @@ export default function MotDePasseTab() {
       setMsg({ type: 'error', text: 'Les codes PIN ne correspondent pas.' })
       return
     }
-    saveSettings({ ...settings, pin: newPin })
-    setMsg({ type: 'success', text: 'Code PIN modifié avec succès !' })
-    setCurrent(''); setNewPin(''); setConfirm('')
+    setBusy(true)
+    try {
+      await saveSettingsConfirmed({ ...settings, pin: newPin })
+      setMsg({ type: 'success', text: 'Code PIN modifié avec succès !' })
+      setCurrent(''); setNewPin(''); setConfirm('')
+    } catch (error) {
+      setMsg({ type: 'error', text: error.message })
+    } finally {
+      setBusy(false)
+    }
   }
 
   return (
     <div>
+      <SiteAccessControls kind="address" />
       <h3 style={{ marginBottom: '20px', color: '#1a1a2e' }}>Changer le code PIN</h3>
       <div className="card" style={{ maxWidth: '400px' }}>
         <form onSubmit={handleSubmit}>
@@ -55,7 +65,7 @@ export default function MotDePasseTab() {
             </div>
           )}
 
-          <button type="submit" className="btn btn-primary">Modifier le PIN</button>
+          <button type="submit" disabled={busy} className="btn btn-primary">{busy ? 'Enregistrement…' : 'Modifier le PIN'}</button>
         </form>
       </div>
     </div>

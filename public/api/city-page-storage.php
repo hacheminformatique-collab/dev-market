@@ -1,4 +1,6 @@
 <?php
+require_once __DIR__ . '/site-guard.php';
+siteMaintenanceGuard('city-page-storage');
 // Small, incremental requests; existing JSON page files remain compatible.
 ini_set('display_errors', '0');
 ini_set('log_errors', '1');

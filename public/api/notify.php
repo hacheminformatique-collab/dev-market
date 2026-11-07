@@ -1,4 +1,6 @@
 <?php
+require_once __DIR__ . '/site-guard.php';
+siteMaintenanceGuard('notify');
 /**
  * notify.php – Receives a new-devis notification, logs it, and sends e-mails.
  *

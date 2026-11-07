@@ -1,5 +1,74 @@
 # React + Vite
 
+## Maintenance, adresse administrative et purge
+
+**Mes Infos > Maintenance du site** ferme les pages publiques sauf l'accueil.
+Les HTML existants ne sont ni effacés ni redirigés vers une page indexable :
+les URL indisponibles répondent **503** avec `Retry-After`. Les assets nécessaires
+à l'accueil et robots.txt restent servis. La connexion administrative, le
+dashboard et les API d'une session administrative restent accessibles.
+Les API publiques autres que les réglages de l'accueil sont bloquées.
+Rouvrir le site avant de publier/vérifier les URL HTML publiques.
+
+**Code PIN > Adresse privée de l'administration** choisit un chemin de 8 à
+80 caractères (minuscules, chiffres, tirets), par exemple `/gestion-paradise`.
+La connexion est à cette adresse et le dashboard à son suffixe `/dashboard`.
+Les anciennes URL `/admin` et `/dashboard` répondent 404. Le chemin n'est pas
+inséré dans les pages publiques ni dans robots.txt ; les pages administratives
+ont un en-tête `X-Robots-Tag: noindex`. Notez votre nouvelle adresse avant de
+la modifier. La discrétion d'une URL ne remplace pas l'authentification.
+
+Le PIN est vérifié côté PHP, avec trois erreurs autorisées avant un blocage
+de dix minutes par IP et une session HttpOnly/SameSite. Les réglages publics
+ne renvoient plus le PIN. Les nouvelles opérations de maintenance, changement
+d'adresse et purge exigent cette session ; reconnectez-vous après déploiement
+si votre ancien onglet n'avait qu'une authentification locale.
+
+**Back-up > Purge des données** propose une suppression par onglet et
+**Tout purger**, avec saisie obligatoire de `PURGER`. Aucune purge réelle n'est
+faite lors du déploiement. Exportez les deux sauvegardes (données métier et
+pages/blog) avant de l'utiliser : il n'y a pas de sauvegarde automatique de
+purge. Terminez la synchronisation et fermez les autres administrations pour
+éviter de réenregistrer leurs copies anciennes. Utilisez de préférence la
+maintenance pour éviter l'arrivée de nouvelles demandes pendant la purge.
+
+- Clients & Devis : clients, documents, reçus, prospects et affectations.
+- Calendrier : événements manuels, promotions/ajustements et affectations ;
+  les devis restent enregistrés avec leur date mais ne réservent plus le
+  calendrier. Une nouvelle signature/validation réactive leur réservation.
+- Comptabilité : paiements et reçus ; les devis conservés sont exclus des
+  calculs jusqu'à un nouveau paiement, une signature ou une validation.
+- Staff, Stock, Matières premières, Formules, Menus, Gâteaux, Prestations :
+  collections correspondantes ; Staff retire aussi les affectations.
+- Pages salle de mariage : données, configuration, galerie, sauvegardes,
+  HTML villes/départements, registre et annuaires, avec retrait du sitemap.
+  Les anciennes adresses ne restent pas accessibles.
+- Tout purger : toutes ces catégories, les autres types de pages villes et
+  le blog avec ses sauvegardes. Mes Infos, le PIN administrateur, l'adresse administrative
+  et l'état de maintenance sont conservés.
+
+Les écritures sont atomiques et partagent les verrous existants du stockage
+et de la publication. Une erreur de stockage ou de suppression est explicite ;
+en cas d'erreur disque en cours d'opération, vérifier les données avant de
+relancer (la purge n'est pas une transaction multi-fichiers).
+Les collections vides sont enregistrées, pas simplement effacées, afin que
+les anciens caches et les valeurs d'exemple ne les recréent pas au rechargement.
+
+Le dashboard charge les composants d'onglet à la demande et seulement leurs
+données nécessaires : cinq clés pour Clients & Devis au lieu de seize au
+démarrage, sans second rafraîchissement complet immédiat. Les rafraîchissements
+périodiques suivent l'onglet actif et conservent l'espacement réseau de 650 ms.
+À la réouverture d'un onglet, les données âgées de plus de 30 secondes sont relues.
+Back-up ne charge toutes les données métier que lors de leur export.
+
+Déployer **tout `dist/`**, notamment `api/site-admin.php`, `site-controls.php`,
+`site-guard.php`, `site-router.php`, `data-purge.php`, les API modifiées et
+`.htaccess`. Préserver `storage-data/site-controls.json` et le fichier racine
+`site-maintenance.flag` lors des déploiements suivants, comme les données métier.
+Pour récupérer une adresse oubliée, lire `site-controls.json` directement sur
+le serveur ; pour une désactivation manuelle, mettre `maintenance` à `false`
+et supprimer uniquement le fichier `site-maintenance.flag`.
+
 ## Identifiants postaux et prospects
 
 Toutes les pages villes utilisent désormais `ville-codepostal`, par exemple

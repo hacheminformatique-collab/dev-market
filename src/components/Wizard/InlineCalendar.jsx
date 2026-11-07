@@ -10,7 +10,7 @@ function buildBookingMaps(clients) {
   const booked = new Set()  // dates with admin-validated reservations
   const pending = new Set() // dates with pending (not yet admin-validated) devis
   ;(clients || []).forEach((c) => {
-    if (!c.dateEvenement) return
+    if (!c.dateEvenement || c.calendarExcluded) return
     const key = c.dateEvenement.slice(0, 10)
     if (c.status === 'signé' || c.status === 'validé_admin') {
       booked.add(key)

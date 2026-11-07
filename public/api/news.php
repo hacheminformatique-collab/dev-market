@@ -1,4 +1,6 @@
 <?php
+require_once __DIR__ . '/site-guard.php';
+siteMaintenanceGuard('news');
 /**
  * news.php – Server-side Google News RSS proxy.
  *

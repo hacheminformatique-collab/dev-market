@@ -1,11 +1,12 @@
 import { siteFetch as fetch } from '../../../utils/siteFetch'
 import { useState } from 'react'
-import { getSettings, saveSettings } from '../../../utils/storage'
+import { getSettings, saveSettingsConfirmed } from '../../../utils/storage'
 import { makePageTypeStorage } from '../../../utils/cityPageStorage'
 import { buildSitemapXml, buildRobotsTxt, downloadTextFile } from '../../../utils/seoFiles'
 import { PAGE_TYPES } from '../../../data/pageTypes'
 import { getBlogArticles } from '../../../utils/blogStorage'
 import { getPublishedWeddingSlugs, getPublishedWeddingDepartments } from '../../../utils/weddingPublication'
+import SiteAccessControls from '../SiteAccessControls'
 
 function resizeImageToDataUrl(file, maxW, maxH) {
   return new Promise((resolve, reject) => {
@@ -51,6 +52,8 @@ function resizeImageToSquare(file, size) {
 export default function MesInfosTab() {
   const [data, setData] = useState(getSettings())
   const [saved, setSaved] = useState(false)
+  const [saveError, setSaveError] = useState('')
+  const [saving, setSaving] = useState(false)
   const [editing, setEditing] = useState(false)
   const [seoBusy, setSeoBusy] = useState(false)
   const [seoMessage, setSeoMessage] = useState('')
@@ -117,11 +120,19 @@ export default function MesInfosTab() {
     }
   }
 
-  function handleSave() {
-    saveSettings(data)
-    setEditing(false)
-    setSaved(true)
-    setTimeout(() => setSaved(false), 2000)
+  async function handleSave() {
+    setSaving(true)
+    setSaveError('')
+    try {
+      await saveSettingsConfirmed(data)
+      setEditing(false)
+      setSaved(true)
+      setTimeout(() => setSaved(false), 2000)
+    } catch (error) {
+      setSaveError(error.message)
+    } finally {
+      setSaving(false)
+    }
   }
 
   function handleCancel() {
@@ -177,6 +188,8 @@ export default function MesInfosTab() {
 
   return (
     <div>
+      <SiteAccessControls kind="maintenance" />
+      {saveError && <p role="alert" style={{ color: '#c0392b' }}>{saveError}</p>}
       <h3 style={{ marginBottom: '20px', color: '#1a1a2e' }}>Informations générales</h3>
       <div className="card" style={{ maxWidth: '600px' }}>
         {!editing && (
@@ -338,8 +351,8 @@ export default function MesInfosTab() {
 
         {editing ? (
           <>
-            <button onClick={handleSave} className="btn btn-primary">💾 Sauvegarder</button>
-            <button onClick={handleCancel} className="btn btn-outline" style={{ marginLeft: '10px' }}>Annuler</button>
+            <button onClick={handleSave} disabled={saving} className="btn btn-primary">{saving ? 'Enregistrement…' : '💾 Sauvegarder'}</button>
+            <button onClick={handleCancel} disabled={saving} className="btn btn-outline" style={{ marginLeft: '10px' }}>Annuler</button>
           </>
         ) : (
           <button onClick={() => setEditing(true)} className="btn btn-primary">

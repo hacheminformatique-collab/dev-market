@@ -82,6 +82,11 @@ export function offDataRefresh(callback) {
  * Safe to call at any time – if the server is unreachable the cache is kept as-is.
  */
 let refreshInFlight = null
+let refreshNames = Object.keys(KEYS)
+export function setRefreshStorageNames(names) {
+  if (names.some((name) => !Object.hasOwn(KEYS, name))) throw new Error('Clé de rafraîchissement inconnue.')
+  refreshNames = [...names]
+}
 export function refreshFromServer() {
   if (!refreshInFlight) {
     refreshInFlight = refreshStorage().finally(() => { refreshInFlight = null })
@@ -92,12 +97,14 @@ export function refreshFromServer() {
 async function refreshStorage() {
   let changed = false
   await Promise.all(
-    Object.entries(KEYS).map(async ([, key]) => {
+    refreshNames.map(async (name) => {
+      const key = KEYS[name]
       try {
-        const res = await fetch(`/api/storage.php?key=${encodeURIComponent(key)}`, { paced: true })
+        const res = await fetch(`/api/storage.php?key=${encodeURIComponent(key)}`, { paced: true, ...(name === 'settings' ? { cache: 'no-store' } : {}) })
         if (!res.ok) return
         const data = await res.json()
         if (data === null || data === undefined) return
+        keyLoadTimes.set(key, Date.now())
         if (JSON.stringify(_cache[key]) !== JSON.stringify(data)) {
           _cache[key] = data
           try { localStorage.setItem(key, JSON.stringify(data)) } catch { /* ignore */ }
@@ -306,6 +313,7 @@ function _get(key) {
 // Write to cache, persist to localStorage as backup, and async-POST to server with retry
 function _save(key, data) {
   _cache[key] = data
+  keyLoadTimes.set(key, Date.now())
   try { localStorage.setItem(key, JSON.stringify(data)) } catch { /* localStorage may be unavailable */ }
   _updateSyncStatus({ pending: _syncStatus.pending + 1 })
   return _postWithRetry(key, data, 0)
@@ -318,6 +326,7 @@ function _save(key, data) {
  */
 let initialization = null
 const keyInitializations = new Map()
+const keyLoadTimes = new Map()
 const serverLoadedKeys = new Set()
 const serverMissingKeys = new Set()
 export function initStorage(options) {
@@ -326,17 +335,18 @@ export function initStorage(options) {
   return initialization
 }
 
-async function initializeStorage({ names = Object.keys(KEYS), paced = true, persistDefaults = true } = {}) {
+async function initializeStorage({ names = Object.keys(KEYS), paced = true, persistDefaults = true, reload = false, maxAge = Infinity } = {}) {
   if (names.some((name) => !Object.hasOwn(KEYS, name))) throw new Error('Clé de stockage inconnue.')
   await Promise.all(
     names.map((name) => {
       const key = KEYS[name]
-      if (keyInitializations.has(key)) return keyInitializations.get(key)
+      const fresh = !reload && (!keyLoadTimes.has(key) || Date.now() - keyLoadTimes.get(key) <= maxAge)
+      if (fresh && keyInitializations.has(key)) return keyInitializations.get(key)
       const load = (async () => {
         let serverConfirmedMissing = false
         // 1. Try server
         try {
-          const res = await fetch(`/api/storage.php?key=${encodeURIComponent(key)}`, { paced })
+          const res = await fetch(`/api/storage.php?key=${encodeURIComponent(key)}`, { paced, ...(!fresh || name === 'settings' ? { cache: 'no-store' } : {}) })
           if (res.ok) {
             const data = await res.json()
             serverLoadedKeys.add(key)
@@ -368,7 +378,7 @@ async function initializeStorage({ names = Object.keys(KEYS), paced = true, pers
           serverMissingKeys.delete(key)
           _save(key, DEFAULTS[name])
         }
-      })()
+      })().finally(() => { keyLoadTimes.set(key, Date.now()) })
       keyInitializations.set(key, load)
       return load
     })
@@ -377,7 +387,7 @@ async function initializeStorage({ names = Object.keys(KEYS), paced = true, pers
   if (persistDefaults && names.includes('settings') && serverLoadedKeys.has(KEYS.settings)) {
     const saved = _cache[KEYS.settings]
     const merged = withSettingsDefaults(saved)
-    if (serverMissingKeys.has(KEYS.settings) || JSON.stringify(merged) !== JSON.stringify(saved)) {
+    if (serverMissingKeys.has(KEYS.settings) || (Object.hasOwn(saved || {}, 'pin') && JSON.stringify(merged) !== JSON.stringify(saved))) {
       serverMissingKeys.delete(KEYS.settings)
       _save(KEYS.settings, merged)
     }
@@ -442,6 +452,24 @@ export function withSettingsDefaults(data) {
 
 export const getSettings = () => withSettingsDefaults(_get(KEYS.settings))
 export const saveSettings = (data) => _save(KEYS.settings, data)
+
+export async function saveSettingsConfirmed(data) {
+  _updateSyncStatus({ pending: _syncStatus.pending + 1 })
+  try {
+    const response = await fetch(`/api/storage.php?key=${KEYS.settings}`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data),
+    })
+    const result = await response.json()
+    if (!response.ok || !result.ok) throw new Error(result.error || `Réglages non enregistrés (HTTP ${response.status}).`)
+    _saveRetryQueue(_loadRetryQueue().filter((item) => item.key !== KEYS.settings))
+    _cache[KEYS.settings] = data
+    keyLoadTimes.set(KEYS.settings, Date.now())
+    try { localStorage.setItem(KEYS.settings, JSON.stringify(data)) } catch { /* local backup may be unavailable */ }
+    _updateSyncStatus({ synced: _syncStatus.synced + 1 })
+  } finally {
+    _updateSyncStatus({ pending: Math.max(0, _syncStatus.pending - 1) })
+  }
+}
 
 export const getFormules = () => _get(KEYS.formules) || DEFAULTS.formules
 export const saveFormules = (data) => _save(KEYS.formules, data)

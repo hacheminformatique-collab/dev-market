@@ -2,6 +2,8 @@ import { useEffect, useState } from 'react'
 import { siteAdminRequest } from '../../utils/siteAdministration'
 
 export default function SiteAccessControls({ kind }) {
+  const maintenanceKey = kind === 'quotes' ? 'quoteMaintenance' : 'maintenance'
+  const isMaintenance = kind !== 'address'
   const [controls, setControls] = useState(null)
   const [slug, setSlug] = useState('')
   const [busy, setBusy] = useState(false)
@@ -16,17 +18,18 @@ export default function SiteAccessControls({ kind }) {
 
   async function save(event) {
     event.preventDefault()
-    if (kind === 'maintenance' && !window.confirm(controls.maintenance
-      ? 'Rouvrir toutes les pages publiques du site ?'
+    if (isMaintenance && !window.confirm(controls[maintenanceKey]
+      ? kind === 'quotes' ? 'Rouvrir les nouvelles demandes de devis ?' : 'Rouvrir toutes les pages publiques du site ?'
+      : kind === 'quotes' ? 'Suspendre les nouvelles demandes de devis ? Les devis existants restent accessibles et signables.'
       : 'Activer la maintenance ? Seuls l’accueil et l’administration resteront accessibles.')) return
     setBusy(true)
     setMessage('')
     try {
       const result = await siteAdminRequest({ action: 'save',
-        ...(kind === 'maintenance' ? { maintenance: !controls.maintenance } : { adminSlug: slug.trim() }) })
+        ...(isMaintenance ? { [maintenanceKey]: !controls[maintenanceKey] } : { adminSlug: slug.trim() }) })
       setControls(result.controls)
       if (kind === 'address') window.location.assign(`/${result.controls.adminSlug}/dashboard`)
-      else setMessage(result.controls.maintenance ? 'Maintenance activée.' : 'Site rouvert.')
+      else setMessage(result.controls[maintenanceKey] ? 'Maintenance activée.' : kind === 'quotes' ? 'Demandes de devis rouvertes.' : 'Site rouvert.')
     } catch (error) {
       setMessage(error.message)
     } finally {
@@ -36,9 +39,10 @@ export default function SiteAccessControls({ kind }) {
 
   return (
     <section className="card" style={{ marginTop: '24px', marginBottom: '24px' }}>
-      <h3>{kind === 'maintenance' ? 'Maintenance du site' : 'Adresse privée de l’administration'}</h3>
+      <h3>{kind === 'quotes' ? 'Maintenance devis' : kind === 'maintenance' ? 'Maintenance du site' : 'Adresse privée de l’administration'}</h3>
       <p style={{ margin: '12px 0' }}>
-        {kind === 'maintenance'
+        {kind === 'quotes' ? 'Suspend uniquement les nouvelles demandes et formulaires de devis, même déjà ouverts. Le site, l’administration, les devis existants et leur signature restent accessibles.'
+          : kind === 'maintenance'
           ? 'En maintenance, seul l’accueil reste public. L’administration reste accessible pour rouvrir le site. Les autres pages répondent HTTP 503 sans supprimer leurs fichiers.'
           : 'Change l’adresse de connexion et celle du dashboard. Les anciennes adresses /admin et /dashboard deviennent indisponibles. Notez la nouvelle adresse : elle ne remplace pas la protection par PIN.'}
       </p>
@@ -48,10 +52,10 @@ export default function SiteAccessControls({ kind }) {
           <input id="admin-slug" className="form-control" value={slug} onChange={(event) => setSlug(event.target.value)} pattern="[a-z][a-z0-9-]{7,79}" required />
           <p style={{ marginTop: '8px' }}>{window.location.origin}/{slug || 'votre-adresse'} — dashboard : /{slug || 'votre-adresse'}/dashboard</p>
         </div>}
-        {kind === 'maintenance' && <p style={{ marginBottom: '12px' }}>État : <strong>{controls.maintenance ? 'en maintenance' : 'site ouvert'}</strong></p>}
+        {isMaintenance && <p style={{ marginBottom: '12px' }}>État : <strong>{controls[maintenanceKey] ? 'en maintenance' : kind === 'quotes' ? 'demandes ouvertes' : 'site ouvert'}</strong></p>}
         <button className="btn btn-primary" disabled={busy}>
           {busy ? 'Enregistrement…' : kind === 'address' ? 'Modifier l’adresse'
-            : controls.maintenance ? 'Désactiver la maintenance' : 'Activer la maintenance'}
+            : controls[maintenanceKey] ? `Désactiver la maintenance${kind === 'quotes' ? ' devis' : ''}` : `Activer la maintenance${kind === 'quotes' ? ' devis' : ''}`}
         </button>
       </form>}
       {!controls && !message && <p role="status">Chargement des réglages…</p>}

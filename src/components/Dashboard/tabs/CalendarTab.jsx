@@ -6,15 +6,11 @@ import {
   getCalOverrides, saveCalOverrides,
   getCalStaff, saveCalStaff,
   getCalManualEvents, saveCalManualEvents,
+  getFormules, saveFormules,
 } from '../../../utils/storage'
+import { getFormuleTarif, getSeason } from '../../../utils/formulePricing'
 
-// ── Pricing helpers (same logic as Step3Formule) ─────────────────────────────
-
-function getSeason(dateStr) {
-  if (!dateStr) return null
-  const month = new Date(dateStr).getMonth() + 1
-  return (month === 12 || month <= 3) ? 'basse' : 'haute'
-}
+// ── Pricing helpers ──────────────────────────────────────────────────────────
 
 function getSeasonLabel(dateStr) {
   if (!dateStr) return ''
@@ -26,28 +22,17 @@ function getDayOfWeek(dateStr) {
   return new Date(dateStr).getDay() // 0=dim,1=lun,...,5=ven,6=sam
 }
 
-function getPriceForDate(dateStr, formuleNom) {
-  if (!dateStr) return 0
-  const month = new Date(dateStr).getMonth() + 1
-  const day = getDayOfWeek(dateStr)
-  const isBasSaison = (month === 12 || month <= 3)
-  const isSec = formuleNom && formuleNom.toLowerCase().includes('sèche')
-
-  if (isBasSaison) {
-    if (day === 5) return isSec ? 2500 : 1500
-    if (day === 6) return isSec ? 3500 : 2500
-    return isSec ? 2000 : 1000
-  } else {
-    if (day === 5) return isSec ? 3500 : 2500
-    if (day === 6) return isSec ? 4500 : 3000
-    return isSec ? 2500 : 1500
-  }
+function isDryRental(formule) {
+  return formule?.forfait !== true && (formule?.nomFormule || '').toLowerCase().includes('sèche')
 }
 
-function getRemise(dateStr) {
+function getRemise(dateStr, formules) {
   if (!dateStr) return 0
-  const secPrice = getPriceForDate(dateStr, 'Location sèche')
-  const presPrice = getPriceForDate(dateStr, 'Location avec prestation')
+  const sec = formules.find(isDryRental)
+  const presta = formules.find((f) => f.forfait !== true && !isDryRental(f))
+  const secPrice = getFormuleTarif(dateStr, sec || 'Location sèche')
+  const presPrice = getFormuleTarif(dateStr, presta || 'Location avec prestation')
+  if (secPrice == null || presPrice == null) return 0
   return secPrice - presPrice
 }
 
@@ -102,16 +87,24 @@ const DAY_NAMES_FR = ['Dimanche', 'Lundi', 'Mardi', 'Mercredi', 'Jeudi', 'Vendre
 
 // ── Price Override Modal ──────────────────────────────────────────────────────
 
-function PriceOverrideModal({ dateStr, currentOverride, onSave, onClose }) {
-  const auto = getPriceForDate(dateStr, 'Location sèche')
+function PriceOverrideModal({ dateStr, currentOverride, formules, onSave, onClose }) {
+  const dryRental = formules.find(isDryRental)
+  const prestation = formules.find((f) => f.forfait !== true && !isDryRental(f))
+  const auto = getFormuleTarif(dateStr, dryRental || 'Location sèche')
   const [customPrice, setCustomPrice] = useState(
     currentOverride?.customPrice != null ? String(currentOverride.customPrice) : String(auto)
   )
   const [isPromo, setIsPromo] = useState(currentOverride?.isPromo ?? false)
   const [note, setNote] = useState(currentOverride?.note || '')
+  const [error, setError] = useState('')
 
   function handleSave() {
-    onSave({ customPrice: parseFloat(customPrice) || auto, isPromo, note })
+    const price = Number(customPrice)
+    if (!customPrice.trim() || !Number.isFinite(price) || price < 0) {
+      setError('Saisissez un prix TTC valide, fini et supérieur ou égal à zéro.')
+      return
+    }
+    onSave({ customPrice: price, isPromo, note })
   }
 
   function handleRemove() {
@@ -129,9 +122,9 @@ function PriceOverrideModal({ dateStr, currentOverride, onSave, onClose }) {
           <div style={{ marginTop: '6px' }}>
             <strong>Tarif standard :</strong>
             <div style={{ paddingLeft: '12px', lineHeight: '1.8', color: '#555' }}>
-              Location sèche : {formatMoney(getPriceForDate(dateStr, 'Location sèche'))}<br />
-              Avec prestation : {formatMoney(getPriceForDate(dateStr, 'Location avec prestation'))}<br />
-              Remise prestation : {formatMoney(getRemise(dateStr))}
+              Location sèche : {formatMoney(auto)}<br />
+              Avec prestation : {formatMoney(getFormuleTarif(dateStr, prestation || 'Location avec prestation'))}<br />
+              Remise prestation : {formatMoney(getRemise(dateStr, formules))}
             </div>
           </div>
         </div>
@@ -145,6 +138,8 @@ function PriceOverrideModal({ dateStr, currentOverride, onSave, onClose }) {
             value={customPrice}
             onChange={(e) => setCustomPrice(e.target.value)}
           />
+          <p style={{ fontSize: '12px', color: '#888' }}>Ce tarif journalier ne modifie pas les forfaits ni leurs devis enregistrés.</p>
+          {error && <p role="alert" style={{ color: '#c0392b' }}>{error}</p>}
         </div>
 
         <div className="form-group" style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
@@ -182,16 +177,20 @@ function PriceOverrideModal({ dateStr, currentOverride, onSave, onClose }) {
 
 // ── Event detail panel ────────────────────────────────────────────────────────
 
-function EventDetail({ client, staffList, assignedStaffIds, calOverride, onClose, onDelete, onReschedule, onStaffChange, onPriceOverride }) {
+function EventDetail({ client, formules, staffList, assignedStaffIds, calOverride, onClose, onDelete, onReschedule, onStaffChange, onPriceOverride }) {
   const nbGuests = (parseInt(client.nbAdultes) || client.nbPersonnes || 0) + (parseInt(client.nbEnfants) || 0)
   const bread = calcBread(nbGuests)
   const beverages = calcBeverages(client.menus, nbGuests)
 
   const dateStr = (client.dateEvenement || '').slice(0, 10)
-  const isSeche = client.formule?.nomFormule?.toLowerCase().includes('sèche')
-  const autoPrice = getPriceForDate(dateStr, client.formule?.nomFormule)
-  const effectivePrice = calOverride?.customPrice != null ? calOverride.customPrice : autoPrice
-  const remise = isSeche ? 0 : getRemise(dateStr)
+  const formule = formules.find((f) => f.id === client.formule?.id) || client.formule
+  const isForfait = client.formule?.forfait === true || formule?.forfait === true
+  const isSeche = !isForfait && isDryRental(formule)
+  const autoPrice = getFormuleTarif(dateStr, formule)
+  const effectivePrice = isForfait
+    ? client.prixSalle
+    : isSeche && calOverride?.customPrice != null ? calOverride.customPrice : autoPrice
+  const remise = isSeche || isForfait ? 0 : getRemise(dateStr, formules)
 
   const payroll = staffList
     .filter((s) => assignedStaffIds.includes(s.id))
@@ -253,7 +252,11 @@ function EventDetail({ client, staffList, assignedStaffIds, calOverride, onClose
       <div style={{ marginBottom: '12px', background: '#fdf3d9', borderRadius: '8px', padding: '10px' }}>
         <div style={{ fontWeight: '700', marginBottom: '6px', color: '#1a1a2e' }}>💰 Tarification</div>
         <div style={{ fontSize: '13px', lineHeight: '1.8' }}>
-          {calOverride?.customPrice != null ? (
+          {isForfait ? (
+            <div>💲 Forfait TTC global enregistré au devis : <strong>{effectivePrice == null ? 'Non renseigné' : formatMoney(effectivePrice)}</strong>
+              <div style={{ fontSize: '11px', color: '#888' }}>Montant conservé lors des modifications de grille, des promos et des reports de date.</div>
+            </div>
+          ) : isSeche && calOverride?.customPrice != null ? (
             <div>💲 Prix personnalisé : <strong>{formatMoney(effectivePrice)}</strong>
               {calOverride.note && <span style={{ color: '#888', fontSize: '11px' }}> ({calOverride.note})</span>}
             </div>
@@ -263,11 +266,11 @@ function EventDetail({ client, staffList, assignedStaffIds, calOverride, onClose
           {!isSeche && remise > 0 && (
             <div style={{ color: '#27ae60' }}>🏷️ Remise prestation incluse : <strong>-{formatMoney(remise)}</strong>
               <div style={{ fontSize: '11px', color: '#888' }}>
-                (Tarif sèche {formatMoney(getPriceForDate(dateStr, 'Location sèche'))} – {formatMoney(effectivePrice)} = {formatMoney(remise)})
+                (Tarif sèche {formatMoney(getFormuleTarif(dateStr, formules.find(isDryRental) || 'Location sèche'))} – {formatMoney(effectivePrice)} = {formatMoney(remise)})
               </div>
             </div>
           )}
-          {calOverride?.isPromo && (
+          {!isForfait && calOverride?.isPromo && (
             <div style={{ color: '#e74c3c', fontWeight: '700' }}>🏷️ PROMO EN COURS affiché sur calendrier client</div>
           )}
         </div>
@@ -360,20 +363,71 @@ function EventDetail({ client, staffList, assignedStaffIds, calOverride, onClose
 
 // ── Price Grid ────────────────────────────────────────────────────────────────
 
-function PriceGrid() {
+const PRICE_SEASONS = [
+  { key: 'basse', label: '🌧️ Basse saison (déc–mars)', dates: ['2026-01-04', '2026-01-02', '2026-01-03'] },
+  { key: 'haute', label: '☀️ Haute saison (avr–nov)', dates: ['2026-07-05', '2026-07-03', '2026-07-04'] },
+]
+const PRICE_DAYS = [
+  { key: 'semaine', label: 'Dimanche–jeudi' },
+  { key: 'vendredi', label: 'Vendredi' },
+  { key: 'samedi', label: 'Samedi' },
+]
+
+function PriceGrid({ formules, onChange }) {
   const [open, setOpen] = useState(false)
-  const rows = [
-    {
-      label: '🌧️ Basse saison (déc–mars)',
-      prestaLunJeu: 1000, prestaVen: 1500, prestaSam: 2500,
-      secheLunJeu: 2000, secheVen: 2500, secheSam: 3500,
-    },
-    {
-      label: '☀️ Haute saison (avr–nov)',
-      prestaLunJeu: 1500, prestaVen: 2500, prestaSam: 3000,
-      secheLunJeu: 2500, secheVen: 3500, secheSam: 4500,
-    },
-  ]
+  const [editingId, setEditingId] = useState(null)
+  const [draft, setDraft] = useState(null)
+  const [error, setError] = useState('')
+  const [hiddenId, setHiddenId] = useState('')
+  const visible = formules.filter((f) => f.afficherGrilleTarifaire !== false)
+  const hidden = formules.filter((f) => f.afficherGrilleTarifaire === false)
+
+  function startEditing(formule) {
+    setEditingId(formule.id)
+    setError('')
+    setDraft(Object.fromEntries(PRICE_SEASONS.map((season) => [
+      season.key,
+      Object.fromEntries(PRICE_DAYS.map((day, i) => [
+        day.key, String(getFormuleTarif(season.dates[i], formule) ?? ''),
+      ])),
+    ])))
+  }
+
+  function savePrices() {
+    const tarifs = {}
+    for (const season of PRICE_SEASONS) {
+      tarifs[season.key] = {}
+      for (const day of PRICE_DAYS) {
+        const value = draft[season.key][day.key]
+        const price = Number(value)
+        if (!value.trim() || !Number.isFinite(price) || price < 0) {
+          setError(`${season.label} — ${day.label} : prix obligatoire, fini et supérieur ou égal à zéro (TTC global).`)
+          return
+        }
+        tarifs[season.key][day.key] = price
+      }
+    }
+    // Relire le catalogue pour ne pas écraser une modification dans un autre onglet.
+    const updated = getFormules().map((f) => f.id === editingId ? { ...f, tarifs } : f)
+    saveFormules(updated)
+    onChange(updated)
+    setEditingId(null)
+    setDraft(null)
+    setError('')
+  }
+
+  function setVisibility(id, afficherGrilleTarifaire) {
+    const updated = getFormules().map((f) => f.id === id ? { ...f, afficherGrilleTarifaire } : f)
+    saveFormules(updated)
+    onChange(updated)
+    if (editingId === id) {
+      setEditingId(null)
+      setDraft(null)
+      setError('')
+    }
+    setHiddenId('')
+  }
+
   return (
     <div style={{ marginTop: '20px', borderRadius: '12px', border: '1.5px solid #e0e0e0', overflow: 'hidden' }}>
       <button
@@ -384,46 +438,65 @@ function PriceGrid() {
         <span>{open ? '▲' : '▼'}</span>
       </button>
       {open && (
-        <div style={{ overflowX: 'auto', padding: '0' }}>
+        <div style={{ padding: '12px' }}>
+          <p style={{ fontSize: '13px', color: '#555' }}>Prix TTC global de la formule, jamais par personne. Les devis déjà enregistrés ne sont pas recalculés.</p>
+          {hidden.length > 0 && (
+            <div className="form-group" style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+              <select className="form-control" aria-label="Formule à réafficher dans la grille" value={hiddenId} onChange={(e) => setHiddenId(e.target.value)} style={{ maxWidth: '320px' }}>
+                <option value="">Choisir une formule masquée</option>
+                {hidden.map((f) => <option key={f.id} value={String(f.id)}>{f.nomFormule}</option>)}
+              </select>
+              <button className="btn btn-outline btn-sm" disabled={!hiddenId} onClick={() => {
+                const formule = hidden.find((f) => String(f.id) === hiddenId)
+                if (formule) setVisibility(formule.id, true)
+              }}>Réafficher dans la grille</button>
+            </div>
+          )}
+          {visible.length === 0 && <p>Aucune formule affichée. Les formules masquées restent disponibles pour les devis.</p>}
+          {error && <p role="alert" style={{ color: '#c0392b' }}>{error}</p>}
+          <div style={{ overflowX: 'auto' }}>
           <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
             <thead>
               <tr style={{ background: '#f8f5f0' }}>
+                <th style={{ padding: '8px 12px', textAlign: 'left', borderBottom: '1px solid #e0e0e0' }}>Formule</th>
                 <th style={{ padding: '8px 12px', textAlign: 'left', borderBottom: '1px solid #e0e0e0' }}>Saison</th>
-                <th style={{ padding: '8px 12px', textAlign: 'center', borderBottom: '1px solid #e0e0e0' }}>Lun–Jeu</th>
-                <th style={{ padding: '8px 12px', textAlign: 'center', borderBottom: '1px solid #e0e0e0' }}>Vendredi</th>
-                <th style={{ padding: '8px 12px', textAlign: 'center', borderBottom: '1px solid #e0e0e0' }}>Samedi</th>
+                {PRICE_DAYS.map((day) => <th key={day.key} style={{ padding: '8px 12px', textAlign: 'center', borderBottom: '1px solid #e0e0e0' }}>{day.label}</th>)}
+                <th style={{ padding: '8px 12px' }}>Actions</th>
               </tr>
             </thead>
             <tbody>
-              {rows.map((r) => (
-                <>
-                  <tr key={`${r.label}-presta`}>
-                    <td style={{ padding: '6px 12px', borderBottom: '1px solid #f0f0f0', fontWeight: '600', color: '#1a1a2e' }} rowSpan={2}>{r.label}</td>
-                    <td style={{ padding: '6px 12px', textAlign: 'center', borderBottom: '1px solid #f0f0f0', color: '#555' }}>
-                      <span style={{ fontSize: '11px', color: '#888' }}>Prestation</span><br /><strong>{r.prestaLunJeu.toLocaleString('fr-FR')} €</strong>
+              {visible.flatMap((formule) => PRICE_SEASONS.map((season, index) => (
+                <tr key={`${formule.id}-${season.key}`} style={{ background: index ? '#fdf8ee' : 'white' }}>
+                  {index === 0 && <td rowSpan={2} style={{ padding: '8px 12px', fontWeight: '600' }}>{formule.nomFormule}{formule.forfait === true && <div style={{ fontSize: '11px', color: '#888' }}>Forfait TTC global</div>}</td>}
+                  <td style={{ padding: '8px 12px' }}>{season.label}</td>
+                  {PRICE_DAYS.map((day, i) => {
+                    const price = getFormuleTarif(season.dates[i], formule)
+                    return <td key={day.key} style={{ padding: '8px 12px', textAlign: 'center' }}>
+                      {editingId === formule.id ? (
+                        <input type="number" min="0" step="0.01" className="form-control" style={{ minWidth: '100px' }}
+                          aria-label={`${formule.nomFormule} — ${season.label} — ${day.label} (TTC global)`}
+                          value={draft[season.key][day.key]}
+                          onChange={(e) => setDraft((previous) => ({ ...previous, [season.key]: { ...previous[season.key], [day.key]: e.target.value } }))}
+                        />
+                      ) : <strong>{price == null ? 'À configurer' : formatMoney(price)}</strong>}
                     </td>
-                    <td style={{ padding: '6px 12px', textAlign: 'center', borderBottom: '1px solid #f0f0f0', color: '#555' }}>
-                      <span style={{ fontSize: '11px', color: '#888' }}>Prestation</span><br /><strong>{r.prestaVen.toLocaleString('fr-FR')} €</strong>
-                    </td>
-                    <td style={{ padding: '6px 12px', textAlign: 'center', borderBottom: '1px solid #f0f0f0', color: '#555' }}>
-                      <span style={{ fontSize: '11px', color: '#888' }}>Prestation</span><br /><strong>{r.prestaSam.toLocaleString('fr-FR')} €</strong>
-                    </td>
-                  </tr>
-                  <tr key={`${r.label}-seche`} style={{ background: '#fdf8ee' }}>
-                    <td style={{ padding: '6px 12px', textAlign: 'center', borderBottom: '2px solid #e0e0e0', color: '#c9a84c' }}>
-                      <span style={{ fontSize: '11px', color: '#888' }}>Sèche</span><br /><strong>{r.secheLunJeu.toLocaleString('fr-FR')} €</strong>
-                    </td>
-                    <td style={{ padding: '6px 12px', textAlign: 'center', borderBottom: '2px solid #e0e0e0', color: '#c9a84c' }}>
-                      <span style={{ fontSize: '11px', color: '#888' }}>Sèche</span><br /><strong>{r.secheVen.toLocaleString('fr-FR')} €</strong>
-                    </td>
-                    <td style={{ padding: '6px 12px', textAlign: 'center', borderBottom: '2px solid #e0e0e0', color: '#c9a84c' }}>
-                      <span style={{ fontSize: '11px', color: '#888' }}>Sèche</span><br /><strong>{r.secheSam.toLocaleString('fr-FR')} €</strong>
-                    </td>
-                  </tr>
-                </>
-              ))}
+                  })}
+                  {index === 0 && <td rowSpan={2} style={{ padding: '8px 12px' }}>
+                    <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+                      {editingId === formule.id ? (
+                        <>
+                          <button className="btn btn-primary btn-sm" onClick={savePrices}>Enregistrer les tarifs</button>
+                          <button className="btn btn-outline btn-sm" onClick={() => { setEditingId(null); setDraft(null); setError('') }}>Annuler</button>
+                        </>
+                      ) : <button className="btn btn-outline btn-sm" onClick={() => startEditing(formule)} disabled={editingId !== null}>Modifier les tarifs</button>}
+                      <button className="btn btn-outline btn-sm" onClick={() => setVisibility(formule.id, false)}>Masquer de la grille</button>
+                    </div>
+                  </td>}
+                </tr>
+              )))}
             </tbody>
           </table>
+          </div>
         </div>
       )}
     </div>
@@ -533,6 +606,7 @@ export default function CalendarTab() {
   const [calOverrides, setCalOverrides] = useState(getCalOverrides())
   const [calStaff, setCalStaff] = useState(getCalStaff())
   const [calManualEvents, setCalManualEvents] = useState(getCalManualEvents())
+  const [formules, setFormules] = useState(getFormules())
   const staffList = getStaff()
 
   const [selectedClientId, setSelectedClientId] = useState(null)
@@ -593,10 +667,14 @@ export default function CalendarTab() {
     }
     const updated = clients.map((c) => {
       if (c.id !== id) return c
+      const formule = formules.find((f) => f.id === c.formule?.id) || c.formule
+      if (c.formule?.forfait === true || formule?.forfait === true) {
+        return { ...c, calendarExcluded: false, dateEvenement: newDateStr }
+      }
       const override = calOverrides[newDateStr]
-      const newPrice = override?.customPrice != null
+      const newPrice = isDryRental(formule) && override?.customPrice != null
         ? override.customPrice
-        : getPriceForDate(newDateStr, c.formule?.nomFormule)
+        : getFormuleTarif(newDateStr, formule)
       return { ...c, calendarExcluded: false, dateEvenement: newDateStr, prixSalle: newPrice }
     })
     saveClients(updated)
@@ -654,10 +732,11 @@ export default function CalendarTab() {
     saveCalOverrides(newOverrides)
     setCalOverrides(newOverrides)
 
-    if (selectedClient && selectedClient.dateEvenement?.slice(0, 10) === key) {
+    const formule = formules.find((f) => f.id === selectedClient?.formule?.id) || selectedClient?.formule
+    if (selectedClient && selectedClient.formule?.forfait !== true && isDryRental(formule) && selectedClient.dateEvenement?.slice(0, 10) === key) {
       const newPrice = overrideData?.customPrice != null
         ? overrideData.customPrice
-        : getPriceForDate(key, selectedClient.formule?.nomFormule)
+        : getFormuleTarif(key, formule)
       const updated = clients.map((c) =>
         c.id === selectedClient.id ? { ...c, prixSalle: newPrice } : c
       )
@@ -706,12 +785,13 @@ export default function CalendarTab() {
             onEventDrop={handleEventDrop}
             onDateClick={handleDateClick}
           />
-          <PriceGrid />
+          <PriceGrid formules={formules} onChange={setFormules} />
         </div>
 
         {selectedClient && (
           <EventDetail
             client={selectedClient}
+            formules={formules}
             staffList={staffList}
             assignedStaffIds={assignedStaffIds}
             calOverride={calOverrides[selectedClient.dateEvenement?.slice(0, 10)]}
@@ -738,6 +818,7 @@ export default function CalendarTab() {
         <PriceOverrideModal
           dateStr={priceOverrideDate}
           currentOverride={calOverrides[priceOverrideDate] || null}
+          formules={formules}
           onSave={handleSavePriceOverride}
           onClose={() => setPriceOverrideDate(null)}
         />

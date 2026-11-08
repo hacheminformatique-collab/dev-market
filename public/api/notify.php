@@ -144,6 +144,7 @@ if (json_last_error() !== JSON_ERROR_NONE) {
 }
 
 $notificationType = isset($data['notificationType']) ? (string) $data['notificationType'] : 'devis_signe';
+if (in_array($notificationType, ['quote_followup', 'devis_brouillon', 'devis_envoye'], true)) quoteMaintenanceGuard();
 
 // ── Log to file ───────────────────────────────────────────────────────────────
 $logDir  = realpath(__DIR__ . '/..') . '/storage-data';
@@ -265,7 +266,10 @@ if ($notificationType === 'quote_followup') {
     }
 
     try {
-        quote_followup_save_progress($followupDir, $followup);
+        if (quote_followup_save_progress($followupDir, $followup) === false) {
+            echo json_encode(['ok' => true, 'duplicate' => true]);
+            exit;
+        }
     } catch (RuntimeException $error) {
         error_log('[quote-followup] ' . $error->getMessage());
         http_response_code(503);

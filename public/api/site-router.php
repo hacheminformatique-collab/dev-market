@@ -7,6 +7,13 @@ $path = '/' . $route;
 [$login, $dashboard] = siteAdminPaths($controls);
 $isAdmin = $path === $login || $path === $dashboard;
 header('Cache-Control: no-store');
+if ($controls['quoteMaintenance'] && rtrim($path, '/') === '/devis') {
+    http_response_code(503);
+    header('Retry-After: 3600');
+    header('Content-Type: text/html; charset=utf-8');
+    echo '<!doctype html><html lang="fr"><meta charset="utf-8"><meta name="robots" content="noindex"><title>Maintenance devis</title><h1>Maintenance devis</h1><p>Les nouvelles demandes sont temporairement suspendues. Vos devis existants et leur signature restent accessibles.</p><a href="/">Accueil</a> <a href="/espace-client">Espace client</a></html>';
+    exit;
+}
 if (($controls['maintenance'] || is_file(dirname(__DIR__) . '/site-maintenance.flag'))
     && $path !== '/' && !$isAdmin) {
     http_response_code(503);

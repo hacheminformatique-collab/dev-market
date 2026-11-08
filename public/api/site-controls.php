@@ -10,12 +10,26 @@ function siteControlFail(int $status, string $message): void {
 
 function siteControls(): array {
     $path = dirname(__DIR__) . '/storage-data/site-controls.json';
-    if (!is_file($path)) return ['maintenance' => false, 'adminSlug' => ''];
+    if (!is_file($path)) return ['maintenance' => false, 'quoteMaintenance' => false, 'adminSlug' => ''];
     $data = json_decode(file_get_contents($path), true);
     if (!is_array($data) || !is_bool($data['maintenance'] ?? null) || !is_string($data['adminSlug'] ?? null)) {
         siteControlFail(503, 'Configuration du site illisible. Vérifiez le stockage serveur.');
     }
-    return $data;
+    if (array_key_exists('quoteMaintenance', $data) && !is_bool($data['quoteMaintenance'])) {
+        siteControlFail(503, 'Configuration de maintenance des devis illisible.');
+    }
+    return $data + ['quoteMaintenance' => false];
+}
+
+function siteAdminCsrf(): string {
+    if (empty($_SESSION['siteAdminCsrf'])) $_SESSION['siteAdminCsrf'] = bin2hex(random_bytes(32));
+    return $_SESSION['siteAdminCsrf'];
+}
+
+function siteRequireAdminCsrf(): void {
+    if (!hash_equals(siteAdminCsrf(), $_SERVER['HTTP_X_ADMIN_CSRF'] ?? '')) {
+        siteControlFail(403, 'Jeton de sécurité invalide. Rechargez la page.');
+    }
 }
 
 function siteAdminPaths(array $controls): array {

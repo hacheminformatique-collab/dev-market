@@ -7,10 +7,11 @@ export function adminPaths() {
 }
 
 export async function siteAdminRequest(data) {
+  const csrf = data && data.action !== 'login' ? (await siteAdminRequest()).csrf : ''
   const response = await siteFetch('/api/site-admin.php', {
     ...(data ? { method: 'POST', body: JSON.stringify(data) } : {}),
     cache: 'no-store',
-    headers: { 'Content-Type': 'application/json', 'X-Admin-Pin': getSettings().pin },
+    headers: { 'Content-Type': 'application/json', 'X-Admin-Pin': getSettings().pin, ...(csrf ? { 'X-Admin-CSRF': csrf } : {}) },
   })
   const result = await response.json()
   if (!response.ok || !result.ok) throw new Error(result.error || `Service administratif indisponible (HTTP ${response.status}).`)

@@ -1,6 +1,7 @@
-import jsPDF from 'jspdf'
+import { jsPDF } from 'jspdf'
 import autoTable from 'jspdf-autotable'
 import { getSettings } from '../../utils/storage'
+import { calculateQuote, calcMenuItemTotal, vatBreakdown } from '../../utils/formulePricing'
 
 function buildCGV(settings) {
   const l = settings.legalInfo || {}
@@ -82,20 +83,6 @@ function formatPdfMoney(n) {
 
 function formatMoney(n) {
   return Number(n || 0).toLocaleString('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' €'
-}
-
-function vatBreakdown(ttc, rate) {
-  const ht = ttc / (1 + rate)
-  const tva = ttc - ht
-  return { ht, tva, ttc }
-}
-
-function calcMenuItemTotal(item, nbAdultes, nbEnfants) {
-  if (!item.tarif) return 0
-  if (item.section === 'Cocktail de bienvenu') return item.tarif * (nbAdultes + nbEnfants)
-  if (item.section === 'Menu enfants') return item.tarif * nbEnfants
-  if (item.section === 'Boissons') return 0
-  return item.tarif * nbAdultes
 }
 
 export function generatePDF(devis, options = {}) {
@@ -203,13 +190,10 @@ export function generatePDF(devis, options = {}) {
   y += 10
 
   // ---- Pricing table ----
-  const prixSalle = devis.prixSalle || 0
-  const menuTotal = (devis.menus || []).reduce((s, m) => s + calcMenuItemTotal(m, nbAdultes, nbEnfants), 0)
-  const gateauTotal = (devis.gateau?.tarif || 0) * nbPersonnes
-  const traiteurTotal = menuTotal + gateauTotal
-  const prestationsTotal = (devis.prestations || []).reduce((s, p) => s + (p.tarif || 0), 0)
+  const { prixSalle, menuTotal, gateauTotal, salle, totalHT, totalTVA, totalTTC } = calculateQuote(devis)
+  const forfait = devis.formule?.forfait === true
 
-  const isAvecPrestation = devis.formule?.nomFormule && !devis.formule.nomFormule.toLowerCase().includes('sèche')
+  const isAvecPrestation = !forfait && devis.formule?.nomFormule && !devis.formule.nomFormule.toLowerCase().includes('sèche')
   let remiseMontant = 0
   if (isAvecPrestation && devis.dateEvenement) {
     const month = new Date(devis.dateEvenement).getMonth() + 1
@@ -229,20 +213,15 @@ export function generatePDF(devis, options = {}) {
     if (remiseMontant < 0) remiseMontant = 0
   }
 
-  const salle = vatBreakdown(prixSalle, 0.20)
-  const traiteur = vatBreakdown(traiteurTotal, 0.10)
-  const optionsVat = vatBreakdown(prestationsTotal, 0.20)
-  const totalHT = salle.ht + traiteur.ht + optionsVat.ht
-  const totalTVA = salle.tva + traiteur.tva + optionsVat.tva
-  const totalTTC = prixSalle + traiteurTotal + prestationsTotal
-
   const rows = []
-  if (prixSalle > 0) {
+  if (prixSalle > 0 || forfait) {
     rows.push([
-      `Location salle\n${devis.formule?.nomFormule || ''}`,
-      '20%',
-      formatPdfMoney(salle.ht),
-      formatPdfMoney(salle.tva),
+      forfait
+        ? `Forfait tout compris\n${devis.formule.nomFormule}\nPart restauration a TVA 10% : ${devis.formule.partTraiteurPourcent || 0}% du prix, reste a TVA 20%`
+        : `Location salle\n${devis.formule?.nomFormule || ''}`,
+      forfait && devis.formule.partTraiteurPourcent > 0 ? '10/20%' : '20%',
+      formatPdfMoney(forfait ? totalHT : salle.ht),
+      formatPdfMoney(forfait ? totalTVA : salle.tva),
       formatPdfMoney(prixSalle),
     ])
   }
@@ -257,7 +236,19 @@ export function generatePDF(devis, options = {}) {
     ])
   }
 
-  if ((devis.menus || []).length > 0) {
+  if (forfait) {
+    for (const menu of devis.menus || []) rows.push([`${menu.section} - ${menu.nomMenu}`, '', '', '', 'Inclus'])
+    if (devis.gateau) {
+      const perso = devis.gateauPersonnalisation
+      rows.push([
+        `Gateau - ${devis.gateau.nomGateau}${perso ? `\nNiveaux : ${perso.niv2}, ${perso.niv3}, ${perso.niv4}${perso.initiales ? `\nInitiales : ${perso.initiales}` : ''}` : ''}`,
+        '', '', '', 'Inclus',
+      ])
+    }
+    for (const prestation of devis.prestations || []) rows.push([`${prestation.nomPresta}\n${prestation.description || ''}`, '', '', '', 'Inclus'])
+  }
+
+  if (!forfait && (devis.menus || []).length > 0) {
     const menuLines = (devis.menus || []).filter((m) => m.tarif > 0).map((m) => {
       const total = calcMenuItemTotal(m, nbAdultes, nbEnfants)
       return `${m.nomMenu} (${m.tarif} EUR/pers.) = ${formatPdfMoney(total)}`
@@ -285,7 +276,7 @@ export function generatePDF(devis, options = {}) {
     ])
   }
 
-  for (const p of (devis.prestations || [])) {
+  for (const p of (forfait ? [] : devis.prestations || [])) {
     const pHT = vatBreakdown(p.tarif, 0.20)
     rows.push([
       `${p.nomPresta}\n${p.description || ''}`,

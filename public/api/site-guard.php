@@ -1,5 +1,11 @@
 <?php
 require_once __DIR__ . '/site-controls.php';
+function quoteMaintenanceGuard(): void {
+    if (siteControls()['quoteMaintenance']) {
+        header('Retry-After: 3600');
+        siteControlFail(503, 'Maintenance devis : les nouvelles demandes sont temporairement suspendues. Vos devis existants et leur signature restent accessibles.');
+    }
+}
 function siteMaintenanceGuard(string $endpoint): void {
     $controls = siteControls();
     $homeSettings = $endpoint === 'storage' && $_SERVER['REQUEST_METHOD'] === 'GET'

@@ -1,5 +1,6 @@
 import { useEffect } from 'react'
 import { getMenus } from '../../../utils/storage'
+import { getFormulaItems, isCategoryIncluded } from '../../../utils/formulePricing'
 
 const SECTION_ORDER = ['Cocktail de bienvenu', 'Entrée', 'Plats', 'Desserts', 'Menu enfants', 'Boissons']
 
@@ -12,7 +13,8 @@ function calcMenuItemTotal(item, nbAdultes, nbEnfants) {
 }
 
 export default function Step4Menu({ data, onChange, onNext, onBack }) {
-  const allMenus = getMenus()
+  const allMenus = getFormulaItems(data.formule, 'menus', getMenus())
+  const included = isCategoryIncluded(data.formule, 'menus')
   const selected = data.menus || []
   const nbAdultes = parseInt(data.nbAdultes) || data.nbPersonnes || 0
   const nbEnfants = parseInt(data.nbEnfants) || 0
@@ -66,11 +68,12 @@ export default function Step4Menu({ data, onChange, onNext, onBack }) {
   }
 
   function canValidate() {
-    const requiredSections = ['Entrée', 'Plats', 'Desserts']
+    const requiredSections = included ? sections.filter((section) => section !== 'Boissons' && (section !== 'Menu enfants' || nbEnfants > 0)) : ['Entrée', 'Plats', 'Desserts']
+    if (included && (!allMenus.length || !selected.length)) return false
     return requiredSections.every((s) => selected.some((m) => m.section === s))
   }
 
-  const menuTotal = selected.reduce((sum, m) => sum + calcMenuItemTotal(m, nbAdultes, nbEnfants), 0)
+  const menuTotal = included ? 0 : selected.reduce((sum, m) => sum + calcMenuItemTotal(m, nbAdultes, nbEnfants), 0)
 
   return (
     <div>
@@ -78,11 +81,13 @@ export default function Step4Menu({ data, onChange, onNext, onBack }) {
       <p className="text-muted mb-3">
         {nbAdultes} adulte{nbAdultes > 1 ? 's' : ''}{nbEnfants > 0 ? ` + ${nbEnfants} enfant${nbEnfants > 1 ? 's' : ''}` : ''}
       </p>
+      {included && <p>Inclus dans votre forfait — aucun supplément.</p>}
+      {!allMenus.length && <p role="alert">Aucun menu disponible pour cette formule. Veuillez revenir au choix de la formule ou nous contacter.</p>}
 
       {sections.map((section) => {
         const items = allMenus.filter((m) => m.section === section)
         const isMultiple = section === 'Boissons'
-        const isRequired = ['Entrée', 'Plats', 'Desserts'].includes(section)
+        const isRequired = included ? section !== 'Boissons' && (section !== 'Menu enfants' || nbEnfants > 0) : ['Entrée', 'Plats', 'Desserts'].includes(section)
         const currentBoissons = selected.filter((m) => m.section === 'Boissons').length
         return (
           <div key={section} style={{ marginBottom: '24px' }}>
@@ -114,9 +119,9 @@ export default function Step4Menu({ data, onChange, onNext, onBack }) {
                     <div style={{ fontWeight: '600', fontSize: '14px', marginBottom: '4px' }}>{item.nomMenu}</div>
                     {item.description && <div style={{ fontSize: '12px', color: '#888', marginBottom: '8px' }}>{item.description}</div>}
                     <div style={{ fontWeight: '700', color: item.tarif > 0 ? '#c9a84c' : '#27ae60' }}>
-                      {item.tarif > 0 ? `${item.tarif} €/pers.` : 'Inclus'}
+                      {included ? 'Inclus dans votre forfait' : item.tarif > 0 ? `${item.tarif} €/pers.` : 'Inclus'}
                     </div>
-                    {item.tarif > 0 && itemTotal > 0 && (
+                    {!included && item.tarif > 0 && itemTotal > 0 && (
                       <div style={{ fontSize: '12px', color: '#888', marginTop: '2px' }}>= {itemTotal.toLocaleString('fr-FR')} €</div>
                     )}
                     {sel && <div style={{ color: '#b8860b', fontSize: '12px', marginTop: '6px' }}>✅</div>}
@@ -139,7 +144,7 @@ export default function Step4Menu({ data, onChange, onNext, onBack }) {
 
       {!canValidate() && (
         <div style={{ background: '#fff3cd', border: '1px solid #ffc107', borderRadius: '8px', padding: '10px 14px', color: '#856404', fontSize: '13px', marginBottom: '12px' }}>
-          ⚠️ Veuillez sélectionner au minimum : une Entrée, un Plat et un Dessert.
+          {included ? 'Veuillez sélectionner un choix dans chaque section obligatoire du forfait.' : '⚠️ Veuillez sélectionner au minimum : une Entrée, un Plat et un Dessert.'}
         </div>
       )}
 

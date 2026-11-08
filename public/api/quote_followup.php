@@ -12,7 +12,9 @@ function quote_followup_save_progress($directory, $followup)
             $previous = $raw === false ? null : json_decode($raw, true);
             if (!is_array($previous)) throw new RuntimeException('Suivi existant illisible. Aucun remplacement effectué.');
         }
-        if ($previous && $previous['stage'] > $followup['stage']) return;
+        // A deleted administrative follow-up must not be recreated by a resumed wizard.
+        if (!empty($previous['deletedAt'])) return false;
+        if ($previous && $previous['stage'] > $followup['stage']) return true;
         $record = [
             'flowId' => $followup['flowId'],
             'stage' => $followup['stage'],
@@ -20,6 +22,7 @@ function quote_followup_save_progress($directory, $followup)
             'acceptedConditions' => true,
             'createdAt' => $previous['createdAt'] ?? gmdate('c'),
             'updatedAt' => gmdate('c'),
+            'internalNotes' => $previous['internalNotes'] ?? '',
         ];
         $json = json_encode($record, JSON_UNESCAPED_UNICODE);
         $tmp = tempnam($directory, '.progress-');
@@ -28,6 +31,7 @@ function quote_followup_save_progress($directory, $followup)
             unlink($tmp);
             throw new RuntimeException('Enregistrement du suivi impossible.');
         }
+        return true;
     } finally {
         flock($lock, LOCK_UN);
         fclose($lock);
@@ -94,9 +98,22 @@ function quote_followup_validate($payload)
         if ($summary['formule'] === '') return false;
     }
     $dryFormula = isset($summary['formule']) && stripos($summary['formule'], 'sèche') !== false;
-    if ($stage >= 4 && !$dryFormula) {
+    $forfait = ($input['forfait'] ?? false) === true;
+    if (isset($input['forfait']) && !is_bool($input['forfait'])) return false;
+    if ($forfait) {
+        $categories = $input['categoriesIncluses'] ?? null;
+        if (!is_array($categories) || count($categories) > 3) return false;
+        foreach ($categories as $category) {
+            if (!is_string($category) || !in_array($category, ['menus', 'gateaux', 'prestations'], true)) return false;
+        }
+        $summary['forfait'] = true;
+        $summary['categoriesIncluses'] = array_values(array_unique($categories));
+    }
+    $needsMenus = $forfait ? in_array('menus', $summary['categoriesIncluses'], true) : !$dryFormula;
+    $needsCake = $forfait ? in_array('gateaux', $summary['categoriesIncluses'], true) : !$dryFormula;
+    if ($stage >= 4 && $needsMenus) {
         $menus = $input['menus'] ?? null;
-        if (!is_array($menus) || count($menus) > 20) return false;
+        if (!is_array($menus) || count($menus) > 20 || ($forfait && count($menus) === 0)) return false;
         $summary['menus'] = [];
         $sections = [];
         foreach ($menus as $menu) {
@@ -107,11 +124,11 @@ function quote_followup_validate($payload)
             $summary['menus'][] = ['section' => $section, 'name' => $name];
             $sections[$section] = true;
         }
-        foreach (['Entrée', 'Plats', 'Desserts'] as $requiredSection) {
+        foreach ($forfait ? [] : ['Entrée', 'Plats', 'Desserts'] as $requiredSection) {
             if (!isset($sections[$requiredSection])) return false;
         }
     }
-    if ($stage >= 5 && !$dryFormula) {
+    if ($stage >= 5 && $needsCake) {
         $summary['gateau'] = quote_followup_text($input['gateau'] ?? '', 100);
         if ($summary['gateau'] === '') return false;
         $details = $input['gateauDetails'] ?? null;

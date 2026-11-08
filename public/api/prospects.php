@@ -12,22 +12,52 @@ function failProspects(int $status, string $message): void {
     exit;
 }
 
-if ($_SERVER['REQUEST_METHOD'] !== 'GET') failProspects(405, 'Méthode non autorisée.');
+if (!in_array($_SERVER['REQUEST_METHOD'], ['GET', 'POST'], true)) failProspects(405, 'Méthode non autorisée.');
 $root = dirname(__DIR__);
-$settings = json_decode(@file_get_contents($root . '/storage-data/paradise_settings.json'), true);
-$pin = $_SERVER['HTTP_X_ADMIN_PIN'] ?? '';
-if (!is_string($pin) || $pin === '' || !is_array($settings) || empty($settings['pin'])
-    || !hash_equals((string)$settings['pin'], $pin)) failProspects(403, 'Accès aux prospects refusé.');
+if (!siteAdminAuthenticated(false)) failProspects(403, 'Accès aux prospects refusé. Reconnectez-vous.');
+$csrf = siteAdminCsrf();
+if ($_SERVER['REQUEST_METHOD'] === 'POST') siteRequireAdminCsrf();
+session_write_close();
+$directory = $root . '/storage-data/quote-followups';
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    $body = file_get_contents('php://input');
+    if (strlen($body) > 40000) failProspects(413, 'Notes trop volumineuses.');
+    $data = json_decode($body, true);
+    if (!is_array($data) || !is_string($data['flowId'] ?? null)
+        || !preg_match('/^[a-f0-9]{32}$/D', $data['flowId'])
+        || !in_array($data['action'] ?? '', ['notes', 'delete'], true)) failProspects(400, 'Action prospect invalide.');
+    if ($data['action'] === 'notes' && (!is_string($data['internalNotes'] ?? null)
+        || strlen($data['internalNotes']) > 10000)) failProspects(400, 'Notes invalides (10 000 octets maximum).');
+    $path = $directory . '/flow-' . $data['flowId'] . '.json';
+    if (!is_file($path) || is_link($path)) failProspects(404, 'Prospect introuvable.');
+    $lock = fopen($path . '.lock', 'c+');
+    if (!$lock || !flock($lock, LOCK_EX)) failProspects(503, 'Verrou du prospect indisponible.');
+    $record = json_decode(file_get_contents($path), true);
+    if (!is_array($record) || ($record['flowId'] ?? '') !== $data['flowId']) failProspects(500, 'Dossier prospect illisible.');
+    if (!empty($record['deletedAt'])) failProspects(404, 'Prospect supprimé.');
+    if ($data['action'] === 'delete') {
+        // Keep only a tombstone: the client may finish its quote without regenerating this prospect.
+        $record = ['flowId' => $data['flowId'], 'deletedAt' => gmdate('c')];
+    } else {
+        $record['internalNotes'] = $data['internalNotes'];
+        $record['notesUpdatedAt'] = gmdate('c');
+    }
+    siteAtomicWrite($path, json_encode($record, JSON_UNESCAPED_UNICODE));
+    flock($lock, LOCK_UN);
+    fclose($lock);
+    echo json_encode(['ok' => true, 'prospect' => $record], JSON_UNESCAPED_UNICODE);
+    exit;
+}
 
 $clientsPath = $root . '/storage-data/paradise_clients.json';
 $clients = is_file($clientsPath) ? json_decode(file_get_contents($clientsPath), true) : [];
 if (!is_array($clients)) failProspects(500, 'Liste des devis illisible.');
-$directory = $root . '/storage-data/quote-followups';
 $paths = is_dir($directory) ? glob($directory . '/flow-*.json') : [];
 if ($paths === false) failProspects(500, 'Lecture des prospects impossible.');
 $prospects = [];
 foreach ($paths as $path) {
     $record = json_decode(file_get_contents($path), true);
+    if (is_array($record) && !empty($record['deletedAt'])) continue;
     if (!is_array($record) || !isset($record['flowId'], $record['stage'], $record['summary'])) {
         failProspects(500, 'Un dossier de suivi est illisible.');
     }
@@ -45,4 +75,4 @@ foreach ($paths as $path) {
     if (!$submitted) $prospects[] = $record;
 }
 usort($prospects, function ($a, $b) { return strcmp($b['updatedAt'], $a['updatedAt']); });
-echo json_encode(['ok' => true, 'prospects' => $prospects], JSON_UNESCAPED_UNICODE);
+echo json_encode(['ok' => true, 'prospects' => $prospects, 'csrf' => $csrf], JSON_UNESCAPED_UNICODE);

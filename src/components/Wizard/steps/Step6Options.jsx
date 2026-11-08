@@ -1,7 +1,9 @@
 import { getPrestations } from '../../../utils/storage'
+import { getFormulaItems, isCategoryIncluded } from '../../../utils/formulePricing'
 
 export default function Step6Options({ data, onChange, onNext, onBack }) {
-  const prestations = getPrestations()
+  const prestations = getFormulaItems(data.formule, 'prestations', getPrestations())
+  const included = isCategoryIncluded(data.formule, 'prestations')
   const selected = data.prestations || []
 
   function isSelected(id) {
@@ -16,12 +18,13 @@ export default function Step6Options({ data, onChange, onNext, onBack }) {
     }
   }
 
-  const optionsTotal = selected.reduce((sum, p) => sum + (p.tarif || 0), 0)
+  const optionsTotal = included ? 0 : selected.reduce((sum, p) => sum + (p.tarif || 0), 0)
 
   return (
     <div>
       <h2 style={{ marginBottom: '8px', color: '#1a1a2e' }}>Options & Prestations</h2>
-      <p className="text-muted mb-3">Ajoutez des prestations pour compléter votre événement</p>
+      <p className="text-muted mb-3">{included ? 'Sélectionnez vos prestations incluses dans votre forfait, sans supplément.' : 'Ajoutez des prestations pour compléter votre événement'}</p>
+      {!prestations.length && <p role="alert">Aucune prestation disponible pour cette formule. Veuillez revenir au choix de la formule ou nous contacter.</p>}
 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: '16px', marginBottom: '24px' }}>
         {prestations.map((p) => {
@@ -46,8 +49,8 @@ export default function Step6Options({ data, onChange, onNext, onBack }) {
               )}
               <div style={{ fontWeight: '700', fontSize: '16px', marginBottom: '6px' }}>{p.nomPresta}</div>
               {p.description && <div style={{ fontSize: '13px', color: '#888', marginBottom: '12px' }}>{p.description}</div>}
-              <div style={{ fontWeight: '800', color: '#c9a84c', fontSize: '20px' }}>{p.tarif.toLocaleString('fr-FR')} €</div>
-              <div style={{ fontSize: '12px', color: '#888' }}>forfait</div>
+              <div style={{ fontWeight: '800', color: '#c9a84c', fontSize: '20px' }}>{included ? 'Inclus dans votre forfait' : `${p.tarif.toLocaleString('fr-FR')} €`}</div>
+              {!included && <div style={{ fontSize: '12px', color: '#888' }}>forfait</div>}
               {sel && <div style={{ color: '#b8860b', fontWeight: '600', fontSize: '13px', marginTop: '10px' }}>✅ Sélectionné</div>}
             </div>
           )
@@ -71,7 +74,7 @@ export default function Step6Options({ data, onChange, onNext, onBack }) {
 
       <div style={{ display: 'flex', justifyContent: 'space-between' }}>
         <button className="btn btn-outline" onClick={onBack}>← Retour</button>
-        <button className="btn btn-primary btn-lg" onClick={onNext}>Suivant →</button>
+        <button className="btn btn-primary btn-lg" onClick={onNext} disabled={included && !prestations.length}>Suivant →</button>
       </div>
     </div>
   )

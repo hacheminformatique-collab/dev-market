@@ -31,18 +31,20 @@ if ($method === 'POST' && ($data['action'] ?? '') === 'login') {
     siteAtomicWrite($attemptPath, json_encode(['count' => 0, 'until' => 0]));
     session_regenerate_id(true);
     $_SESSION['siteAdmin'] = hash('sha256', $pin);
+    unset($_SESSION['siteAdminCsrf']);
     echo json_encode(['ok' => true]);
     exit;
 }
 
 if (!siteAdminAuthenticated(false)) siteControlFail(403, 'Accès administrateur refusé. Reconnectez-vous.');
 if ($method === 'GET') {
-    echo json_encode(['ok' => true, 'controls' => siteControls()]);
+    echo json_encode(['ok' => true, 'controls' => siteControls(), 'csrf' => siteAdminCsrf()]);
     exit;
 }
 if ($method !== 'POST') siteControlFail(405, 'Méthode non autorisée.');
+siteRequireAdminCsrf();
 if (($data['action'] ?? '') === 'logout') {
-    unset($_SESSION['siteAdmin']);
+    unset($_SESSION['siteAdmin'], $_SESSION['siteAdminCsrf']);
     echo json_encode(['ok' => true]);
     exit;
 }
@@ -53,6 +55,10 @@ $controls = siteControls();
 if (array_key_exists('maintenance', $data)) {
     if (!is_bool($data['maintenance'])) siteControlFail(400, 'État de maintenance invalide.');
     $controls['maintenance'] = $data['maintenance'];
+}
+if (array_key_exists('quoteMaintenance', $data)) {
+    if (!is_bool($data['quoteMaintenance'])) siteControlFail(400, 'État de maintenance des devis invalide.');
+    $controls['quoteMaintenance'] = $data['quoteMaintenance'];
 }
 if (array_key_exists('adminSlug', $data)) {
     $slug = $data['adminSlug'];

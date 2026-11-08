@@ -485,6 +485,18 @@ export const savePrestations = (data) => _save(KEYS.prestations, data)
 
 export const getClients = () => _get(KEYS.clients) || []
 export const saveClients = (data) => _save(KEYS.clients, data)
+export async function saveClientsConfirmed(data) {
+  const response = await fetch(`/api/storage.php?key=${KEYS.clients}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data),
+  })
+  const result = await response.json()
+  if (!response.ok || result.ok !== true) throw new Error(result.error || 'Enregistrement du devis impossible. Veuillez réessayer.')
+  _cache[KEYS.clients] = data
+  keyLoadTimes.set(KEYS.clients, Date.now())
+  try { localStorage.setItem(KEYS.clients, JSON.stringify(data)) } catch { /* localStorage may be unavailable */ }
+}
 
 export const getLoginAttempts = () => _get(KEYS.loginAttempts) || DEFAULTS.loginAttempts
 export const saveLoginAttempts = (data) => _save(KEYS.loginAttempts, data)

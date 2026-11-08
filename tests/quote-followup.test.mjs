@@ -32,6 +32,33 @@ function basePayload(overrides = {}) {
   }
 }
 
+  test('forfaits validate only included categories and keep legacy requirements', () => {
+    const summary = {
+      typeEvenement: 'Mariage', dateEvenement: '2099-06-12', nbAdultes: 50, nbEnfants: 0,
+      formule: 'Forfait personnalisé', forfait: true, prestations: [],
+    }
+    const validate = (overrides, stage = 6) => php(basePayload({ stage, summary: { ...summary, ...overrides } }))
+    const menu = { section: 'Cocktail de bienvenu', name: 'Cocktail premium' }
+    const menusOnly = validate({ categoriesIncluses: ['menus'], menus: [menu] })
+    assert.deepEqual(menusOnly.summary.menus, [menu])
+    assert.equal(menusOnly.summary.gateau, undefined)
+    assert.equal(validate({ categoriesIncluses: ['menus'], menus: [] }), false)
+    assert.equal(validate({ categoriesIncluses: ['menus'] }), false)
+    assert.ok(validate({ categoriesIncluses: ['menus'], menus: [menu] }, 4))
+    const cakesOnly = validate({ categoriesIncluses: ['gateaux'], gateau: 'Gâteau 1' })
+    assert.equal(cakesOnly.summary.gateau, 'Gâteau 1')
+    assert.equal(cakesOnly.summary.menus, undefined)
+    assert.ok(validate({ categoriesIncluses: ['gateaux'] }, 4))
+    assert.equal(validate({ categoriesIncluses: ['gateaux'] }, 5), false)
+    assert.ok(validate({ categoriesIncluses: ['prestations'], prestations: ['DJ'] }))
+    assert.ok(validate({ categoriesIncluses: [] }))
+    assert.equal(validate({ categoriesIncluses: ['invalid'] }), false)
+    assert.equal(validate({ categoriesIncluses: 'menus' }), false)
+    assert.equal(validate({ categoriesIncluses: [], forfait: 'true' }), false)
+    assert.equal(validate({ categoriesIncluses: [], forfait: false, menus: [menu], gateau: 'Gâteau 1' }), false)
+    assert.equal(validate({ categoriesIncluses: [], forfait: false }), false)
+  })
+
 test('validates accepted contact information and removes markup/control characters', () => {
   const result = php(basePayload({
     summary: { prenom: '<b>Alice</b>\n<script>', nom: 'Martin' },
@@ -74,6 +101,7 @@ test('notify HTTP records step one silently and sends one prospect alert after s
     await cp(path.join(root, 'public/api/notify.php'), path.join(api, 'notify.php'))
     await cp(path.join(root, 'public/api/site-guard.php'), path.join(api, 'site-guard.php'))
     await cp(path.join(root, 'public/api/site-controls.php'), path.join(api, 'site-controls.php'))
+    await cp(path.join(root, 'public/api/site-admin.php'), path.join(api, 'site-admin.php'))
     await cp(phpHelper, path.join(api, 'quote_followup.php'))
     await cp(path.join(root, 'public/api/prospects.php'), path.join(api, 'prospects.php'))
     await writeFile(fakeSendmail, `#!/usr/bin/env node
@@ -175,7 +203,9 @@ process.stdin.on('end', () => {
     assert.match(delivered, /Événement : Mariage/)
     assert.match(delivered, /Participants : 140 \(120 adultes, 20 enfants\)/)
     const prospectEndpoint = `http://127.0.0.1:${httpPort}/api/prospects.php`
-    const getProspects = () => fetch(prospectEndpoint, { headers: { 'X-Admin-Pin': settings.pin } }).then((response) => response.json())
+    const login = await fetch(`http://127.0.0.1:${httpPort}/api/site-admin.php`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'login', pin: settings.pin }) })
+    const cookie = login.headers.get('set-cookie').split(';')[0]
+    const getProspects = () => fetch(prospectEndpoint, { headers: { Cookie: cookie } }).then((response) => response.json())
     assert.equal((await fetch(prospectEndpoint)).status, 403)
     assert.equal((await fetch(prospectEndpoint, { headers: { 'X-Admin-Pin': 'wrong' } })).status, 403)
     let prospects = await getProspects()

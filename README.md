@@ -1,5 +1,55 @@
 # React + Vite
 
+## Forfaits tout compris et suivi administratif
+
+**Formules** permet de créer un forfait à prix global ou de convertir une
+formule existante en cochant **Forfait à prix global**. Cocher **Menus**,
+**Gâteaux** ou **Prestations** ajoute un écran de configuration pour choisir
+les éléments autorisés de chaque catalogue. Une catégorie activée exige au
+moins un élément disponible. Les anciennes formules non converties conservent
+leur fonctionnement et leurs tarifs séparés.
+
+**Calendrier > Grille tarifaire saison / jour** permet de renseigner les six
+prix globaux TTC par formule : basse saison (décembre–mars), haute saison
+(avril–novembre), dimanche–jeudi, vendredi et samedi. Zéro est accepté ; les
+valeurs vides, négatives ou non finies sont refusées. Un nouveau forfait sans
+tarif pour la date choisie ne peut pas être réservé. Retirer une formule de
+la grille la masque seulement : ses tarifs et sa fiche sont conservés, et
+elle peut être réaffichée.
+
+Le client ne voit que les étapes activées et les choix autorisés. Les menus
+gardent un choix par section (jusqu'à trois boissons), le gâteau un choix,
+et les prestations plusieurs choix facultatifs. Tous ces choix sont
+**inclus dans le forfait, sans supplément**, indépendamment des tarifs du
+catalogue et du nombre d'invités. Le panier, le récapitulatif, le PDF, l'espace
+client et la comptabilité utilisent le même calcul. Le prix, les inclusions
+et la ventilation de TVA sont copiés dans le devis : modifier ultérieurement
+une formule ou sa grille ne recalcule pas les devis enregistrés. Les promotions
+journalières historiques de location sèche ne remplacent pas le prix d'un forfait.
+
+Lorsqu'un forfait inclut de la restauration, renseigner explicitement la
+**part du prix global soumise à TVA 10%**, en pourcentage ; le reste utilise
+20%. Faire confirmer cette ventilation par votre comptable. Elle ne se déduit
+pas des prix des catalogues et ne change pas le total TTC du forfait.
+
+**Prospect** propose une note interne modifiable et une suppression confirmée.
+La note reste privée et n'est pas envoyée au client. La suppression efface les
+coordonnées de ce suivi et conserve un marqueur privé pour éviter qu'un ancien
+formulaire ne le recrée ; elle ne supprime aucun devis associé. Les écritures
+partagent le verrou du suivi et exigent une session administrateur avec CSRF.
+
+**Mes Infos > Maintenance devis** suspend uniquement les nouvelles demandes,
+indépendamment de la maintenance générale. Les formulaires autonomes et intégrés
+affichent un message ; les API refusent aussi les étapes et l'enregistrement
+d'un nouveau devis, même depuis un ancien onglet. Le site, les devis existants
+et leur signature restent disponibles. Le formulaire attend la confirmation
+serveur avant d'annoncer l'enregistrement d'un devis, sans mise en file d'attente
+d'une demande refusée. Aucun cron ni traitement métier en arrière-plan n'est ajouté.
+
+Déployer tout `dist/`, y compris la nouvelle API `quote-access.php`,
+les API modifiées et les nouveaux assets. Préserver
+les données métier et `storage-data/site-controls.json` lors du déploiement.
+
 ## Maintenance, adresse administrative et purge
 
 **Mes Infos > Maintenance du site** ferme les pages publiques sauf l'accueil.
@@ -100,7 +150,7 @@ coordonnées et l'événement (étapes 1 et 2), mais pas la formule (étape 3).
 Un devis finalisé est exclu ; un retour arrière ne réintroduit pas une demande
 plus avancée. Ces demandes peuvent être encore en cours, sans délai d'abandon
 supposé. Les anciens journaux ne permettent pas de reconstruire les coordonnées.
-`api/prospects.php` exige le PIN enregistré et ne met pas les résultats en cache ;
+`api/prospects.php` exige une session administrative et ne met pas les résultats en cache ;
 les dossiers restent dans le stockage privé `storage-data/quote-followups/`.
 La validation de l'étape 1 enregistre le parcours sans envoyer d'e-mail.
 Après l'enregistrement de l'étape 2, un seul e-mail « Nouveau prospect » est

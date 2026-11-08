@@ -2,7 +2,6 @@ import assert from 'node:assert/strict'
 import { test, before, after } from 'node:test'
 import { createServer } from 'vite'
 import { mkdtemp, cp, mkdir, readFile, writeFile, rm, chmod } from 'node:fs/promises'
-import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
 import { createServer as createTcpServer } from 'node:net'
 import { spawn } from 'node:child_process'
@@ -48,8 +47,8 @@ async function freePort() {
   return port
 }
 
-function start(command, args) {
-  const child = spawn(command, args, { stdio: ['ignore', 'pipe', 'pipe'] })
+function start(command, args, options = {}) {
+  const child = spawn(command, args, { ...options, stdio: ['ignore', 'pipe', 'pipe'] })
   let output = ''
   child.stdout.on('data', (chunk) => { output += chunk })
   child.stderr.on('data', (chunk) => { output += chunk })
@@ -66,7 +65,7 @@ async function ready(url, output) {
     } catch { /* wait for the isolated server to bind */ }
     await new Promise((wait) => setTimeout(wait, 50))
   }
-  assert.fail(`Server did not start: ${output()}`)
+  assert.fail(`Server did not start: ${await output()}`)
 }
 
 before(async () => {
@@ -80,7 +79,7 @@ before(async () => {
   ;({ default: WeddingDirectory } = await vite.ssrLoadModule('/src/components/WeddingDirectory.jsx'))
   template = await readFile(join(root, 'dist/static-city.html'), 'utf8')
   shellTemplate = await readFile(join(root, 'dist/index.html'), 'utf8')
-  directory = await mkdtemp(join(tmpdir(), 'dev-market-static-test-'))
+  directory = await mkdtemp(join(root, 'tests/.dev-market-static-test-'))
   await chmod(directory, 0o755)
   site = join(directory, 'site')
   await cp(join(root, 'dist'), site, { recursive: true })
@@ -92,6 +91,9 @@ before(async () => {
   const phpOutput = start('php', ['-d', 'post_max_size=16M', '-S', `127.0.0.1:${phpPort}`, '-t', site])
   await ready(`http://127.0.0.1:${phpPort}/static-city.html`, phpOutput)
   const configPath = join(directory, 'apache.conf')
+  // The unprivileged Apache worker cannot traverse /root; its inherited cwd
+  // gives access to this isolated fixture without changing ancestor permissions.
+  const apacheSite = process.getuid() === 0 ? '/proc/self/cwd/site' : site
   await writeFile(configPath, `
 ServerRoot "${directory}"
 DefaultRuntimeDir "${directory}"
@@ -115,15 +117,16 @@ User #${process.getuid() === 0 ? 65534 : process.getuid()}
 Group #${process.getuid() === 0 ? 65534 : process.getgid()}
 ErrorLog "${directory}/apache-error.log"
 TypesConfig /etc/mime.types
-DocumentRoot "${site}"
-<Directory "${site}">
+DocumentRoot "${apacheSite}"
+<Directory "${apacheSite}">
   Require all granted
   AllowOverride All
 </Directory>
 ProxyPass /api/ http://127.0.0.1:${phpPort}/api/
 `)
-  const apacheOutput = start('apache2', ['-X', '-f', configPath])
-  await ready(`${origin}/static-city.html`, apacheOutput)
+  const apacheOutput = start('apache2', ['-X', '-f', configPath], { cwd: directory })
+  await ready(`${origin}/static-city.html`, async () =>
+    `${apacheOutput()}\n${await readFile(join(directory, 'apache-error.log'), 'utf8').catch(() => '')}`)
 })
 
 after(async () => {
@@ -821,11 +824,15 @@ test('postcode identities preserve homonymous towns and migrate historical URLs 
 })
 
 test('maintenance gates static pages and APIs, renamed administration stays accessible, and purges persist', async () => {
-  const request = (path, data, cookie) => fetch(new URL(path, origin), {
+  const request = async (path, data, cookie) => {
+    const csrf = path === '/api/site-admin.php' && cookie && data && data.action !== 'login'
+      ? (await (await fetch(new URL(path, origin), { headers: { Cookie: cookie } })).json()).csrf : ''
+    return fetch(new URL(path, origin), {
     ...(data ? { method: 'POST', body: JSON.stringify(data) } : {}),
-    headers: { 'Content-Type': 'application/json', ...(cookie ? { Cookie: cookie } : {}) },
+    headers: { 'Content-Type': 'application/json', ...(cookie ? { Cookie: cookie } : {}), ...(csrf ? { 'X-Admin-CSRF': csrf } : {}) },
     redirect: 'manual',
   })
+  }
   assert.equal((await request('/api/site-admin.php')).status, 403)
   assert.equal((await request('/api/data-purge.php', { type: 'all', confirmation: 'PURGER' })).status, 403)
   const publicSettings = await (await request('/api/storage.php?key=paradise_settings')).json()

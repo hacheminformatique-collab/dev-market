@@ -5,12 +5,12 @@ export const ADMIN_STORAGE_NAMES = ['settings', 'clients', 'loginAttempts', 'sta
 export function dashboardStorageNames(tab) {
   const dependencies = {
     clients: ['clients', 'menus', 'gateaux', 'prestations'],
-    calendar: ['clients', 'staff', 'calOverrides', 'calStaff', 'calManualEvents'],
+    calendar: ['clients', 'staff', 'formules', 'calOverrides', 'calStaff', 'calManualEvents'],
     compta: ['clients', 'staff', 'ingredients', 'matieresPremieresRecettes'],
     staff: ['staff'],
     stock: ['clients', 'stockSec', 'stockMatiere', 'stockBoisson'],
     matieres: ['clients', 'menus', 'ingredients', 'matieresPremieresRecettes', 'stockSec', 'stockMatiere', 'stockBoisson'],
-    formules: ['formules'], menus: ['menus'], gateaux: ['gateaux'], prestations: ['prestations'],
+    formules: ['formules', 'menus', 'gateaux', 'prestations'], menus: ['menus'], gateaux: ['gateaux'], prestations: ['prestations'],
   }
   return ['settings', ...(dependencies[tab] || [])]
 }

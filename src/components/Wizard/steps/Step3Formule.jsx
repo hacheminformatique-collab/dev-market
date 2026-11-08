@@ -1,29 +1,7 @@
 import { getFormules } from '../../../utils/storage'
+import { getFormuleTarif as getSaisonTarif } from '../../../utils/formulePricing'
 
-function getSaisonTarif(dateStr, formuleNom) {
-  if (!dateStr) return 0
-  const date = new Date(dateStr)
-  const month = date.getMonth() + 1 // 1-12
-  const day = date.getDay() // 0=dim, 1=lun, ..., 5=ven, 6=sam
-
-  // Note: getMonth() returns 0-11, so December = 11, January = 0, etc.
-  const isBasSaison = month === 12 || month <= 3
-  const isSec = formuleNom && formuleNom.toLowerCase().includes('sèche')
-
-  if (isBasSaison) {
-    if (day === 5) return isSec ? 2500 : 1500  // vendredi
-    if (day === 6) return isSec ? 3500 : 2500  // samedi
-    return isSec ? 2000 : 1000                  // dim-jeudi
-  } else {
-    if (day === 5) return isSec ? 3500 : 2500  // vendredi
-    if (day === 6) return isSec ? 4500 : 3000  // samedi
-    return isSec ? 2500 : 1500                  // dim-jeudi
-  }
-}
-
-export function getFormuleTarif(dateStr, formuleNom) {
-  return getSaisonTarif(dateStr, formuleNom)
-}
+export { getFormuleTarif } from '../../../utils/formulePricing'
 
 function getBasePriceSec(dateStr) {
   return getSaisonTarif(dateStr, 'Location sèche')
@@ -46,7 +24,14 @@ export default function Step3Formule({ data, onChange, onNext, onBack }) {
   }
 
   function handleSelect(formule) {
-    const tarif = getSaisonTarif(dateStr, formule.nomFormule)
+    const tarif = getSaisonTarif(dateStr, formule)
+    if (tarif === null) return
+    if (formule.id !== data.formule?.id || JSON.stringify(formule.inclusions) !== JSON.stringify(data.formule?.inclusions)) {
+      onChange('menus', [])
+      onChange('gateau', null)
+      onChange('gateauPersonnalisation', null)
+      onChange('prestations', [])
+    }
     onChange('formule', formule)
     onChange('prixSalle', tarif)
   }
@@ -62,11 +47,11 @@ export default function Step3Formule({ data, onChange, onNext, onBack }) {
 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: '16px', marginBottom: '24px' }}>
         {formules.map((f) => {
-          const tarif = getSaisonTarif(dateStr, f.nomFormule)
+          const tarif = getSaisonTarif(dateStr, f)
           const isSelected = data.formule?.id === f.id
           const isSec = f.nomFormule?.toLowerCase().includes('sèche')
           const tarifSec = dateStr ? getBasePriceSec(dateStr) : 0
-          const remise = (!isSec && dateStr) ? (tarifSec - tarif) : 0
+          const remise = (!f.forfait && !isSec && dateStr && tarif !== null) ? (tarifSec - tarif) : 0
           return (
             <div
               key={f.id}
@@ -75,7 +60,7 @@ export default function Step3Formule({ data, onChange, onNext, onBack }) {
                 border: isSelected ? '2px solid #c9a84c' : '2px solid #e0e0e0',
                 borderRadius: '12px',
                 padding: '24px',
-                cursor: 'pointer',
+                cursor: tarif === null ? 'not-allowed' : 'pointer',
                 background: isSelected ? '#fdf3d9' : 'white',
                 transition: 'all 0.2s',
               }}
@@ -98,9 +83,9 @@ export default function Step3Formule({ data, onChange, onNext, onBack }) {
                 </div>
               ) : null}
               <div style={{ fontSize: '24px', fontWeight: '800', color: '#c9a84c' }}>
-                {dateStr ? `${tarif.toLocaleString('fr-FR')} €` : '—'}
+                {tarif === null ? 'Tarif indisponible' : `${tarif.toLocaleString('fr-FR')} €`}
               </div>
-              <div style={{ fontSize: '12px', color: '#888' }}>TTC</div>
+              <div style={{ fontSize: '12px', color: '#888' }}>{f.forfait ? 'Prix global TTC — choix inclus, sans supplément' : 'TTC'}</div>
               {isSelected && (
                 <div style={{ marginTop: '12px', color: '#b8860b', fontWeight: '600', fontSize: '13px' }}>
                   ✅ Sélectionnée
@@ -121,8 +106,11 @@ export default function Step3Formule({ data, onChange, onNext, onBack }) {
         <button className="btn btn-outline" onClick={onBack}>← Retour</button>
         <button
           className="btn btn-primary btn-lg"
-          onClick={onNext}
-          disabled={!data.formule}
+          onClick={() => {
+            handleSelect(formules.find((formule) => formule.id === data.formule.id) || data.formule)
+            onNext()
+          }}
+          disabled={!data.formule || getSaisonTarif(dateStr, data.formule) === null}
           style={{ opacity: data.formule ? 1 : 0.5 }}
         >
           Suivant →

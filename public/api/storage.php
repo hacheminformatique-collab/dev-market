@@ -86,6 +86,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         echo json_encode(['error' => 'Invalid JSON payload']);
         exit;
     }
+    if ($key === 'paradise_clients' && siteControls()['quoteMaintenance']) {
+        $incoming = json_decode($body, true);
+        $existing = is_file($file) ? json_decode(file_get_contents($file), true) : [];
+        if (!is_array($incoming) || !is_array($existing)) siteControlFail(503, 'Liste des devis illisible.');
+        $ids = array_column($existing, 'id');
+        foreach ($incoming as $client) {
+            if (!is_array($client) || !isset($client['id']) || !in_array($client['id'], $ids, true)) quoteMaintenanceGuard();
+        }
+    }
 
     // Atomic write: write to a temp file then rename to avoid partial reads
     $tmp = $file . '.tmp.' . getmypid();

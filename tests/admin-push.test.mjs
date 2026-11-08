@@ -101,8 +101,9 @@ test('admin push session auth, CSRF, subscriptions, VAPID storage, library encry
       assert.equal((await post({ ...body, endpoint: item.endpoint, subscription: item })).status, 200)
     }
     assert.equal((await post(body)).status, 503, 'bounded device capacity')
+    const adminCsrf = (await (await fetch(`${origin}/api/site-admin.php`, { headers: { Cookie: cookie } })).json()).csrf
     const logout = await fetch(`${origin}/api/site-admin.php`, {
-      method: 'POST', headers: { 'Content-Type': 'application/json', Cookie: cookie },
+      method: 'POST', headers: { 'Content-Type': 'application/json', Cookie: cookie, 'X-Admin-CSRF': adminCsrf },
       body: JSON.stringify({ action: 'logout' }),
     })
     assert.equal(logout.status, 200)

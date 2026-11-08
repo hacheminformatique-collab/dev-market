@@ -190,6 +190,7 @@ export default function MesInfosTab() {
   return (
     <div>
       <SiteAccessControls kind="maintenance" />
+      <SiteAccessControls kind="quotes" />
       <AdminPushControls />
       {saveError && <p role="alert" style={{ color: '#c0392b' }}>{saveError}</p>}
       <h3 style={{ marginBottom: '20px', color: '#1a1a2e' }}>Informations générales</h3>

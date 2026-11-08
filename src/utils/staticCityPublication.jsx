@@ -14,6 +14,7 @@ import { validateWeddingTravel } from './weddingTravel'
 import { WEDDING_DEPARTMENTS, departmentPath, directoryDepartmentCode } from './weddingDepartments'
 import DepartmentPage from '../components/VillesPages/DepartmentPage'
 import { canonicalCityPages, legacyCityAliases } from './cityPageIdentity'
+import { verifyPublishedUrl } from './publicationVerification'
 
 function escapeHtml(value) {
   return String(value).replaceAll('&', '&amp;').replaceAll('<', '&lt;')
@@ -150,7 +151,9 @@ export function renderCityDocument({ template, snapshot, settings, origin, direc
     .replace('<!-- CITY_DATA -->', () => `<!-- CITY_DIRECTORY_START -->${directory}<!-- CITY_DIRECTORY_END -->\n<script id="city-page-data" type="application/json">${scriptJson(snapshot)}</script>`)
 }
 
-export async function publishWeddingPages({ pages, config, gallery, allTypePages, blogArticles, settings, origin, onProgress, updateTemplate = false }) {
+export async function publishWeddingPages({ pages, config, gallery, allTypePages, blogArticles, settings, origin, onProgress: reportProgress, updateTemplate = false }) {
+  const counts = { published: 0, unchanged: 0, upgraded: 0 }
+  const onProgress = (progress) => reportProgress({ ...progress, ...counts })
   pages = canonicalCityPages(pages)
   const slugs = Object.keys(pages)
   if (!slugs.length) throw new Error('Aucune page mariage à publier.')
@@ -208,10 +211,27 @@ export async function publishWeddingPages({ pages, config, gallery, allTypePages
       inspection.pages[slug] = batch.pages[slug]
     }
   }
-  const counts = { published: 0, unchanged: 0, upgraded: 0 }
   const pageHashes = {}
   const directoryHashes = {}
   const publishedNow = new Set()
+  const pendingCheckpoints = {}
+  async function flushCheckpoints() {
+    if (!inspection.checkpointsSupported || !Object.keys(pendingCheckpoints).length) return
+    const result = await write({ action: 'checkpoint', pages: pendingCheckpoints, aliases: legacyCityAliases, expectedRegistryHash: inspection.registryHash })
+    if (!/^[a-f0-9]{64}$/.test(result.registryHash || '')) throw new Error('Confirmation de reprise de publication invalide.')
+    inspection.registryHash = result.registryHash
+    for (const slug of Object.keys(pendingCheckpoints)) delete pendingCheckpoints[slug]
+  }
+  async function verifyCity(slug, fileHash) {
+    const alreadyVerified = inspection.checkpointsSupported && inspection.pages[slug]?.verifiedHash === fileHash
+    if (alreadyVerified && inspection.publishedSlugs.includes(slug)) return
+    if (!alreadyVerified) await verifyPublishedUrl({ path: `${PAGE_TYPES_BY_ID.mariage.basePath}/${slug}`, expectedHash: fileHash, label: getCityBySlug(slug).name, hashText })
+    if (inspection.checkpointsSupported) {
+      pendingCheckpoints[slug] = fileHash
+      if (Object.keys(pendingCheckpoints).length >= 25) await flushCheckpoints()
+    }
+  }
+  try {
   for (let i = 0; i < allSlugs.length; i++) {
     const slug = allSlugs[i]
     onProgress({ done: i, total: allSlugs.length, current: getCityBySlug(slug).name })
@@ -225,10 +245,7 @@ export async function publishWeddingPages({ pages, config, gallery, allTypePages
     if (!snapshot) {
       if (!snapshot && existing.fileHash === 'missing' && existing.legacySlug) {
         const result = await write({ action: 'city-migrate', slug, legacySlug: existing.legacySlug, expectedHash: existing.legacyHash })
-        const check = await fetch(`${PAGE_TYPES_BY_ID.mariage.basePath}/${slug}`, { cache: 'no-store' })
-        if (!check.ok || await hashText(await check.text()) !== result.fileHash) {
-          throw new Error(`La nouvelle URL de ${getCityBySlug(slug).name} ne sert pas le fichier migré. Vérifiez .htaccess et mod_rewrite.`)
-        }
+        await verifyCity(slug, result.fileHash)
         pageHashes[slug] = result.fileHash
         directoryHashes[slug] = result.directoryHash
         counts.published++
@@ -239,6 +256,7 @@ export async function publishWeddingPages({ pages, config, gallery, allTypePages
       if (!snapshot && existing.fileHash === 'missing') throw new Error(`Page publiée manquante : ${slug}.`)
       pageHashes[slug] = existing.fileHash
       directoryHashes[slug] = existing.directoryHash
+      if (inspection.checkpointsSupported) await verifyCity(slug, existing.fileHash)
       counts.unchanged++
       onProgress({ done: i + 1, total: allSlugs.length, current: '' })
       continue
@@ -248,21 +266,20 @@ export async function publishWeddingPages({ pages, config, gallery, allTypePages
     if (!updateTemplate && existing.fileHash === desiredHash) {
       pageHashes[slug] = existing.fileHash
       directoryHashes[slug] = existing.directoryHash
+      if (inspection.checkpointsSupported) await verifyCity(slug, desiredHash)
       counts.unchanged++
       onProgress({ done: i + 1, total: allSlugs.length, current: '' })
       continue
     }
     await write({ action: 'page', slug, html, expectedHash: existing.fileHash })
-    const check = await fetch(`${snapshot.pageType.basePath}/${slug}`, { cache: 'no-store' })
-    if (!check.ok || await check.text() !== html) {
-      throw new Error(`Le fichier de ${getCityBySlug(slug).name} a été écrit, mais son URL ne sert pas le HTML publié. Vérifiez le fichier .htaccess et mod_rewrite.`)
-    }
+    await verifyCity(slug, desiredHash)
     counts.published++
     publishedNow.add(slug)
     pageHashes[slug] = desiredHash
     directoryHashes[slug] = await hashText(cityDirectory(allSlugs, slug, snapshot.config.businessName || 'Le Paradise 77'))
     onProgress({ done: i + 1, total: allSlugs.length, current: '' })
   }
+  await flushCheckpoints()
   for (let i = 0; i < allSlugs.length; i++) {
     const slug = allSlugs[i]
     onProgress({ done: i, total: allSlugs.length, current: `Annuaire : ${getCityBySlug(slug).name}` })
@@ -274,11 +291,25 @@ export async function publishWeddingPages({ pages, config, gallery, allTypePages
     if (directoryHashes[slug] !== directoryHash) {
       const result = await write({ action: 'city-directory', slug, directory: directoryHtml, styles: directoryStyles, expectedHash: pageHashes[slug] })
       if (result.directoryHash !== directoryHash) throw new Error(`L’annuaire de ${getCityBySlug(slug).name} n’a pas pu être vérifié.`)
+      if (inspection.checkpointsSupported) {
+        if (!/^[a-f0-9]{64}$/.test(result.fileHash || '')) throw new Error(`Hash de l’annuaire de ${slug} invalide.`)
+        await verifyCity(slug, result.fileHash)
+        pageHashes[slug] = result.fileHash
+      }
       if (!publishedNow.has(slug)) {
         counts.unchanged--
         counts.upgraded++
       }
     }
+  }
+  await flushCheckpoints()
+  } catch (error) {
+    try {
+      await flushCheckpoints()
+    } catch (checkpointError) {
+      throw new Error(`${error.message} La confirmation de reprise a aussi échoué : ${checkpointError.message}`, { cause: error })
+    }
+    throw error
   }
   const departmentCodes = WEDDING_DEPARTMENTS.map(({ code }) => code)
   for (const code of departmentCodes) {

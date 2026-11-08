@@ -666,19 +666,20 @@ export default function PagesClientTab({ pageType }) {
                     Hors Île-de-France, l’annuaire des villes ne contient que les communes publiées du même département.
                     Gardez cet onglet ouvert jusqu’à la fin : aucun traitement ne continue sur le serveur après sa fermeture.
                     Le bouton « Mettre à jour les trajets » calcule la distance et la durée routières réelles depuis Le Paradise pour les pages enregistrées avant ce calcul ; elles sont exigées pour publier.
-                    Enregistrez la configuration et gardez cet onglet ouvert jusqu’à la fin.
+                    Enregistrez la configuration et gardez cet onglet ouvert jusqu’à la fin. Les fichiers sont enregistrés au fur et à mesure ; les pages identiques ne sont pas réécrites. L’annuaire et le sitemap sont finalisés à la fin.
                   </p>
                   <div aria-live="polite" style={{ fontSize: '13px', marginTop: '8px' }}>
                     {publishing && (
                       <>
                         <progress value={publishProgress.done} max={publishProgress.total || 1} style={{ width: '100%' }} />
                         <p>{publishProgress.done}/{publishProgress.total} pages vérifiées — {publishProgress.current}</p>
+                        <p>{publishProgress.published || 0} fichier(s) publié(s) et conservé(s), {publishProgress.unchanged || 0} inchangé(s), sans réécriture.</p>
                       </>
                     )}
                     {publishMessage && <p style={{ color: 'var(--success)' }}>{publishMessage}</p>}
                     {publishError && (
                       <p role="alert" style={{ color: 'var(--danger)' }}>
-                        {publishError} {publishProgress.done}/{publishProgress.total} pages vérifiées pendant cette publication.
+                        {publishError} {publishProgress.done}/{publishProgress.total} pages vérifiées pendant cette publication. {publishProgress.published || 0} fichier(s) publié(s) conservé(s), {publishProgress.unchanged || 0} inchangé(s). Relancez pour reprendre : les fichiers identiques ne seront pas réécrits.
                       </p>
                     )}
                   </div>

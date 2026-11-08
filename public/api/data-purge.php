@@ -35,6 +35,7 @@ if (!$publicationLock || !flock($publicationLock, LOCK_EX)) siteControlFail(503,
 $writes = $type === 'all' ? array_merge(...array_values($groups)) : $groups[$type];
 $purgePages = $type === 'all' || $type === 'pages-mariage';
 $purgeClients = $type === 'all' || $type === 'clients';
+if ($purgePages) $writes['wedding-publication-checkpoints'] = (object)[];
 if ($type === 'all') {
     foreach (['reception', 'anniversaire', 'bapteme', 'fiancaille', 'fiancailles', 'seminaire'] as $pageType) {
         $writes['paradise_city_pages_' . $pageType] = (object)[];

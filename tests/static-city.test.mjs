@@ -459,7 +459,7 @@ test('publication reports API failures, incorrect routing and canonical domain m
             ? { ok: true, registryHash: 'missing', publishedSlugs: [], pages: Object.fromEntries(Object.keys(fixture.pages).map((slug) => [slug, { fileHash: 'missing', fingerprint: null, sharedDirectory: false }])) }
             : { ok: true }), { headers: { 'Content-Type': 'application/json' } })
           : new Response('<div id="root"></div>')
-    await assert.rejects(publication.publishWeddingPages(options), /ne sert pas le HTML publié/)
+    await assert.rejects(publication.publishWeddingPages(options), /reste enregistré.*n’a pas pu être vérifiée/)
     let writes = 0
     globalThis.fetch = async (url) => {
       if (url === '/api/static-publish.php') writes++
@@ -616,6 +616,67 @@ test('publication inspects bounded batches before writing and explains empty PHP
     emptyResponse = true
     await assert.rejects(publication.publishWeddingPages({ ...fixture, pages, origin, onProgress() {} }), /réponse vide.*static-publish\.php.*inspect.*HTTP 500/)
     assert.equal(calls.length, 1)
+  } finally {
+    globalThis.fetch = nativeFetch
+  }
+})
+
+test('interrupted publication checkpoints successful files and resumes without rewriting or rechecking them', async () => {
+  const nativeFetch = globalThis.fetch
+  const htmlFiles = {}
+  const verified = {}
+  const actions = []
+  const urlReads = []
+  let registryHash = 'missing'
+  let failSecond = true
+  const slugs = Object.keys(fixture.pages)
+  const { createHash } = await import('node:crypto')
+  const digest = (text) => createHash('sha256').update(text).digest('hex')
+  globalThis.fetch = async (url, options) => {
+    if (url === '/static-city.html') return new Response(template)
+    if (url === '/') return new Response(shellTemplate)
+    if (url !== '/api/static-publish.php') {
+      const slug = new URL(url, origin).pathname.split('/').at(-1)
+      urlReads.push(slug)
+      if (failSecond && slug === slugs[1]) return new Response('Forbidden', { status: 403 })
+      return new Response(htmlFiles[slug] || 'Missing', { status: htmlFiles[slug] ? 200 : 404 })
+    }
+    const body = JSON.parse(options.body)
+    actions.push(body)
+    if (body.action === 'inspect') return new Response(JSON.stringify({
+      ok: true, checkpointsSupported: true, registryHash, publishedSlugs: Object.keys(verified),
+      departments: {},
+      pages: Object.fromEntries(body.inspectSlugs.map((slug) => [slug, {
+        fileHash: htmlFiles[slug] ? digest(htmlFiles[slug]) : 'missing', directoryHash: null, verifiedHash: verified[slug] || null,
+      }])),
+    }))
+    if (body.action === 'page') {
+      htmlFiles[body.slug] = body.html
+      return new Response(JSON.stringify({ ok: true }))
+    }
+    if (body.action === 'checkpoint') {
+      assert.equal(body.expectedRegistryHash, registryHash)
+      for (const [slug, hash] of Object.entries(body.pages)) {
+        assert.equal(hash, digest(htmlFiles[slug]))
+        verified[slug] = hash
+      }
+      registryHash = digest(JSON.stringify(Object.keys(verified)))
+      return new Response(JSON.stringify({ ok: true, registryHash }))
+    }
+    return new Response(JSON.stringify({ error: 'Stop finalization in fixture' }), { status: 409 })
+  }
+  try {
+    const options = { ...fixture, origin, onProgress() {} }
+    await assert.rejects(publication.publishWeddingPages(options), /HTTP 403/)
+    assert.deepEqual(Object.keys(htmlFiles), slugs, 'Both physical files survive interruption')
+    assert.deepEqual(Object.keys(verified), [slugs[0]], 'Successful URL is checkpointed before returning the error')
+    actions.length = 0
+    urlReads.length = 0
+    failSecond = false
+    await assert.rejects(publication.publishWeddingPages(options), /Stop finalization/)
+    assert.equal(actions.filter(({ action }) => action === 'page').length, 0, 'Matching HTML files are never rewritten on resume')
+    assert.deepEqual(urlReads, [slugs[1]], 'Only the URL not previously verified is checked')
+    assert.deepEqual(Object.keys(verified), slugs)
   } finally {
     globalThis.fetch = nativeFetch
   }

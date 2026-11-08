@@ -38,6 +38,32 @@ function validCitySlug($slug): bool {
     return is_string($slug) && strlen($slug) <= 120 && preg_match('/^[a-z0-9]+(?:-[a-z0-9]+)*$/D', $slug) === 1;
 }
 
+function readPublicationRegistry(string $root): array {
+    $content = readCityFile($root . '/wedding-pages.json');
+    if ($content === false) return [[], 'missing'];
+    $slugs = json_decode($content, true);
+    if (!is_array(json_decode($content)) || !is_array($slugs) || array_values($slugs) !== $slugs || count($slugs) > 6000) {
+        failPublication(409, 'Registre des pages publiées invalide. Aucun fichier ne sera remplacé.');
+    }
+    foreach ($slugs as $slug) {
+        if (!validCitySlug($slug)) failPublication(409, 'Registre des pages publiées invalide.');
+    }
+    return [$slugs, hash('sha256', $content)];
+}
+
+function readPublicationCheckpoints(string $root): array {
+    $content = readCityFile($root . '/storage-data/wedding-publication-checkpoints.json');
+    if ($content === false) return [];
+    $journal = json_decode($content);
+    if (!is_object($journal)) failPublication(409, 'Journal de vérification des pages invalide. Aucun fichier ne sera remplacé.');
+    foreach ($journal as $slug => $hash) {
+        if (!validCitySlug($slug) || !is_string($hash) || preg_match('/^[a-f0-9]{64}$/D', $hash) !== 1) {
+            failPublication(409, 'Journal de vérification des pages invalide. Aucun fichier ne sera remplacé.');
+        }
+    }
+    return (array)$journal;
+}
+
 function cityAliases($value): array {
     if (!is_array($value) || count($value) > 6000) failPublication(400, 'Correspondances des villes invalides.');
     foreach ($value as $old => $new) {
@@ -165,24 +191,48 @@ if (is_link($cityDirectory) || (file_exists($cityDirectory) && !is_dir($cityDire
     failPublication(500, 'Le dossier de publication est invalide.');
 }
 
-if (($data['action'] ?? '') === 'inspect') {
+if (($data['action'] ?? '') === 'checkpoint') {
+    if (!array_key_exists('aliases', $data)) failPublication(409, 'Rechargez le dashboard pour utiliser les identifiants ville-code postal.');
+    $aliases = cityAliases($data['aliases']);
+    $pages = $data['pages'] ?? null;
+    if (!is_array($pages) || !is_object(json_decode($body)->pages ?? null) || count($pages) > 25) {
+        failPublication(400, 'Lot de confirmation invalide (maximum 25 pages).');
+    }
+    [$previous, $registryHash] = readPublicationRegistry($root);
+    $expected = $data['expectedRegistryHash'] ?? null;
+    if (!is_string($expected) || !hash_equals($registryHash, $expected)) {
+        failPublication(409, 'Le registre a changé depuis la vérification. Relancez la publication.');
+    }
+    $journal = readPublicationCheckpoints($root);
+    foreach ($pages as $slug => $hash) {
+        if (!validCitySlug($slug) || !is_string($hash) || preg_match('/^[a-f0-9]{64}$/D', $hash) !== 1) {
+            failPublication(400, 'Identifiant ou empreinte de page invalide.');
+        }
+        $path = cityFile($root, $slug);
+        if (is_link($path)) failPublication(409, 'Un fichier de page est un lien symbolique ; publication arrêtée.');
+        $actual = is_file($path) ? hash_file('sha256', $path) : false;
+        if ($actual === false || !hash_equals($actual, $hash)) {
+            failPublication(409, 'La page a changé depuis sa vérification : ' . $slug . '. Relancez la publication.');
+        }
+    }
+    $slugs = array_values(array_unique(array_merge(
+        array_map(function ($slug) use ($aliases) { return $aliases[$slug] ?? $slug; }, $previous),
+        array_keys($pages)
+    )));
+    if (count($slugs) > 6000) failPublication(400, 'Registre trop volumineux (maximum 6000 pages).');
+    $content = json_encode($slugs);
+    // Acknowledgements precede registration: a failed registry write is safely retryable.
+    writeIfChanged($root . '/storage-data/wedding-publication-checkpoints.json', json_encode((object)array_replace($journal, $pages)));
+    writeIfChanged($root . '/wedding-pages.json', $content);
+    echo json_encode(['ok' => true, 'registryHash' => hash('sha256', $content)]);
+    exit;
+} elseif (($data['action'] ?? '') === 'inspect') {
     if (!array_key_exists('aliases', $data)) failPublication(409, 'Rechargez le dashboard pour utiliser les identifiants ville-code postal.');
     $aliases = cityAliases($data['aliases'] ?? []);
     $slugs = $data['slugs'] ?? null;
     if (!is_array($slugs) || count($slugs) > 6000) failPublication(400, 'Liste de villes invalide.');
-    $registryFile = $root . '/wedding-pages.json';
-    $previous = [];
-    $registryHash = 'missing';
-    if (is_link($registryFile)) failPublication(409, 'Registre des pages publiées invalide.');
-    if (is_file($registryFile)) {
-        $registryContent = file_get_contents($registryFile);
-        if ($registryContent === false) failPublication(500, 'Impossible de lire le registre des pages publiées.');
-        $registryHash = hash('sha256', $registryContent);
-        $previous = json_decode($registryContent, true);
-        if (!is_array($previous) || array_values($previous) !== $previous || count($previous) > 6000) {
-            failPublication(409, 'Registre des pages publiées invalide. Aucun fichier ne sera remplacé.');
-        }
-    }
+    [$previous, $registryHash] = readPublicationRegistry($root);
+    $journal = readPublicationCheckpoints($root);
     foreach (array_merge($previous, $slugs) as $slug) {
         if (!validCitySlug($slug)) failPublication(400, 'Identifiant de ville invalide.');
     }
@@ -213,19 +263,20 @@ if (($data['action'] ?? '') === 'inspect') {
                 $legacyHtml = readCityFile(cityFile($root, $legacyPages[$slug]));
                 $saved = $legacyHtml === false ? false : citySnapshot($legacyHtml);
                 if ($saved === false || snapshotFingerprint($legacyHtml, $saved) === false) failPublication(409, 'Ancienne page publiée absente ou invalide : ' . $slug);
-                $result[$slug] = ['fileHash' => 'missing', 'fingerprint' => null, 'directoryHash' => null,
+                $result[$slug] = ['fileHash' => 'missing', 'verifiedHash' => $journal[$slug] ?? null, 'fingerprint' => null, 'directoryHash' => null,
                     'legacySlug' => $legacyPages[$slug], 'legacyHash' => hash('sha256', $legacyHtml),
                     'businessName' => $saved->config->businessName ?? 'Le Paradise 77', 'generatedAt' => $saved->page->generatedAt ?? null];
                 continue;
             }
             if (in_array($slug, $previous, true)) failPublication(409, 'Une page du registre est absente : ' . $slug . '. Vérifiez les fichiers publiés.');
-            $result[$slug] = ['fileHash' => 'missing', 'fingerprint' => null, 'directoryHash' => null];
+            $result[$slug] = ['fileHash' => 'missing', 'verifiedHash' => $journal[$slug] ?? null, 'fingerprint' => null, 'directoryHash' => null];
         } else {
             $savedSnapshot = citySnapshot($html);
             $fingerprint = $savedSnapshot === false ? false : snapshotFingerprint($html, $savedSnapshot);
             if ($fingerprint === false) failPublication(409, 'Une page existante ne contient pas de données de publication reconnues : ' . $slug . '. Aucun fichier ne sera remplacé.');
             $result[$slug] = [
                 'fileHash' => hash('sha256', $html),
+                'verifiedHash' => $journal[$slug] ?? null,
                 'fingerprint' => $fingerprint,
                 'directoryHash' => cityDirectoryHash($html),
                 'businessName' => !empty($savedSnapshot->config->businessName) ? $savedSnapshot->config->businessName : 'Le Paradise 77',
@@ -239,7 +290,7 @@ if (($data['action'] ?? '') === 'inspect') {
         $html = readCityFile($departmentFolder . '/' . $code . '.html');
         $departments[$code] = $html === false ? 'missing' : hash('sha256', $html);
     }
-    echo json_encode(['ok' => true, 'pages' => $result, 'departments' => (object)$departments, 'publishedSlugs' => $previous, 'registryHash' => $registryHash]);
+    echo json_encode(['ok' => true, 'checkpointsSupported' => true, 'pages' => $result, 'departments' => (object)$departments, 'publishedSlugs' => $previous, 'registryHash' => $registryHash]);
     exit;
 } elseif (($data['action'] ?? '') === 'city-directory') {
     $slug = $data['slug'] ?? '';
@@ -280,7 +331,7 @@ if (($data['action'] ?? '') === 'inspect') {
     if (strpos($html, 'src="/shared-wedding-directory-v1.js"') !== false) failPublication(409, 'Ancien script d’annuaire non reconnu.');
     writeIfChanged($path, $html);
     if (readCityFile($path) !== $html) failPublication(500, 'Impossible de vérifier l’annuaire écrit sur le serveur.');
-    echo json_encode(['ok' => true, 'directoryHash' => cityDirectoryHash($html)]);
+    echo json_encode(['ok' => true, 'fileHash' => hash('sha256', $html), 'directoryHash' => cityDirectoryHash($html)]);
     exit;
 } elseif (($data['action'] ?? '') === 'city-migrate') {
     $slug = $data['slug'] ?? null;

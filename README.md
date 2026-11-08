@@ -1,5 +1,34 @@
 # React + Vite
 
+## Publication progressive et reprise après interruption
+
+Chaque HTML est écrit et conservé dès sa publication. La vérification des URL
+réessaie au maximum trois fois les erreurs temporaires et les contenus
+différents, avec espacement et paramètre de contrôle anticache. Les erreurs
+403/404 et la protection 429/509 ne déclenchent pas de rafale de tentatives.
+Un échec indique la ville, son URL, le statut HTTP et la différence constatée ;
+il ne conclut plus automatiquement que `mod_rewrite` est désactivé.
+
+Les URL vérifiées sont confirmées au serveur par lots de 25. Le registre
+`wedding-pages.json` et le journal privé
+`storage-data/wedding-publication-checkpoints.json` enregistrent cette progression.
+En cas d'arrêt, les dernières confirmations réussies sont également envoyées
+avant d'afficher l'erreur, tant que le serveur reste disponible. La reprise
+scanne les fichiers existants : un HTML identique n'est pas réécrit et une URL
+déjà vérifiée pour le même hash n'est pas redemandée. Un fichier écrit mais
+non encore confirmé est revérifié sans réécriture s'il est inchangé.
+Une modification de modèle, de contenu ou d'annuaire déclenche sa mise à jour.
+Les contrôles de hash et de concurrence restent actifs.
+
+Les compteurs distinguent désormais fichiers publiés/conservés et fichiers
+inchangés. **Le sitemap, l'annuaire global et les pages département restent
+finalisés à la fin** ; un lot interrompu n'est donc pas une finalisation SEO
+complète. Le déploiement doit préserver les HTML et le journal privé ; les
+purges mariage/totale réinitialisent aussi ce journal.
+Déployer tout `dist/`, notamment `api/static-publish.php`, `api/data-purge.php`
+et les nouveaux assets, puis recharger l'administration. Garder l'onglet
+et l'écran actifs : aucun traitement métier en arrière-plan n'est ajouté.
+
 ## Vérification de publication sous la limite PHP de 30 secondes
 
 La publication vérifie les HTML existants par lots de **25 pages maximum**

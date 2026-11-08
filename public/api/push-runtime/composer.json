@@ -1,0 +1,15 @@
+{
+  "name": "paradise/admin-push-runtime",
+  "description": "Vendored Web Push runtime for shared hosting",
+  "require": {
+    "php": "^8.2",
+    "ext-curl": "*",
+    "ext-openssl": "*",
+    "ext-mbstring": "*",
+    "minishlink/web-push": "^10.0"
+  },
+  "config": {
+    "platform": { "php": "8.2.0" },
+    "sort-packages": true
+  }
+}

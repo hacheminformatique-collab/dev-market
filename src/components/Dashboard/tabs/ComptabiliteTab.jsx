@@ -1,21 +1,9 @@
 import { useState, useEffect } from 'react'
 import { getClients, getStaff, getMatieresPremieresRecettes, getIngredients } from '../../../utils/storage'
+import { calculateQuote } from '../../../utils/formulePricing'
 
 function calcTotal(devis) {
-  const nbAdultes = parseInt(devis.nbAdultes) || devis.nbPersonnes || 0
-  const nbEnfants = parseInt(devis.nbEnfants) || 0
-  const nbP = nbAdultes + nbEnfants
-  const prixSalle = devis.prixSalle || 0
-  const menuTotal = (devis.menus || []).reduce((s, m) => {
-    if (!m.tarif) return s
-    if (m.section === 'Cocktail de bienvenu') return s + m.tarif * (nbAdultes + nbEnfants)
-    if (m.section === 'Menu enfants') return s + m.tarif * nbEnfants
-    if (m.section === 'Boissons') return s
-    return s + m.tarif * nbAdultes
-  }, 0)
-  const gateauTotal = (devis.gateau?.tarif || 0) * nbP
-  const prestationsTotal = (devis.prestations || []).reduce((s, p) => s + (p.tarif || 0), 0)
-  return prixSalle + menuTotal + gateauTotal + prestationsTotal
+  return calculateQuote(devis).totalTTC
 }
 
 function calcMasseSalariale(devis, staff) {
@@ -68,7 +56,7 @@ export default function ComptabiliteTab() {
   const today = new Date().toISOString().split('T')[0]
 
   const eventsData = clients
-    .filter((c) => c.status !== 'annulé' && c.dateEvenement)
+    .filter((c) => !c.accountingExcluded && c.status !== 'annulé' && c.dateEvenement)
     .filter((c) => {
       if (filter === 'upcoming') return c.dateEvenement >= today
       if (filter === 'past') return c.dateEvenement < today

@@ -1,5 +1,6 @@
 import { getCityBySlug } from '../data/idf-cities'
 import { normalizeCityName as plainLocationName } from './cityNames'
+import { PARADISE_COORDS } from './weddingTravel'
 
 function normalizeSiteUrl(rawUrl, fallback = window.location.origin) {
   const input = (rawUrl || '').trim()
@@ -15,7 +16,9 @@ function normalizeSiteUrl(rawUrl, fallback = window.location.origin) {
 export function buildSeoData(pathname, settings, cityPages, detectedPageType, blogArticle, blogConfig, origin) {
   const businessName = settings?.nom?.trim() || 'Le Paradise 77'
   const baseUrl = normalizeSiteUrl(settings?.siteUrl, origin)
-  const canonical = new URL(pathname, baseUrl).toString()
+  const routeCity = detectedPageType ? getCityBySlug(pathname.split('/').filter(Boolean).at(-1)) : null
+  const canonicalPath = routeCity ? `${detectedPageType.basePath}/${routeCity.slug}` : pathname
+  const canonical = new URL(canonicalPath, baseUrl).toString()
   const imageUrl = new URL('/media/hero-paradise.jpg', baseUrl).toString()
 
   // Detect city slug from any known page-type base path
@@ -24,7 +27,7 @@ export function buildSeoData(pathname, settings, cityPages, detectedPageType, bl
     const parts = pathname.split('/')
     citySlug = parts[parts.length - 1] || ''
   }
-  const hasGeneratedCityPage = Boolean(citySlug && cityPages?.[citySlug]?.content)
+  const hasGeneratedCityPage = Boolean(citySlug && (cityPages?.[citySlug]?.content || cityPages?.[routeCity?.slug]?.content))
   const isIndexable = pathname === '/' || hasGeneratedCityPage
 
   const base = {
@@ -62,7 +65,7 @@ export function buildSeoData(pathname, settings, cityPages, detectedPageType, bl
             addressRegion: 'Seine-et-Marne',
             addressCountry: 'FR',
           },
-          geo: { '@type': 'GeoCoordinates', latitude: 48.9617, longitude: 2.8985 },
+          geo: { '@type': 'GeoCoordinates', latitude: PARADISE_COORDS.lat, longitude: PARADISE_COORDS.lng },
         },
       ],
     },

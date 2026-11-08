@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { getGateaux } from '../../../utils/storage'
+import { getFormulaItems, isCategoryIncluded } from '../../../utils/formulePricing'
 
 const GOUT_OPTIONS = ['Chocolat', 'Fruit', 'Fraise', 'Caramel spéculoos']
 
@@ -57,7 +58,8 @@ function GateauPopup({ gateau, personalisation, onValidate, onClose }) {
 }
 
 export default function Step5Gateau({ data, onChange, onNext, onBack }) {
-  const gateaux = getGateaux()
+  const gateaux = getFormulaItems(data.formule, 'gateaux', getGateaux())
+  const included = isCategoryIncluded(data.formule, 'gateaux')
   const nbPersonnes = data.nbPersonnes || 0
   const [popupGateau, setPopupGateau] = useState(null)
 
@@ -80,6 +82,8 @@ export default function Step5Gateau({ data, onChange, onNext, onBack }) {
     <div>
       <h2 style={{ marginBottom: '8px', color: '#1a1a2e' }}>Pièce montée / Gâteau</h2>
       <p className="text-muted mb-3">Choisissez votre gâteau pour {nbPersonnes} personnes</p>
+      {included && <p>Inclus dans votre forfait — aucun supplément.</p>}
+      {!gateaux.length && <p role="alert">Aucun gâteau disponible pour cette formule. Veuillez revenir au choix de la formule ou nous contacter.</p>}
 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: '16px', marginBottom: '24px' }}>
         {gateaux.map((g) => {
@@ -106,9 +110,9 @@ export default function Step5Gateau({ data, onChange, onNext, onBack }) {
               )}
               <div style={{ fontWeight: '600', marginBottom: '8px' }}>{g.nomGateau}</div>
               <div style={{ fontWeight: '800', color: g.tarif > 0 ? '#c9a84c' : '#27ae60', fontSize: '18px' }}>
-                {g.tarif > 0 ? `${g.tarif} €/pers.` : 'Gratuit'}
+                {included ? 'Inclus dans votre forfait' : g.tarif > 0 ? `${g.tarif} €/pers.` : 'Gratuit'}
               </div>
-              {g.tarif > 0 && nbPersonnes > 0 && (
+              {!included && g.tarif > 0 && nbPersonnes > 0 && (
                 <div style={{ fontSize: '12px', color: '#888', marginTop: '4px' }}>
                   Total : {total.toLocaleString('fr-FR')} €
                 </div>

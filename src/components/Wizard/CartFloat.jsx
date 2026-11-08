@@ -1,22 +1,8 @@
 import { useIsMobile } from '../../hooks/useIsMobile'
-
-function calcMenuItemTotal(item, nbAdultes, nbEnfants) {
-  if (!item.tarif) return 0
-  if (item.section === 'Cocktail de bienvenu') return item.tarif * (nbAdultes + nbEnfants)
-  if (item.section === 'Menu enfants') return item.tarif * nbEnfants
-  if (item.section === 'Boissons') return 0
-  return item.tarif * nbAdultes
-}
+import { calculateQuote } from '../../utils/formulePricing'
 
 export default function CartFloat({ data }) {
-  const nbAdultes = parseInt(data.nbAdultes) || data.nbPersonnes || 0
-  const nbEnfants = parseInt(data.nbEnfants) || 0
-  const nbPersonnes = nbAdultes + nbEnfants
-  const prixSalle = data.prixSalle || 0
-  const menuTotal = (data.menus || []).reduce((sum, m) => sum + calcMenuItemTotal(m, nbAdultes, nbEnfants), 0)
-  const gateauTotal = (data.gateau?.tarif || 0) * nbPersonnes
-  const prestationsTotal = (data.prestations || []).reduce((sum, p) => sum + (p.tarif || 0), 0)
-  const totalTTC = prixSalle + menuTotal + gateauTotal + prestationsTotal
+  const { nbPersonnes, totalTTC } = calculateQuote(data)
   const isMobile = useIsMobile()
 
   if (totalTTC === 0) return null

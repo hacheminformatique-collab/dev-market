@@ -7,6 +7,8 @@ import { initStorage } from './utils/storage'
 import { PAGE_TYPES_BY_ID } from './data/pageTypes'
 import PublicWeddingDirectory from './components/PublicWeddingDirectory'
 import { storageProfile } from './utils/storageProfiles'
+import { adminPaths, siteAdminRequest } from './utils/siteAdministration'
+import PageAnalytics from './components/PageAnalytics'
 
 const AdminLogin = lazy(() => import('./components/AdminLogin'))
 const Dashboard = lazy(() => import('./components/Dashboard/Dashboard'))
@@ -28,22 +30,36 @@ function LegacyVillesRedirect() {
 }
 
 function ProtectedDashboard() {
+  const [verified, setVerified] = useState(false)
+  const [failed, setFailed] = useState(false)
+  useEffect(() => {
+    let cancelled = false
+    siteAdminRequest().then(async () => {
+      await initStorage({ names: ['settings'], reload: true, paced: false, persistDefaults: false })
+      if (!cancelled) setVerified(true)
+    }).catch(() => { if (!cancelled) { sessionStorage.removeItem('adminAuth'); setFailed(true) } })
+    return () => { cancelled = true }
+  }, [])
+  if (failed) return <Navigate to={adminPaths().login} replace />
   if (!sessionStorage.getItem('adminAuth')) {
-    return <Navigate to="/admin" replace />
+    return <Navigate to={adminPaths().login} replace />
   }
+  if (!verified) return <p role="status">Vérification de l’accès…</p>
   return <Dashboard />
 }
 
 function AppContent() {
   const { pathname } = useLocation()
+  const paths = adminPaths()
+  const isAdmin = pathname === paths.login || pathname === paths.dashboard
   const [readyPath, setReadyPath] = useState('')
   const [error, setError] = useState('')
-  const profile = storageProfile(pathname)
+  const profile = storageProfile(pathname, paths)
   const waitsForStorage = pathname !== '/devis' && (!profile || profile.names.some((name) => name !== 'settings'))
 
   useEffect(() => {
     let cancelled = false
-    initStorage(storageProfile(pathname)).then(() => {
+    initStorage(storageProfile(pathname, paths)).then(() => {
       if (!cancelled) { setError(''); setReadyPath(pathname) }
     }).catch((err) => {
       console.error('[Storage]', err)
@@ -53,6 +69,9 @@ function AppContent() {
   }, [pathname])
 
   if (error) return <p role="alert">Chargement impossible : {error}</p>
+  if (document.getElementById('site-maintenance') && pathname !== '/' && !isAdmin) {
+    return <main><h1>Site en maintenance</h1><p>Seule la page d’accueil reste accessible.</p><a href="/">Retour à l’accueil</a></main>
+  }
   if (readyPath !== pathname && waitsForStorage) {
     return (
       <div style={{
@@ -74,6 +93,7 @@ function AppContent() {
 
   return (
     <>
+      <PageAnalytics enabled={!isAdmin} />
       <SeoManager settingsVersion={readyPath} />
       <PublicWeddingDirectory />
       <Suspense fallback={(
@@ -95,8 +115,8 @@ function AppContent() {
       >
         <Routes>
           <Route path="/" element={<HomePage />} />
-          <Route path="/admin" element={<AdminLogin />} />
-          <Route path="/dashboard" element={<ProtectedDashboard />} />
+          <Route path={paths.login} element={<AdminLogin />} />
+          <Route path={paths.dashboard} element={<ProtectedDashboard />} />
           <Route path="/devis" element={<WizardForm />} />
           <Route path="/espace-client" element={<SpaceAccess kind="client" />} />
           <Route path="/espace-staff" element={<SpaceAccess kind="staff" />} />

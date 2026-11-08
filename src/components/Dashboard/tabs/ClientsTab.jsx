@@ -4,6 +4,7 @@ import { generatePDF } from '../../PDF/generatePDF'
 import { generatePaymentReceiptPDF } from '../../PDF/generatePaymentReceipt'
 import { useIsMobile } from '../../../hooks/useIsMobile'
 import { getDocsLocal, fetchDocsServer, getReceiptsLocal, fetchReceiptsServer, saveReceiptsAny } from '../../../utils/clientFiles'
+import { calculateQuote, getFormulaItems } from '../../../utils/formulePricing'
 
 function getDocs(devisId) {
   const local = getDocsLocal(devisId)
@@ -71,20 +72,7 @@ function Voyant({ ok }) {
 }
 
 function calcTotal(devis) {
-  const nbAdultes = parseInt(devis.nbAdultes) || devis.nbPersonnes || 0
-  const nbEnfants = parseInt(devis.nbEnfants) || 0
-  const nbP = nbAdultes + nbEnfants
-  const prixSalle = devis.prixSalle || 0
-  const menuTotal = (devis.menus || []).reduce((s, m) => {
-    if (!m.tarif) return s
-    if (m.section === 'Cocktail de bienvenu') return s + m.tarif * (nbAdultes + nbEnfants)
-    if (m.section === 'Menu enfants') return s + m.tarif * nbEnfants
-    if (m.section === 'Boissons') return s
-    return s + m.tarif * nbAdultes
-  }, 0)
-  const gateauTotal = (devis.gateau?.tarif || 0) * nbP
-  const prestationsTotal = (devis.prestations || []).reduce((s, p) => s + (p.tarif || 0), 0)
-  return prixSalle + menuTotal + gateauTotal + prestationsTotal
+  return calculateQuote(devis).totalTTC
 }
 
 function PaymentBar({ client }) {
@@ -263,7 +251,7 @@ export default function ClientsTab() {
 
   function handleAdminValidate(id) {
     if (!confirm('Valider et signer définitivement ce devis ? Une confirmation sera envoyée au client.')) return
-    const updated = clients.map((c) => c.id === id ? { ...c, status: 'validé_admin', adminValidatedAt: new Date().toISOString() } : c)
+    const updated = clients.map((c) => c.id === id ? { ...c, calendarExcluded: false, accountingExcluded: false, status: 'validé_admin', adminValidatedAt: new Date().toISOString() } : c)
     saveClients(updated)
     setClients(updated)
     const validated = updated.find((c) => c.id === id)
@@ -282,6 +270,7 @@ export default function ClientsTab() {
       c.id === selected.id ? {
         ...c,
         payments: [...(c.payments || []), payment],
+        accountingExcluded: false,
         paymentReceipts: [...(c.paymentReceipts || []), {
           id: receiptId,
           receiptNumber,
@@ -605,19 +594,19 @@ export default function ClientsTab() {
                     </div>
                   </div>
                   <div style={{ marginBottom: '10px' }}>
-                    <label style={{ fontSize: '11px', color: '#888' }}>Prix salle (€)</label>
+                    <label style={{ fontSize: '11px', color: '#888' }}>{selected.formule?.forfait ? 'Prix global du forfait TTC (€)' : 'Prix salle (€)'}</label>
                     <input type="number" min="0" className="form-control" value={editData.prixSalle}
                       onChange={(e) => setEditData((d) => ({ ...d, prixSalle: e.target.value }))}
                       style={{ fontSize: '12px', padding: '6px 10px' }} />
                   </div>
                   <div style={{ marginBottom: '10px' }}>
                     <label style={{ fontSize: '11px', color: '#888', display: 'block', marginBottom: '4px' }}>Menus</label>
-                    {getMenus().map((m) => (
+                    {getFormulaItems(selected.formule, 'menus', getMenus()).map((m) => (
                       <label key={m.id} style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12px', marginBottom: '4px', cursor: 'pointer' }}>
                         <input type="checkbox"
                           checked={editData.menus.some((em) => em.id === m.id)}
                           onChange={() => toggleEditMenu(m)} />
-                        {m.nomMenu}{m.tarif > 0 ? ` — ${m.tarif} €/pers.` : ' (Inclus)'}
+                        {m.nomMenu}{selected.formule?.forfait ? ' — Inclus dans le forfait' : m.tarif > 0 ? ` — ${m.tarif} €/pers.` : ' (Inclus)'}
                       </label>
                     ))}
                   </div>
@@ -630,19 +619,19 @@ export default function ClientsTab() {
                         setEditData((d) => ({ ...d, gateau: g }))
                       }}>
                       <option value="">— Aucun —</option>
-                      {getGateaux().map((g) => (
-                        <option key={g.id} value={g.id}>{g.nomGateau} — {g.tarif} €/pers.</option>
+                      {getFormulaItems(selected.formule, 'gateaux', getGateaux()).map((g) => (
+                        <option key={g.id} value={g.id}>{g.nomGateau} — {selected.formule?.forfait ? 'Inclus dans le forfait' : `${g.tarif} €/pers.`}</option>
                       ))}
                     </select>
                   </div>
                   <div style={{ marginBottom: '12px' }}>
                     <label style={{ fontSize: '11px', color: '#888', display: 'block', marginBottom: '4px' }}>Prestations</label>
-                    {getPrestations().map((p) => (
+                    {getFormulaItems(selected.formule, 'prestations', getPrestations()).map((p) => (
                       <label key={p.id} style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12px', marginBottom: '4px', cursor: 'pointer' }}>
                         <input type="checkbox"
                           checked={editData.prestations.some((ep) => ep.id === p.id)}
                           onChange={() => toggleEditPrestation(p)} />
-                        {p.nomPresta} — {p.tarif} €
+                        {p.nomPresta} — {selected.formule?.forfait ? 'Inclus dans le forfait' : `${p.tarif} €`}
                       </label>
                     ))}
                   </div>
@@ -659,7 +648,7 @@ export default function ClientsTab() {
                       <strong>Menus :</strong>
                       <ul style={{ paddingLeft: '16px' }}>
                         {selected.menus.map((m) => (
-                          <li key={m.id}>{m.nomMenu} — {m.tarif > 0 ? `${m.tarif} €/pers.` : 'Inclus'}</li>
+                          <li key={m.id}>{m.nomMenu} — {selected.formule?.forfait ? 'Inclus dans le forfait' : m.tarif > 0 ? `${m.tarif} €/pers.` : 'Inclus'}</li>
                         ))}
                       </ul>
                     </div>
@@ -670,7 +659,7 @@ export default function ClientsTab() {
                       <strong>Prestations :</strong>
                       <ul style={{ paddingLeft: '16px' }}>
                         {selected.prestations.map((p) => (
-                          <li key={p.id}>{p.nomPresta} — {p.tarif} €</li>
+                          <li key={p.id}>{p.nomPresta} — {selected.formule?.forfait ? 'Inclus dans le forfait' : `${p.tarif} €`}</li>
                         ))}
                       </ul>
                     </div>

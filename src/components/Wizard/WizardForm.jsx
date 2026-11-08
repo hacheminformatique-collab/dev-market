@@ -12,6 +12,9 @@ import Step6Options from './steps/Step6Options'
 import CartFloat from './CartFloat'
 import VideoHero from '../VideoHero'
 import PublicHeader from '../PublicHeader'
+import { getQuoteSteps } from '../../utils/formulePricing'
+import QuoteRequestGuard from '../QuoteRequestGuard'
+import { assertQuoteRequestsAvailable } from '../../utils/quoteMaintenance'
 
 const STEP_LABELS = ['Coordonnées', 'Événement', 'Formule', 'Menu', 'Gâteau', 'Options', 'Récapitulatif']
 const Step7Summary = lazy(() => import('./steps/Step7Summary'))
@@ -38,6 +41,10 @@ function getFlowId() {
 }
 
 export default function WizardForm({ inline = false }) {
+  return <QuoteRequestGuard><WizardContent inline={inline} /></QuoteRequestGuard>
+}
+
+function WizardContent({ inline }) {
   const navigate = useNavigate()
   const [step, setStep] = useState(1)
   const [formData, setFormData] = useState({})
@@ -45,6 +52,7 @@ export default function WizardForm({ inline = false }) {
   const [followupError, setFollowupError] = useState('')
   const [pendingFollowup, setPendingFollowup] = useState(null)
   const [followupSkipped, setFollowupSkipped] = useState(false)
+  const [quoteBlocked, setQuoteBlocked] = useState(false)
   const [flowId, setFlowId] = useState(getFlowId)
   const followupInFlight = useRef(false)
 
@@ -91,10 +99,16 @@ export default function WizardForm({ inline = false }) {
       heureFin: formData.heureFin || '',
       commentaire: formData.commentaire || '',
     })
-    if (stage >= 3) summary.formule = formData.formule?.nomFormule || ''
-    const dryFormula = formData.formule?.nomFormule?.toLowerCase().includes('sèche')
-    if (stage >= 4 && !dryFormula) summary.menus = (formData.menus || []).map((menu) => ({ section: menu.section, name: menu.nomMenu }))
-    if (stage >= 5 && !dryFormula) {
+    if (stage >= 3) {
+      summary.formule = formData.formule?.nomFormule || ''
+      if (formData.formule?.forfait) {
+        summary.forfait = true
+        summary.categoriesIncluses = Object.keys(formData.formule.inclusions || {})
+      }
+    }
+    const visibleSteps = getQuoteSteps(formData.formule)
+    if (stage >= 4 && visibleSteps.includes(4)) summary.menus = (formData.menus || []).map((menu) => ({ section: menu.section, name: menu.nomMenu }))
+    if (stage >= 5 && visibleSteps.includes(5)) {
       summary.gateau = formData.gateau?.nomGateau || ''
       summary.gateauDetails = formData.gateauPersonnalisation || null
     }
@@ -123,6 +137,8 @@ export default function WizardForm({ inline = false }) {
     followupInFlight.current = true
     setFollowupError('')
     try {
+      await assertQuoteRequestsAvailable()
+      setQuoteBlocked(false)
       await ensureStepStorage(targetStep)
       const response = await siteFetch('/api/notify.php', {
         method: 'POST',
@@ -144,6 +160,7 @@ export default function WizardForm({ inline = false }) {
       setPendingFollowup(null)
       setFollowupSkipped(false)
     } catch (error) {
+      setQuoteBlocked(error.quoteMaintenance === true)
       setFollowupError(error.message || 'Erreur de transmission. Veuillez réessayer.')
       setPendingFollowup({ targetStep, stage })
     } finally {
@@ -174,9 +191,9 @@ export default function WizardForm({ inline = false }) {
               <button type="button" className="btn btn-outline" onClick={() => advanceValidatedSection(pendingFollowup.targetStep, pendingFollowup.stage)}>
                 Réessayer l’envoi
               </button>
-              <button type="button" className="btn btn-outline" onClick={continueWithoutFollowup}>
+              {!quoteBlocked && <button type="button" className="btn btn-outline" onClick={continueWithoutFollowup}>
                 Continuer sans envoyer le récapitulatif
-              </button>
+              </button>}
             </div>
           </div>
         )}
@@ -184,33 +201,21 @@ export default function WizardForm({ inline = false }) {
     )
   }
 
-  function isLocationSeche() {
-    return formData.formule?.nomFormule?.toLowerCase().includes('sèche')
+  const visibleSteps = getQuoteSteps(formData.formule)
+  function nextStep(currentStep) {
+    return visibleSteps[visibleSteps.indexOf(currentStep) + 1] || 7
   }
-
   function prevStep() {
-    if (step === 6 && isLocationSeche()) {
-      setStep(3) // go back to formule
-    } else {
-      setStep((s) => Math.max(s - 1, 1))
-    }
+    setStep(visibleSteps[Math.max(0, visibleSteps.indexOf(step) - 1)])
   }
-
-  // Visual step indicator: steps 4 & 5 highlighted when applicable
-  function getDisplayStep() {
-    if (isLocationSeche() && step === 6) return 4 // visually step 4/5 (skipped)
-    if (step > 5) return step - (isLocationSeche() ? 2 : 0)
-    return step
-  }
-
-  const totalVisibleSteps = isLocationSeche() ? 5 : 7
-  const displayStep = getDisplayStep()
+  const totalVisibleSteps = visibleSteps.length
+  const displayStep = visibleSteps.indexOf(step) + 1
 
   const showCart = step >= 3
 
   if (inline) {
     return (
-      <div style={{ background: '#f8f5f0', borderRadius: '12px', overflow: 'hidden' }}>
+      <div className="quote-wizard" style={{ background: '#f8f5f0', color: '#2c2c2c', borderRadius: '12px', overflow: 'hidden' }}>
         {/* Progress bar */}
         <div style={{ background: 'white', padding: '16px 24px', borderBottom: '1px solid #eee' }}>
           <div style={{ display: 'flex', gap: '4px', marginBottom: '8px' }}>
@@ -238,11 +243,11 @@ export default function WizardForm({ inline = false }) {
             {renderFollowupNotice()}
             {step === 1 && <Step1Client data={formData} onChange={updateField} onNext={() => advanceValidatedSection(2, 1)} conditionsAccepted={conditionsAccepted} onConditionsChange={updateConditionsAcceptance} />}
             {step === 2 && <Step2Event data={formData} onChange={updateField} onNext={() => advanceValidatedSection(3, 2)} onBack={() => setStep(1)} />}
-            {step === 3 && <Step3Formule data={formData} onChange={updateField} onNext={() => advanceValidatedSection(isLocationSeche() ? 6 : 4, 3)} onBack={() => setStep(2)} />}
-            {step === 4 && <Step4Menu data={formData} onChange={updateField} onNext={() => advanceValidatedSection(5, 4)} onBack={() => setStep(3)} />}
-            {step === 5 && <Step5Gateau data={formData} onChange={updateField} onNext={() => advanceValidatedSection(6, 5)} onBack={() => setStep(4)} />}
+            {step === 3 && <Step3Formule data={formData} onChange={updateField} onNext={() => advanceValidatedSection(nextStep(3), 3)} onBack={prevStep} />}
+            {step === 4 && <Step4Menu data={formData} onChange={updateField} onNext={() => advanceValidatedSection(nextStep(4), 4)} onBack={prevStep} />}
+            {step === 5 && <Step5Gateau data={formData} onChange={updateField} onNext={() => advanceValidatedSection(nextStep(5), 5)} onBack={prevStep} />}
             {step === 6 && <Step6Options data={formData} onChange={updateField} onNext={() => advanceValidatedSection(7, 6)} onBack={prevStep} />}
-            {step === 7 && <Suspense fallback={<p role="status">Chargement du récapitulatif…</p>}><Step7Summary data={formData} onBack={() => setStep(6)} onSubmit={handleQuoteSubmitted} /></Suspense>}
+            {step === 7 && <Suspense fallback={<p role="status">Chargement du récapitulatif…</p>}><Step7Summary data={{ ...formData, quoteFlowId: flowId }} onBack={prevStep} onSubmit={handleQuoteSubmitted} /></Suspense>}
           </div>
         </div>
 
@@ -297,11 +302,11 @@ export default function WizardForm({ inline = false }) {
           {renderFollowupNotice()}
           {step === 1 && <Step1Client data={formData} onChange={updateField} onNext={() => advanceValidatedSection(2, 1)} conditionsAccepted={conditionsAccepted} onConditionsChange={updateConditionsAcceptance} />}
           {step === 2 && <Step2Event data={formData} onChange={updateField} onNext={() => advanceValidatedSection(3, 2)} onBack={() => setStep(1)} />}
-          {step === 3 && <Step3Formule data={formData} onChange={updateField} onNext={() => advanceValidatedSection(isLocationSeche() ? 6 : 4, 3)} onBack={() => setStep(2)} />}
-          {step === 4 && <Step4Menu data={formData} onChange={updateField} onNext={() => advanceValidatedSection(5, 4)} onBack={() => setStep(3)} />}
-          {step === 5 && <Step5Gateau data={formData} onChange={updateField} onNext={() => advanceValidatedSection(6, 5)} onBack={() => setStep(4)} />}
+          {step === 3 && <Step3Formule data={formData} onChange={updateField} onNext={() => advanceValidatedSection(nextStep(3), 3)} onBack={prevStep} />}
+          {step === 4 && <Step4Menu data={formData} onChange={updateField} onNext={() => advanceValidatedSection(nextStep(4), 4)} onBack={prevStep} />}
+          {step === 5 && <Step5Gateau data={formData} onChange={updateField} onNext={() => advanceValidatedSection(nextStep(5), 5)} onBack={prevStep} />}
           {step === 6 && <Step6Options data={formData} onChange={updateField} onNext={() => advanceValidatedSection(7, 6)} onBack={prevStep} />}
-          {step === 7 && <Suspense fallback={<p role="status">Chargement du récapitulatif…</p>}><Step7Summary data={formData} onBack={() => setStep(6)} onSubmit={handleQuoteSubmitted} /></Suspense>}
+          {step === 7 && <Suspense fallback={<p role="status">Chargement du récapitulatif…</p>}><Step7Summary data={{ ...formData, quoteFlowId: flowId }} onBack={prevStep} onSubmit={handleQuoteSubmitted} /></Suspense>}
         </div>
       </div>
 

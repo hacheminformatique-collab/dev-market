@@ -1,4 +1,5 @@
 import { siteFetch as fetch } from './siteFetch'
+import { canonicalCityPages, legacyCityAliases } from './cityPageIdentity'
 /**
  * Storage helpers for the "Pages Client" feature.
  *
@@ -56,14 +57,39 @@ async function _set(key, data, requireServer = false) {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(data),
     })
-    if (requireServer && (!response.ok || !(await response.json())?.ok)) {
-      throw new Error(`Stockage serveur refusé (HTTP ${response.status}).`)
-    }
+    if (requireServer) await confirmStorage(response)
   } catch (error) {
     if (requireServer) {
       console.error('[CityPagesStorage]', error)
-      throw new Error('Enregistrement serveur impossible. Une copie locale a été tentée ; vérifiez le stockage PHP avant de continuer.', { cause: error })
+      throw new Error(`Enregistrement serveur impossible. ${error.message} Une copie locale a été tentée.`, { cause: error })
     }
+  }
+}
+
+async function confirmStorage(response, endpoint = 'api/storage.php') {
+  const text = await response.text()
+  let result
+  try { result = JSON.parse(text) } catch { /* Hosting error pages are not JSON. */ }
+  if (!response.ok || !result?.ok) {
+    const detail = typeof result?.error === 'string' ? result.error : (
+      response.status === 413 ? 'La requête dépasse la limite de taille de l’hébergement.' :
+        `Réponse de stockage invalide. Vérifiez le déploiement de ${endpoint} et les journaux PHP.`
+    )
+    throw new Error(`HTTP ${response.status} : ${detail}`)
+  }
+}
+
+async function pageOperation(key, action, payload) {
+  try {
+    const response = await fetch(`/api/city-page-storage.php?key=${encodeURIComponent(key)}&action=${action}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    })
+    await confirmStorage(response, 'api/city-page-storage.php')
+  } catch (error) {
+    console.error('[CityPagesStorage]', error)
+    throw new Error(`Enregistrement serveur impossible. ${error.message}`, { cause: error })
   }
 }
 
@@ -96,11 +122,11 @@ export async function saveCityPagesConfig(config) {
  * Returns the map of generated pages:  { [citySlug]: { content, generatedAt } }
  */
 export async function getCityPages() {
-  return (await _get(KEY_PAGES)) || {}
+  return canonicalCityPages((await _get(KEY_PAGES)) || {})
 }
 
 export async function saveCityPages(pages) {
-  await _set(KEY_PAGES, pages)
+  await _set(KEY_PAGES, canonicalCityPages(pages))
 }
 
 // ── Photo gallery ──────────────────────────────────────────────────────────
@@ -150,12 +176,12 @@ export function makePageTypeStorage(typeId) {
   const kPages  = _keyPages(typeId)
   const kBackup = _keyBackup(typeId)
 
-  async function getConfig() {
+  async function getConfig({ requireServer = false } = {}) {
     // For non-mariage types, fall back to the global mariage config for
     // shared fields (businessName, token, social, maps key) when no
     // type-specific config exists yet.
-    const global = await _get(KEY_CONFIG)
-    const local  = await _get(kConfig)
+    const global = await _get(KEY_CONFIG, requireServer)
+    const local  = kConfig === KEY_CONFIG ? global : await _get(kConfig, requireServer)
     const base   = {
       ...DEFAULT_CONFIG,
       ...(global || {}),   // inherit shared settings
@@ -169,15 +195,35 @@ export function makePageTypeStorage(typeId) {
   }
 
   async function getPages({ requireServer = false } = {}) {
-    return (await _get(kPages, requireServer)) || {}
+    return canonicalCityPages((await _get(kPages, requireServer)) || {})
   }
 
   async function savePages(pages, { requireServer = false } = {}) {
-    await _set(kPages, pages, requireServer)
+    await _set(kPages, canonicalCityPages(pages), requireServer)
   }
 
-  async function getGallery() {
-    return (await _get(KEY_GALLERY)) || []
+  async function savePage(slug, page) {
+    const [canonical] = Object.keys(canonicalCityPages({ [slug]: page }))
+    const legacySlug = Object.keys(legacyCityAliases).find((key) => legacyCityAliases[key] === canonical)
+    await pageOperation(kPages, 'save-page', { slug: canonical, page, legacySlug })
+  }
+
+  async function migratePageKeys() {
+    const raw = (await _get(kPages, true)) || {}
+    const moves = Object.entries(raw).flatMap(([slug, page]) => {
+      const [canonical] = Object.keys(canonicalCityPages({ [slug]: page }))
+      return canonical !== slug ? [[slug, canonical]] : []
+    })
+    if (!moves.length) return canonicalCityPages(raw)
+    await backupPages({ requireServer: true })
+    for (let i = 0; i < moves.length; i += 250) {
+      await pageOperation(kPages, 'migrate-pages', { aliases: Object.fromEntries(moves.slice(i, i + 250)) })
+    }
+    return canonicalCityPages(raw)
+  }
+
+  async function getGallery({ requireServer = false } = {}) {
+    return (await _get(KEY_GALLERY, requireServer)) || []
   }
 
   async function saveGallery(photos) {
@@ -185,6 +231,10 @@ export function makePageTypeStorage(typeId) {
   }
 
   async function backupPages({ requireServer = false } = {}) {
+    if (requireServer) {
+      await pageOperation(kPages, 'backup-pages', {})
+      return
+    }
     const current = await getPages({ requireServer })
     if (!current || Object.keys(current).length === 0) return
     const existing = (await _get(kBackup, requireServer)) || []
@@ -196,7 +246,7 @@ export function makePageTypeStorage(typeId) {
     return (await _get(kBackup)) || []
   }
 
-  return { getConfig, saveConfig, getPages, savePages, getGallery, saveGallery, backupPages, getBackups }
+  return { getConfig, saveConfig, getPages, savePages, savePage, migratePageKeys, getGallery, saveGallery, backupPages, getBackups }
 }
 
 export function generateLocalCityContent(cityName, deptName, keywords, businessName, businessType, mainKeyword) {

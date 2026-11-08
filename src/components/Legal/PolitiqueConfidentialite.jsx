@@ -1,7 +1,13 @@
+import { useState } from 'react'
 import { getSettings } from '../../utils/storage'
 import LegalLayout from './LegalLayout'
+import { setAnalyticsOptOut } from '../../utils/siteAnalytics'
 
 export default function PolitiqueConfidentialite() {
+  const [analyticsDisabled, setAnalyticsDisabled] = useState(() => {
+    try { return localStorage.getItem('paradise_analytics_opt_out') === 'true' } catch { return false }
+  })
+  const [analyticsPreferenceError, setAnalyticsPreferenceError] = useState('')
   const s = getSettings()
   const l = s.legalInfo || {}
   const raisonSociale = l.raisonSociale || 'SARL AFM'
@@ -23,7 +29,8 @@ export default function PolitiqueConfidentialite() {
       <ul style={{ paddingLeft: '20px', lineHeight: '2' }}>
         <li>Nom, prénom, adresse e-mail, numéro de téléphone (via le formulaire de devis) ;</li>
         <li>Date et type d&apos;événement souhaité ;</li>
-        <li>Toute information communiquée volontairement lors d&apos;une prise de contact.</li>
+        <li>Toute information communiquée volontairement lors d&apos;une prise de contact ;</li>
+        <li>Données de fréquentation agrégées : pages consultées et nombre estimé de navigateurs uniques par jour, sans adresse IP ni donnée d&apos;identité.</li>
       </ul>
 
       <h2 style={h2}>3. Finalités du traitement</h2>
@@ -32,6 +39,7 @@ export default function PolitiqueConfidentialite() {
         <li>Établir et transmettre un devis personnalisé ;</li>
         <li>Gérer la relation client (suivi de dossier, facturation) ;</li>
         <li>Répondre à vos demandes d&apos;information ;</li>
+        <li>Mesurer la fréquentation et les pages consultées afin d&apos;améliorer le site ;</li>
         <li>Respecter nos obligations légales et réglementaires.</li>
       </ul>
       <p>
@@ -40,7 +48,7 @@ export default function PolitiqueConfidentialite() {
 
       <h2 style={h2}>4. Base légale</h2>
       <p>
-        Le traitement de vos données est fondé sur votre consentement (formulaire de devis) et/ou sur l&apos;exécution d&apos;un contrat (gestion de réservation), conformément à l&apos;article 6 du Règlement Général sur la Protection des Données (RGPD — UE 2016/679).
+        Le formulaire de devis repose sur votre consentement et/ou l&apos;exécution de mesures précontractuelles. La mesure d&apos;audience repose sur l&apos;intérêt légitime à comprendre et améliorer la fréquentation du site ; vous pouvez vous y opposer ci-dessous, conformément à l&apos;article 6 du RGPD (UE 2016/679).
       </p>
 
       <h2 style={h2}>5. Durée de conservation</h2>
@@ -49,12 +57,13 @@ export default function PolitiqueConfidentialite() {
       </p>
       <ul style={{ paddingLeft: '20px', lineHeight: '2' }}>
         <li>3 ans à compter du dernier contact pour les prospects ;</li>
-        <li>10 ans à compter de la clôture du contrat pour les clients (obligations comptables).</li>
+        <li>10 ans à compter de la clôture du contrat pour les clients (obligations comptables) ;</li>
+        <li>13 mois pour les statistiques de fréquentation agrégées.</li>
       </ul>
 
       <h2 style={h2}>6. Destinataires des données</h2>
       <p>
-        Vos données sont strictement réservées à l&apos;usage interne de {raisonSociale}. Elles ne sont en aucun cas transmises, vendues ou louées à des tiers, sauf obligation légale.
+        Les données de devis et les statistiques sont réservées à l&apos;usage interne de {raisonSociale}. Elles ne sont ni vendues ni louées. Les vidéos intégrées peuvent toutefois contacter Instagram ou TikTok, qui traitent les données techniques selon leurs propres règles.
       </p>
 
       <h2 style={h2}>7. Vos droits</h2>
@@ -75,7 +84,24 @@ export default function PolitiqueConfidentialite() {
 
       <h2 style={h2}>8. Cookies</h2>
       <p>
-        Ce site utilise le stockage local (localStorage) de votre navigateur uniquement pour le fonctionnement technique de l&apos;application (données de devis, paramètres). Aucun cookie de traçage ou de publicité n&apos;est utilisé.
+        Ce site utilise le stockage local (localStorage) de votre navigateur pour le fonctionnement technique de l&apos;application et pour un identifiant aléatoire renouvelé chaque jour. Il sert uniquement à estimer le nombre de navigateurs uniques par jour ; le serveur n&apos;en conserve qu&apos;une empreinte pseudonymisée propre à la journée, sans l&apos;associer à votre identité. L&apos;adresse IP n&apos;est pas enregistrée dans ces statistiques, conservées pendant 13 mois. Aucun outil publicitaire ou analytique tiers n&apos;est utilisé pour ces mesures.
+      </p>
+      <p>
+        <button type="button" className="btn btn-outline btn-sm" onClick={() => {
+          const disabled = !analyticsDisabled
+          if (!setAnalyticsOptOut(disabled)) {
+            setAnalyticsPreferenceError('Le réglage de votre navigateur n’a pas pu être enregistré.')
+            return
+          }
+          setAnalyticsDisabled(disabled)
+          setAnalyticsPreferenceError('')
+        }}>
+          {analyticsDisabled ? 'Réactiver la mesure d’audience' : 'Désactiver la mesure d’audience'}
+        </button>
+      </p>
+      {analyticsPreferenceError && <p role="alert">{analyticsPreferenceError}</p>}
+      <p>
+        Certaines pages peuvent afficher des vidéos Instagram ou TikTok intégrées. Le chargement de ces contenus peut transmettre des données techniques, comme votre adresse IP, au réseau social concerné, selon ses propres règles de confidentialité.
       </p>
 
       <h2 style={h2}>9. Réclamation</h2>

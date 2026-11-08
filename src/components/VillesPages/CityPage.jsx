@@ -2,7 +2,7 @@ import { siteFetch as fetch } from '../../utils/siteFetch'
 import { useEffect, useState } from 'react'
 import { useParams, Link as RouterLink } from 'react-router-dom'
 import { makePageTypeStorage, getCityPagesConfig } from '../../utils/cityPageStorage'
-import { getCityBySlug, getNearbyCities, haversineKm } from '../../data/idf-cities'
+import { getCityBySlug, getNearbyCities } from '../../data/idf-cities'
 import { PAGE_TYPES } from '../../data/pageTypes'
 import { getBlogArticles } from '../../utils/blogStorage'
 import WizardForm from '../Wizard/WizardForm'
@@ -14,15 +14,13 @@ import { normalizeCityName } from '../../utils/cityNames'
 import { resolveWeddingSourceLayout } from '../../utils/weddingSourceLayout'
 import WeddingSourceSections from './WeddingSourceSections'
 import PublicHeader from '../PublicHeader'
-import { normalizeWeddingDisplayText } from '../../utils/weddingDisplayText'
+import { normalizeWeddingDisplayText, withoutTestimonials } from '../../utils/weddingDisplayText'
+import { PARADISE_ADDRESS, PARADISE_COORDS, validateWeddingTravel } from '../../utils/weddingTravel'
 
 function Link(props) {
   return <RouterLink {...props} reloadDocument />
 }
 
-// ── Paradise 77 location (5 avenue Fridingen, 77100 Nanteuil-lès-Meaux) ──────
-const PARADISE_LAT = 48.9617
-const PARADISE_LNG = 2.8985
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -30,11 +28,8 @@ function cityVariant(name, n = 3) {
   return name.split('').reduce((acc, c) => acc + c.charCodeAt(0), 0) % n
 }
 
-function getTravelInfo(city) {
-  const km = haversineKm({ lat: city.lat, lng: city.lng }, { lat: PARADISE_LAT, lng: PARADISE_LNG })
-  const roadKm = Math.round(km * 1.35)
-  const driveMin = Math.max(10, Math.round(roadKm / 80 * 60))
-  return { km: Math.round(km), roadKm, driveMin }
+function drivingDuration(city) {
+  return city.travel ? `en environ ${city.travel.minutes} minutes en voiture` : 'en voiture'
 }
 
 // Clean AI-generated text before rendering:
@@ -120,8 +115,8 @@ function Section({ id, title, children, style }) {
 function CityMap({ city, apiKey }) {
   if (!city) return null
   const src = apiKey
-    ? `https://www.google.com/maps/embed/v1/place?key=${encodeURIComponent(apiKey)}&q=${encodeURIComponent('Le Paradise, 5 avenue Fridingen, 77100 Nanteuil-lès-Meaux, France')}&zoom=14`
-    : `https://www.google.com/maps?q=${PARADISE_LAT},${PARADISE_LNG}&output=embed`
+    ? `https://www.google.com/maps/embed/v1/place?key=${encodeURIComponent(apiKey)}&q=${encodeURIComponent(PARADISE_ADDRESS)}&center=${PARADISE_COORDS.lat},${PARADISE_COORDS.lng}&zoom=16`
+    : `https://maps.google.com/maps?q=${encodeURIComponent(PARADISE_ADDRESS)}&ll=${PARADISE_COORDS.lat},${PARADISE_COORDS.lng}&z=16&output=embed`
   return (
     <div style={{ borderRadius: '12px', overflow: 'hidden', border: '2px solid var(--gold)', boxShadow: 'var(--shadow-md)' }}>
       <iframe
@@ -172,19 +167,84 @@ function GalleryGrid({ photos }) {
 
 // ── Instagram post embed ───────────────────────────────────────────────────────
 
-function InstagramEmbed({ url }) {
-  if (!url) return null
-  const embedUrl = url.replace(/\/$/, '') + '/embed'
+function instagramEmbedUrl(value) {
+  try {
+    const url = new URL(value)
+    if (!['instagram.com', 'www.instagram.com'].includes(url.hostname)) return ''
+    const match = url.pathname.match(/^\/(p|reel|tv)\/([A-Za-z0-9_-]+)(?:\/embed)?\/?$/)
+    return match ? {
+      embedUrl: `https://www.instagram.com/${match[1]}/${match[2]}/embed`,
+      postUrl: `https://www.instagram.com/${match[1]}/${match[2]}/`,
+    } : null
+  } catch {
+    return null
+  }
+}
+
+function SocialVideoCard({ platform, profileUrl, embedUrl, title, height = 580 }) {
   return (
-    <iframe
-      src={embedUrl}
-      title="Instagram post"
-      style={{ border: 'none', borderRadius: '12px', width: '328px', minHeight: '440px', maxWidth: '100%' }}
-      scrolling="no"
-      loading="lazy"
-      allowTransparency
-      allow="encrypted-media"
-    />
+    <article style={{
+      width: 'min(100%, 390px)',
+      overflow: 'hidden',
+      background: '#fff',
+      border: '1px solid #e8e4df',
+      borderRadius: '16px',
+      boxShadow: '0 12px 32px rgba(28,28,46,0.10)',
+    }}>
+      <a href={profileUrl} target="_blank" rel="noreferrer noopener"
+        style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '13px 15px', color: 'var(--dark)', textDecoration: 'none' }}>
+        <span aria-hidden="true" style={{
+          display: 'grid', placeItems: 'center', width: '34px', height: '34px', flexShrink: 0,
+          borderRadius: '50%', color: '#fff', fontSize: '19px', fontWeight: 700,
+          background: platform === 'Instagram'
+            ? 'linear-gradient(135deg, #7b39a8, #e1306c 58%, #f6a543)'
+            : '#111',
+        }}>{platform === 'Instagram' ? '◎' : '♪'}</span>
+        <span style={{ minWidth: 0 }}>
+          <strong style={{ display: 'block', fontSize: '14px' }}>{platform}</strong>
+          <span style={{ display: 'block', color: '#777', fontSize: '12px' }}>Voir la publication</span>
+        </span>
+        <span aria-hidden="true" style={{ marginLeft: 'auto', color: 'var(--gold)', fontSize: '20px' }}>↗</span>
+      </a>
+      <iframe
+        src={embedUrl}
+        title={title}
+        style={{ display: 'block', border: 0, width: '100%', height: `${height}px`, background: '#faf9f7' }}
+        scrolling="no"
+        loading="lazy"
+        referrerPolicy="strict-origin-when-cross-origin"
+        allowFullScreen
+        allow="encrypted-media; picture-in-picture; web-share"
+      />
+      <div style={{ padding: '10px 15px', color: '#777', fontSize: '12px' }}>
+        Contenu intégré fourni par {platform}
+      </div>
+    </article>
+  )
+}
+
+function InstagramEmbed({ url, username }) {
+  if (!url) return null
+  const embed = instagramEmbedUrl(url)
+  if (!embed) {
+    return <p role="note" style={{ color: '#777', maxWidth: '390px' }}>Lien Instagram invalide. Utilisez l’URL d’une publication, d’un Reel ou d’une vidéo publique.</p>
+  }
+  return (
+    <div style={{ width: 'min(100%, 400px)' }}>
+      <iframe
+        src={embed.embedUrl}
+        title={username ? `Publication Instagram de @${username}` : 'Publication Instagram'}
+        style={{ display: 'block', border: 0, width: '100%', height: '580px', maxWidth: '100%', background: '#fff' }}
+        scrolling="no"
+        loading="lazy"
+        referrerPolicy="strict-origin-when-cross-origin"
+        allow="encrypted-media; picture-in-picture; web-share"
+      />
+      <a href={embed.postUrl} target="_blank" rel="noreferrer noopener"
+        style={{ display: 'inline-block', marginTop: '8px', color: 'var(--gold)', fontWeight: 600, fontSize: '13px' }}>
+        Ouvrir cette publication sur Instagram
+      </a>
+    </div>
   )
 }
 
@@ -192,18 +252,17 @@ function InstagramEmbed({ url }) {
 
 function TikTokEmbed({ url }) {
   if (!url) return null
-  const match = url.match(/\/video\/(\d+)/)
-  if (!match) return null
+  let parsed
+  try { parsed = new URL(url) } catch { parsed = null }
+  const match = parsed && ['www.tiktok.com', 'tiktok.com'].includes(parsed.hostname)
+    ? parsed.pathname.match(/\/video\/(\d+)/)
+    : null
+  if (!match) {
+    return <p role="note" style={{ color: '#777', maxWidth: '390px' }}>Lien TikTok invalide. Utilisez l’URL complète d’une vidéo publique.</p>
+  }
   const videoId = match[1]
   return (
-    <iframe
-      src={`https://www.tiktok.com/embed/${videoId}`}
-      title="TikTok video"
-      style={{ border: 'none', borderRadius: '12px', width: '325px', height: '575px', maxWidth: '100%' }}
-      loading="lazy"
-      allowFullScreen
-      allow="encrypted-media"
-    />
+    <SocialVideoCard platform="TikTok" profileUrl={`https://www.tiktok.com${parsed.pathname}`} embedUrl={`https://www.tiktok.com/embed/${videoId}`} title="Vidéo TikTok intégrée" height={640} />
   )
 }
 
@@ -399,9 +458,12 @@ function SectionReviews({ page }) {
             <h2 id="google-reviews-heading">Avis Google sur Le Paradise</h2>
             <p>Extraits d’avis reproduits à partir des captures fournies, sans attribution à une ville particulière.</p>
             {reviews.map((review) => (
-              <figure key={review.id} style={{ margin: '20px 0', padding: '16px', borderLeft: '3px solid var(--gold)', background: 'var(--bg-light)' }}>
-                <blockquote style={{ margin: '0 0 12px', overflowWrap: 'anywhere' }}>« {review.excerpt} »</blockquote>
-                <figcaption>{review.author} — {review.rating}/5 sur Google (extrait)</figcaption>
+              <figure key={review.id} style={{ margin: '20px 0', padding: '24px', border: '1px solid #e3e5e8', borderRadius: '12px', background: '#fff', color: '#202124', boxShadow: '0 2px 6px rgba(0,0,0,0.06)' }}>
+                <figcaption style={{ fontWeight: 600, marginBottom: '8px' }}>{review.author}</figcaption>
+                <p style={{ marginBottom: '12px' }}>
+                  {review.rating}/5 sur Google (extrait) <span aria-label={`${review.rating} étoiles sur 5`} style={{ color: '#fbbc04', letterSpacing: '2px' }}>{'★'.repeat(review.rating)}</span>
+                </p>
+                <blockquote style={{ margin: 0, lineHeight: 1.7, overflowWrap: 'anywhere' }}>« {review.excerpt} »</blockquote>
               </figure>
             ))}
             <a href={WEDDING_REVIEW_SOURCE} target="_blank" rel="noopener noreferrer">Consulter la fiche Google de Le Paradise</a>
@@ -411,13 +473,14 @@ function SectionReviews({ page }) {
   )
 }
 
-function SectionIntro({ city, businessName, page }) {
+function SectionIntro({ city, businessName, page, gallery }) {
   return (
     <Section id="intro" title={page.template?.version === 2 ? undefined : `${businessName} — votre réception depuis ${city.name}`}>
       <div style={{ fontSize: '15px', color: 'var(--text)', lineHeight: 1.8 }}>
-        {renderContent(normalizeWeddingDisplayText(page.content, getCityBySlug(city.slug)))}
+        {renderContent(withoutTestimonials(normalizeWeddingDisplayText(page.content, getCityBySlug(city.slug))))}
         <SectionReviews page={page} />
       </div>
+      {gallery}
     </Section>
   )
 }
@@ -425,17 +488,17 @@ function SectionIntro({ city, businessName, page }) {
 // ── 2. Section Pourquoi choisir Le Paradise 77 ────────────────────────────────
 
 function SectionWhyChoose({ city, businessName }) {
-  const travel = getTravelInfo(city)
+  const travel = city.travel
   const v = cityVariant(city.name)
 
   const intros = [
-    `Les habitants de ${city.name} qui souhaitent organiser un mariage ou une réception d'exception connaissent bien ${businessName}. Situé à seulement ${travel.driveMin} minutes en voiture depuis le centre de ${city.name}, notre salle de mariage et de réception allie prestige, accessibilité et services complets. Voici pourquoi des centaines de couples de ${city.name} nous font confiance chaque année.`,
-    `Depuis ${city.name}, rejoindre ${businessName} ne prend que ${travel.driveMin} minutes en voiture — une distance raisonnable pour une salle de mariage d'exception. Notre établissement s'est imposé comme la référence incontournable pour les résidents de ${city.name} qui veulent célébrer leur mariage ou leur réception dans un cadre luxueux et sans compromis.`,
-    `Vous planifiez votre mariage ou votre réception depuis ${city.name} ? ${businessName} est votre allié le plus proche pour un événement inoubliable. En seulement ${travel.driveMin} minutes depuis ${city.name}, vous accédez à une salle de mariage pouvant accueillir jusqu'à 300 invités, avec tous les services nécessaires pour faire de votre journée un souvenir impérissable.`,
+    `Les habitants de ${city.name} qui souhaitent organiser un mariage ou une réception d'exception connaissent bien ${businessName}. Accessible ${drivingDuration(city)} depuis le centre de ${city.name}, notre salle de mariage et de réception allie prestige, accessibilité et services complets. Voici pourquoi des centaines de couples de ${city.name} nous font confiance chaque année.`,
+    `Depuis ${city.name}, vous pouvez rejoindre ${businessName} ${drivingDuration(city)}. Notre établissement s'est imposé comme la référence incontournable pour les résidents de ${city.name} qui veulent célébrer leur mariage ou leur réception dans un cadre luxueux et sans compromis.`,
+    `Vous planifiez votre mariage ou votre réception depuis ${city.name} ? ${businessName} est votre allié pour un événement inoubliable. Depuis ${city.name}, vous accédez ${drivingDuration(city)} à une salle de mariage pouvant accueillir jusqu'à 300 invités, avec tous les services nécessaires pour faire de votre journée un souvenir impérissable.`,
   ]
 
   const cards = [
-    { icon: '⏱', title: 'Temps de trajet', value: `≈ ${travel.driveMin} min en voiture`, desc: `${travel.roadKm} km depuis ${city.name}` },
+    { icon: '⏱', title: 'Temps de trajet', value: travel ? `≈ ${travel.minutes} min en voiture` : 'Consulter l’itinéraire', desc: travel ? `${travel.km} km depuis ${city.name}` : `Depuis ${city.name}` },
     { icon: '🅿', title: 'Parking gratuit', value: '∼ 60 places', desc: 'Surveillé par agent de sécurité' },
     { icon: '🛣', title: 'Accès autoroute', value: 'A4 · A104 · N3', desc: 'A140 · A1 · A3 à proximité' },
     { icon: '🚉', title: 'Gare à proximité', value: 'Gare de Meaux', desc: '15 min en voiture' },
@@ -605,7 +668,7 @@ function SectionReservation({ city, businessName }) {
     },
     {
       n: '02', emoji: '👀', title: 'Visite de la salle',
-      desc: `Rien ne vaut une visite en personne pour se projeter ! Nous vous invitons à découvrir ${businessName} sur rendez-vous. Depuis ${city.name}, un trajet de ${getTravelInfo(city).driveMin} minutes vous permet de visualiser la salle, les équipements, la cuisine et le parking. Notre équipe vous accueille et répond à toutes vos questions lors de cette visite conviviale et sans pression.`,
+      desc: `Rien ne vaut une visite en personne pour se projeter ! Nous vous invitons à découvrir ${businessName} sur rendez-vous. Depuis ${city.name}, rejoignez-nous ${drivingDuration(city)} pour visualiser la salle, les équipements, la cuisine et le parking. Notre équipe vous accueille et répond à toutes vos questions lors de cette visite conviviale et sans pression.`,
     },
     {
       n: '03', emoji: '🖊', title: 'Signature du contrat',
@@ -646,7 +709,7 @@ function SectionReservation({ city, businessName }) {
 function SectionCapacite({ city, businessName }) {
   const v = cityVariant(city.name, 2)
   const intros = [
-    `${businessName} est l'une des salles de réception les plus spacieuses et les mieux équipées d'Île-de-France. Depuis ${city.name}, accédez en ${getTravelInfo(city).driveMin} minutes à un espace capable d'accueillir jusqu'à 300 invités dans des conditions optimales de confort et d'élégance.`,
+    `${businessName} est l'une des salles de réception les plus spacieuses et les mieux équipées d'Île-de-France. Depuis ${city.name}, accédez ${drivingDuration(city)} à un espace capable d'accueillir jusqu'à 300 invités dans des conditions optimales de confort et d'élégance.`,
     `Avec une capacité maximale de 300 personnes, ${businessName} est la salle de réception de référence pour les grands événements depuis ${city.name}. Que vous soyez 80 ou 300 invités, notre espace modulable s'adapte à la taille de votre réunion pour un résultat toujours impeccable.`,
   ]
   const specs = [
@@ -678,11 +741,16 @@ function SectionCapacite({ city, businessName }) {
 // ── 6. Section Galerie ─────────────────────────────────────────────────────────
 
 function SectionGalerie({ gallery, instagramUsername, instagramPosts, tiktokUsername, tiktokPosts }) {
+  const hasContent = gallery?.length || instagramUsername || instagramPosts.length || tiktokUsername || tiktokPosts.length
+  if (!hasContent) return null
   return (
-    <Section id="galerie" title="📸 Galerie & Réseaux sociaux">
+    <div id="galerie" style={{ marginTop: '40px', paddingTop: '28px', borderTop: '1px solid var(--border)' }}>
+      <h3 style={{ fontFamily: 'var(--font-heading)', fontSize: '1.35rem', fontWeight: '700', color: 'var(--dark)', margin: '0 0 20px' }}>
+        📸 Photos & réseaux sociaux
+      </h3>
       {gallery && gallery.length > 0 && (
         <div style={{ marginBottom: '36px' }}>
-          <h3 style={{ fontFamily: 'var(--font-heading)', fontSize: '1.1rem', fontWeight: '700', color: 'var(--dark)', marginBottom: '16px' }}>Notre galerie photos</h3>
+          <h4 style={{ fontFamily: 'var(--font-heading)', fontSize: '1.1rem', fontWeight: '700', color: 'var(--dark)', marginBottom: '16px' }}>Notre galerie photos</h4>
           <GalleryGrid photos={gallery} />
         </div>
       )}
@@ -701,8 +769,8 @@ function SectionGalerie({ gallery, instagramUsername, instagramPosts, tiktokUser
             </p>
           )}
           {instagramPosts.length > 0 && (
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '16px' }}>
-              {instagramPosts.filter(Boolean).map((url, i) => <InstagramEmbed key={i} url={url} />)}
+            <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'flex-start', gap: '20px' }}>
+              {instagramPosts.filter(Boolean).map((url, i) => <InstagramEmbed key={i} url={url} username={instagramUsername} />)}
             </div>
           )}
         </div>
@@ -722,13 +790,13 @@ function SectionGalerie({ gallery, instagramUsername, instagramPosts, tiktokUser
             </p>
           )}
           {tiktokPosts.length > 0 && (
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '16px' }}>
+            <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'flex-start', gap: '20px' }}>
               {tiktokPosts.filter(Boolean).map((url, i) => <TikTokEmbed key={i} url={url} />)}
             </div>
           )}
         </div>
       )}
-    </Section>
+    </div>
   )
 }
 
@@ -879,7 +947,7 @@ export function getWeddingFaqs({ city, businessName }) {
     },
     {
       q: 'Peut-on visiter la salle avant de réserver ?',
-      a: `Oui, les visites de ${businessName} sont possibles sur rendez-vous. Depuis ${city.name}, rejoignez notre salle en seulement ${getTravelInfo(city).driveMin} minutes pour découvrir en personne nos espaces, nos équipements et notre cuisine professionnelle. Notre équipe vous accueille chaleureusement et répond à toutes vos questions sans engagement.`,
+      a: `Oui, les visites de ${businessName} sont possibles sur rendez-vous. Depuis ${city.name}, rejoignez notre salle ${drivingDuration(city)} pour découvrir en personne nos espaces, nos équipements et notre cuisine professionnelle. Notre équipe vous accueille chaleureusement et répond à toutes vos questions sans engagement.`,
     },
     {
       q: 'La salle est-elle climatisée ?',
@@ -1131,7 +1199,7 @@ export default function CityPage({ pageType }) {
       ...allTypeStorages.map((s) => s.getPages()),
       getPublishedWeddingSlugs(),
     ]).then(([pages, gal, cfg, blogArticlesMap, ...typePagesArr]) => {
-      setPage(pages?.[citySlug] || null)
+      setPage(pages?.[getCityBySlug(citySlug)?.slug] || null)
       setGallery(gal || [])
       setConfig(cfg)
       // Pick up to 3 published blog articles relevant to the current page type
@@ -1190,7 +1258,7 @@ export default function CityPage({ pageType }) {
 }
 
 export function CityPageContent({ citySlug, pageType, page, gallery, config, allTypePages, blogArticles, published = false }) {
-  const sourceCity = getCityBySlug(citySlug)
+  const sourceCity = { ...getCityBySlug(citySlug), travel: validateWeddingTravel(page.travel) }
   const city = { ...sourceCity, name: normalizeCityName(sourceCity.name) }
   const basePath = pageType?.basePath || '/locationsalledemariage'
   const businessName      = config?.businessName || 'Le Paradise 77'
@@ -1220,17 +1288,16 @@ export function CityPageContent({ citySlug, pageType, page, gallery, config, all
   const orderedSections = sourceLayout ? [
     <WeddingSourceSections key="source" layout={sourceLayout} city={sourceCity}
       knownFaqs={getWeddingFaqs({ city, businessName: 'Le Paradise' })} businessName="Le Paradise"
-      afterIntro={<SectionReviews key="reviews" page={page} />} gallery={liveGallery} />,
+      afterIntro={<><SectionReviews key="reviews" page={page} />{liveGallery}</>} />,
     <SectionBlogArticles key="blog-articles" articles={blogArticles} />,
   ] : [
-    <SectionIntro key="intro" city={city} businessName={businessName} page={page} />,
+    <SectionIntro key="intro" city={city} businessName={businessName} page={page} gallery={liveGallery} />,
     ...(page.template?.version === 2 ? [] : [
       <SectionWhyChoose key="why-choose" city={city} businessName={businessName} />,
       <SectionPrestations key="prestations" city={city} businessName={businessName} />,
       <SectionReservation key="reservation" city={city} businessName={businessName} />,
       <SectionCapacite key="capacite" city={city} businessName={businessName} />,
     ]),
-    liveGallery,
     ...(page.template?.version === 2 ? [] : [
       <SectionLieux key="lieux" city={city} businessName={businessName} />,
       <SectionConseils key="conseils" city={city} />,
@@ -1252,7 +1319,7 @@ export function CityPageContent({ citySlug, pageType, page, gallery, config, all
         </div>
         <h1 style={{ fontFamily: 'var(--font-heading)', fontSize: 'clamp(2rem, 5vw, 3.5rem)', fontWeight: '700', color: 'white', marginBottom: '12px', letterSpacing: '0.03em' }}>
           {pageType?.id === 'mariage'
-            ? `Location salle de mariage ${citySlug === 'nanteuil-les-meaux' ? 'à' : 'près de'} ${city.name} — ${businessName}`
+            ? `Location salle de mariage ${sourceCity.legacySlug === 'nanteuil-les-meaux' ? 'à' : 'près de'} ${city.name} — ${businessName}`
             : `${pageType?.label.replace(/^Pages /, '') || 'Salle de réception'} près de ${city.name} — ${businessName}`}
         </h1>
         <p style={{ fontSize: '1.1rem', color: 'rgba(255,255,255,0.7)', maxWidth: '680px', margin: '0 auto 8px' }}>
@@ -1283,10 +1350,10 @@ export function CityPageContent({ citySlug, pageType, page, gallery, config, all
           <p>
             Vous recherchez une location de salle de mariage pour vos invités de {city.name} ({city.deptName}) ?
             Notre établissement est situé au 5 avenue Fridingen, 77100 Nanteuil les Meaux
-            {citySlug !== 'nanteuil-les-meaux' && `, et non à ${city.name}`}.
+            {sourceCity.legacySlug !== 'nanteuil-les-meaux' && `, et non à ${city.name}`}.
           </p>
           <p style={{ marginTop: '12px' }}>
-            <a href={`https://www.google.com/maps/dir/?api=1&origin=${encodeURIComponent(`${city.name}, ${city.deptName}, France`)}&destination=${PARADISE_LAT},${PARADISE_LNG}`}
+            <a href={`https://www.google.com/maps/dir/?api=1&origin=${encodeURIComponent(`${city.name}, ${city.deptName}, France`)}&destination=${encodeURIComponent(PARADISE_ADDRESS)}`}
               target="_blank" rel="noreferrer noopener" title={`Itinéraire depuis ${city.name} vers Le Paradise à Nanteuil les Meaux`}>
               Consulter l’itinéraire depuis {city.name}
             </a>. Pour connaître les disponibilités, les prestations et le tarif correspondant à votre projet,

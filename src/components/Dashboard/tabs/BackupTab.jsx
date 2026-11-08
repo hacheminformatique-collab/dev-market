@@ -2,9 +2,11 @@ import { siteFetch as fetch } from '../../../utils/siteFetch'
 import { useState, useRef } from 'react'
 import { PAGE_TYPES } from '../../../data/pageTypes'
 import { makePageTypeStorage } from '../../../utils/cityPageStorage'
+import DataPurgePanel from '../DataPurgePanel'
+import { ADMIN_STORAGE_NAMES } from '../../../utils/storageProfiles'
 import { getBlogArticles, saveBlogArticles } from '../../../utils/blogStorage'
 import {
-  getSettings, saveSettings,
+  getSettings, saveSettingsConfirmed, initStorage,
   getClients, saveClients,
   getStaff, saveStaff,
   getFormules, saveFormules,
@@ -90,6 +92,7 @@ async function fetchFileAsBase64(url) {
 }
 
 async function collectBusinessData() {
+  await initStorage({ names: ADMIN_STORAGE_NAMES, paced: true, persistDefaults: false, reload: true })
   const [favicon32, favicon64] = await Promise.all([
     fetchFileAsBase64('/favicon.ico'),
     fetchFileAsBase64('/favicon-64.png'),
@@ -119,7 +122,7 @@ async function collectBusinessData() {
 }
 
 async function restoreBusinessData(data) {
-  if (data.settings && typeof data.settings === 'object')     saveSettings(data.settings)
+  if (data.settings && typeof data.settings === 'object') await saveSettingsConfirmed(data.settings)
   if (data.favicon32 || data.favicon64) {
     try {
       await fetch('/api/favicon-write.php', {
@@ -328,6 +331,7 @@ export default function BackupTab() {
 
   return (
     <div style={{ maxWidth: '720px' }}>
+      <DataPurgePanel />
 
       {/* Status banner */}
       {status && (

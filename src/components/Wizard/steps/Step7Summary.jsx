@@ -1,21 +1,9 @@
 import { useEffect, useState } from 'react'
-import { getClients, saveClients, generateDevisNumber, notifyEvent } from '../../../utils/storage'
+import { getClients, saveClientsConfirmed, generateDevisNumber, notifyEvent } from '../../../utils/storage'
 import SignaturePad from '../../SignaturePad'
 import { getFormuleTarif } from './Step3Formule'
-
-function vatBreakdown(ttc, rate) {
-  const ht = ttc / (1 + rate)
-  const tva = ttc - ht
-  return { ht, tva, ttc }
-}
-
-function calcMenuItemTotal(item, nbAdultes, nbEnfants) {
-  if (!item.tarif) return 0
-  if (item.section === 'Cocktail de bienvenu') return item.tarif * (nbAdultes + nbEnfants)
-  if (item.section === 'Menu enfants') return item.tarif * nbEnfants
-  if (item.section === 'Boissons') return 0
-  return item.tarif * nbAdultes
-}
+import { calculateQuote } from '../../../utils/formulePricing'
+import { assertQuoteRequestsAvailable } from '../../../utils/quoteMaintenance'
 
 export default function Step7Summary({ data, onBack, onSubmit }) {
   const [submitting, setSubmitting] = useState(false)
@@ -29,28 +17,13 @@ export default function Step7Summary({ data, onBack, onSubmit }) {
   const [previewUrl, setPreviewUrl] = useState('')
   const [pendingSignedDevis, setPendingSignedDevis] = useState(null)
 
-  const nbAdultes = parseInt(data.nbAdultes) || data.nbPersonnes || 0
-  const nbEnfants = parseInt(data.nbEnfants) || 0
-  const nbPersonnes = nbAdultes + nbEnfants
-  const prixSalle = data.prixSalle || 0
+  const { nbPersonnes, prixSalle, traiteurTotal, prestationsTotal, salle, traiteur, options, totalTTC, totalHT, totalTVA } = calculateQuote(data)
+  const forfait = data.formule?.forfait === true
 
   const isSeche = data.formule?.nomFormule?.toLowerCase().includes('sèche')
   const dateStr = (data.dateEvenement || '').slice(0, 10)
   const basePriceSec = dateStr ? getFormuleTarif(dateStr, 'Location sèche') : 0
-  const remiseSalleTTC = (!isSeche && dateStr && basePriceSec > prixSalle) ? (basePriceSec - prixSalle) : 0
-
-  const menuTotal = (data.menus || []).reduce((sum, m) => sum + calcMenuItemTotal(m, nbAdultes, nbEnfants), 0)
-  const gateauTotal = (data.gateau?.tarif || 0) * nbPersonnes
-  const traiteurTotal = menuTotal + gateauTotal
-  const prestationsTotal = (data.prestations || []).reduce((sum, p) => sum + (p.tarif || 0), 0)
-  const totalTTC = prixSalle + traiteurTotal + prestationsTotal
-
-  const salle = vatBreakdown(prixSalle, 0.20)
-  const traiteur = vatBreakdown(traiteurTotal, 0.10)
-  const options = vatBreakdown(prestationsTotal, 0.20)
-
-  const totalHT = salle.ht + traiteur.ht + options.ht
-  const totalTVA = salle.tva + traiteur.tva + options.tva
+  const remiseSalleTTC = (!forfait && !isSeche && dateStr && basePriceSec > prixSalle) ? (basePriceSec - prixSalle) : 0
 
   useEffect(() => {
     return () => {
@@ -75,9 +48,10 @@ export default function Step7Summary({ data, onBack, onSubmit }) {
     }
   }
 
-  function finalizeDevis(devis, notificationType) {
+  async function finalizeDevis(devis, notificationType) {
+    await assertQuoteRequestsAvailable()
     const clients = getClients()
-    saveClients([...clients, devis])
+    await saveClientsConfirmed([...clients, devis])
     notifyEvent({ ...devis, notificationType })
     setDevisId(devis.id)
     setDevisNumber(devis.devisNumber)
@@ -86,12 +60,17 @@ export default function Step7Summary({ data, onBack, onSubmit }) {
     if (onSubmit) onSubmit(devis)
   }
 
-  function handleSendByMail() {
+  async function handleSendByMail() {
     setSubmitError('')
     setSubmitting(true)
     const devis = buildDevis('brouillon_envoyé', null)
-    finalizeDevis(devis, 'devis_brouillon')
-    setSubmissionType('brouillon_envoyé')
+    try {
+      await finalizeDevis(devis, 'devis_brouillon')
+      setSubmissionType('brouillon_envoyé')
+    } catch (error) {
+      setSubmitError(error.message)
+      setSubmitting(false)
+    }
   }
 
   async function openValidationPreview() {
@@ -118,7 +97,14 @@ export default function Step7Summary({ data, onBack, onSubmit }) {
   async function confirmSignedDevis() {
     if (!pendingSignedDevis) return
     setSubmitting(true)
-    finalizeDevis(pendingSignedDevis, 'devis_signe')
+    try {
+      await finalizeDevis(pendingSignedDevis, 'devis_signe')
+    } catch (error) {
+      setSubmitError(error.message)
+      setSubmitting(false)
+      setPreviewOpen(false)
+      return
+    }
     try {
       const { generatePDF } = await import('../../PDF/generatePDF')
       generatePDF(pendingSignedDevis)
@@ -192,7 +178,7 @@ export default function Step7Summary({ data, onBack, onSubmit }) {
             </tr>
           </thead>
           <tbody>
-            {prixSalle > 0 && (
+            {(prixSalle > 0 || forfait) && (
               <>
                 {remiseSalleTTC > 0 && (
                   <tr>
@@ -218,15 +204,22 @@ export default function Step7Summary({ data, onBack, onSubmit }) {
                 )}
                 <tr>
                   <td style={{ padding: '8px 12px' }}>
-                    Location salle — {data.formule?.nomFormule}
-                    <div style={{ fontSize: '12px', color: '#888' }}>TVA 20%</div>
+                    {forfait ? 'Forfait tout compris' : 'Location salle'} — {data.formule?.nomFormule}
+                    <div style={{ fontSize: '12px', color: '#888' }}>{forfait ? `TVA : ${data.formule.partTraiteurPourcent || 0}% du prix à 10%, reste à 20%` : 'TVA 20%'}</div>
                   </td>
-                  <td style={{ padding: '8px 12px', textAlign: 'right' }}>{salle.ht.toFixed(2)} €</td>
-                  <td style={{ padding: '8px 12px', textAlign: 'right' }}>{salle.tva.toFixed(2)} €</td>
+                  <td style={{ padding: '8px 12px', textAlign: 'right' }}>{(forfait ? totalHT : salle.ht).toFixed(2)} €</td>
+                  <td style={{ padding: '8px 12px', textAlign: 'right' }}>{(forfait ? totalTVA : salle.tva).toFixed(2)} €</td>
                   <td style={{ padding: '8px 12px', textAlign: 'right', fontWeight: '600' }}>{prixSalle.toLocaleString('fr-FR')} €</td>
                 </tr>
               </>
             )}
+            {forfait && <>
+              {(data.menus || []).map((menu) => <tr key={`menu-${menu.id}`}><td style={{ padding: '8px 12px' }}>{menu.section} — {menu.nomMenu}</td><td colSpan={3} style={{ textAlign: 'right' }}>Inclus dans votre forfait</td></tr>)}
+              {data.gateau && <tr><td style={{ padding: '8px 12px' }}>{data.gateau.nomGateau}
+                {data.gateauPersonnalisation && <div>{data.gateauPersonnalisation.niv2} / {data.gateauPersonnalisation.niv3} / {data.gateauPersonnalisation.niv4}{data.gateauPersonnalisation.initiales && ` — ${data.gateauPersonnalisation.initiales}`}</div>}
+              </td><td colSpan={3} style={{ textAlign: 'right' }}>Inclus dans votre forfait</td></tr>}
+              {(data.prestations || []).map((prestation) => <tr key={`prestation-${prestation.id}`}><td style={{ padding: '8px 12px' }}>{prestation.nomPresta}</td><td colSpan={3} style={{ textAlign: 'right' }}>Inclus dans votre forfait</td></tr>)}
+            </>}
             {traiteurTotal > 0 && (
               <tr>
                 <td style={{ padding: '8px 12px' }}>

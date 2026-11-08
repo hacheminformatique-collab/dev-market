@@ -9,7 +9,7 @@
 
 import weddingPostcodes from './wedding-postcodes.json'
 
-export const DEPARTMENTS = [
+const SOURCE_DEPARTMENTS = [
   // ── Île-de-France ──────────────────────────────────────────────────────────
   {
     code: '75', name: 'Paris', region: 'Île-de-France',
@@ -5927,14 +5927,30 @@ export const DEPARTMENTS = [
 ]
 
 /** Flat list of every city across all departments */
+export const DEPARTMENTS = SOURCE_DEPARTMENTS.map((dept) => ({
+  ...dept,
+  cities: dept.cities.map((city) => ({
+    ...city,
+    legacySlug: city.slug,
+    postalCode: weddingPostcodes[dept.code][city.slug],
+    slug: `${city.slug}-${weddingPostcodes[dept.code][city.slug]}`,
+  })),
+}))
+
 export const ALL_CITIES = DEPARTMENTS.flatMap((dept) =>
   dept.cities.map((city) => ({
     ...city,
     deptCode: dept.code,
     deptName: dept.name,
-    postalCode: weddingPostcodes[dept.code]?.[city.slug],
+    postalCode: city.postalCode,
   }))
 )
+
+const CITY_BY_SLUG = new Map(ALL_CITIES.map((city) => [city.slug, city]))
+const CITY_BY_LEGACY_SLUG = new Map()
+for (const city of ALL_CITIES) {
+  if (!CITY_BY_LEGACY_SLUG.has(city.legacySlug)) CITY_BY_LEGACY_SLUG.set(city.legacySlug, city)
+}
 
 /**
  * Haversine great-circle distance between two {lat, lng} points (in km).
@@ -5954,14 +5970,14 @@ export function haversineKm(a, b) {
  * Returns the list of cities within `radiusKm` of a given city slug.
  */
 export function getNearbyCities(slug, radiusKm = 5) {
-  const origin = ALL_CITIES.find((c) => c.slug === slug)
+  const origin = getCityBySlug(slug)
   if (!origin) return []
   return ALL_CITIES.filter(
-    (c) => c.slug !== slug && haversineKm(origin, c) <= radiusKm
+    (c) => c.slug !== origin.slug && haversineKm(origin, c) <= radiusKm
   )
 }
 
 /** Find a city by its slug */
 export function getCityBySlug(slug) {
-  return ALL_CITIES.find((c) => c.slug === slug) || null
+  return CITY_BY_SLUG.get(slug) || CITY_BY_LEGACY_SLUG.get(slug) || null
 }

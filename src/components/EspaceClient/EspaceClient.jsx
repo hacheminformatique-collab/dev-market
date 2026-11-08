@@ -5,6 +5,7 @@ import { generatePDF } from '../PDF/generatePDF'
 import { useIsMobile } from '../../hooks/useIsMobile'
 import SignaturePad from '../SignaturePad'
 import { getDocsLocal, fetchDocsServer, saveDocsAny, getReceiptsLocal, fetchReceiptsServer } from '../../utils/clientFiles'
+import { calculateQuote, calcMenuItemTotal as menuItemTotal } from '../../utils/formulePricing'
 
 function formatMoney(n) {
   return Number(n || 0).toLocaleString('fr-FR', { minimumFractionDigits: 2 }) + ' €'
@@ -204,23 +205,12 @@ export default function EspaceClient() {
     )
   }
 
-  const nbAdultes = parseInt(devis.nbAdultes) || devis.nbPersonnes || 0
-  const nbEnfants = parseInt(devis.nbEnfants) || 0
-  const nbPersonnes = nbAdultes + nbEnfants
-  const prixSalle = devis.prixSalle || 0
+  const { nbAdultes, nbEnfants, nbPersonnes, prixSalle, gateauTotal, totalTTC } = calculateQuote(devis)
+  const forfait = devis.formule?.forfait === true
 
   function calcMenuItemTotal(item) {
-    if (!item.tarif) return 0
-    if (item.section === 'Cocktail de bienvenu') return item.tarif * (nbAdultes + nbEnfants)
-    if (item.section === 'Menu enfants') return item.tarif * nbEnfants
-    if (item.section === 'Boissons') return 0
-    return item.tarif * nbAdultes
+    return forfait ? 0 : menuItemTotal(item, nbAdultes, nbEnfants)
   }
-
-  const menuTotal = (devis.menus || []).reduce((s, m) => s + calcMenuItemTotal(m), 0)
-  const gateauTotal = (devis.gateau?.tarif || 0) * nbPersonnes
-  const prestationsTotal = (devis.prestations || []).reduce((s, p) => s + (p.tarif || 0), 0)
-  const totalTTC = prixSalle + menuTotal + gateauTotal + prestationsTotal
 
   // Payments / balance
   const payments = devis.payments || []
@@ -231,7 +221,7 @@ export default function EspaceClient() {
     if (!pendingSignatureData) return
     const sigData = pendingSignatureData
     const updated = clients.map((c) =>
-      (c.id === devisId || c.devisNumber === devisId) ? { ...c, signature: sigData, status: 'signé_client', signedAt: new Date().toISOString() } : c
+      (c.id === devisId || c.devisNumber === devisId) ? { ...c, calendarExcluded: false, accountingExcluded: false, signature: sigData, status: 'signé_client', signedAt: new Date().toISOString() } : c
     )
     saveClients(updated)
     const signedDevis = updated.find((c) => c.id === devis?.id) || updated.find((c) => c.devisNumber === devis?.devisNumber)
@@ -427,21 +417,21 @@ export default function EspaceClient() {
               <h3 style={{ marginBottom: '16px', color: '#1a1a2e' }}>💰 Détail tarifaire</h3>
               <table style={{ width: '100%', fontSize: '14px', borderCollapse: 'collapse' }}>
                 <tbody>
-                  {prixSalle > 0 && (
+                  {(prixSalle > 0 || forfait) && (
                     <tr style={{ borderBottom: '1px solid #eee' }}>
-                      <td style={{ padding: '10px 0' }}>Location salle — {devis.formule?.nomFormule}</td>
+                      <td style={{ padding: '10px 0' }}>{forfait ? 'Forfait tout compris' : 'Location salle'} — {devis.formule?.nomFormule}</td>
                       <td style={{ padding: '10px 0', textAlign: 'right', fontWeight: '600' }}>{formatMoney(prixSalle)}</td>
                     </tr>
                   )}
-                  {(devis.menus || []).filter((m) => m.tarif > 0).map((m) => (
+                  {(devis.menus || []).filter((m) => forfait || m.tarif > 0).map((m) => (
                     <tr key={m.id} style={{ borderBottom: '1px solid #eee' }}>
                       <td style={{ padding: '8px 0', paddingLeft: '16px', color: '#666' }}>
                         {m.nomMenu}
                       </td>
-                      <td style={{ padding: '8px 0', textAlign: 'right', color: '#666' }}>{formatMoney(calcMenuItemTotal(m))}</td>
+                      <td style={{ padding: '8px 0', textAlign: 'right', color: '#666' }}>{forfait ? 'Inclus dans votre forfait' : formatMoney(calcMenuItemTotal(m))}</td>
                     </tr>
                   ))}
-                  {gateauTotal > 0 && (
+                  {(gateauTotal > 0 || (forfait && devis.gateau)) && (
                     <tr style={{ borderBottom: '1px solid #eee' }}>
                       <td style={{ padding: '8px 0', paddingLeft: '16px', color: '#666' }}>
                         {devis.gateau?.nomGateau} × {nbPersonnes} pers.
@@ -452,13 +442,13 @@ export default function EspaceClient() {
                           </div>
                         )}
                       </td>
-                      <td style={{ padding: '8px 0', textAlign: 'right', color: '#666' }}>{formatMoney(gateauTotal)}</td>
+                      <td style={{ padding: '8px 0', textAlign: 'right', color: '#666' }}>{forfait ? 'Inclus dans votre forfait' : formatMoney(gateauTotal)}</td>
                     </tr>
                   )}
                   {(devis.prestations || []).map((p) => (
                     <tr key={p.id} style={{ borderBottom: '1px solid #eee' }}>
                       <td style={{ padding: '8px 0', paddingLeft: '16px', color: '#666' }}>{p.nomPresta}</td>
-                      <td style={{ padding: '8px 0', textAlign: 'right', color: '#666' }}>{formatMoney(p.tarif)}</td>
+                      <td style={{ padding: '8px 0', textAlign: 'right', color: '#666' }}>{forfait ? 'Inclus dans votre forfait' : formatMoney(p.tarif)}</td>
                     </tr>
                   ))}
                   <tr style={{ background: '#1a1a2e', color: 'white' }}>

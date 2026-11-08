@@ -1,4 +1,6 @@
 <?php
+require_once __DIR__ . '/site-guard.php';
+siteMaintenanceGuard('openai-generate');
 header('Content-Type: application/json; charset=utf-8');
 header('Cache-Control: no-store');
 http_response_code(410);

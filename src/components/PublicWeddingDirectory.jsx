@@ -18,14 +18,16 @@ export default function PublicWeddingDirectory() {
   useEffect(() => {
     const container = document.getElementById('public-wedding-directory')
     if (!isPublicPath(pathname) || !container) return
+    if (pathname === '/' && document.getElementById('site-maintenance')) return
     let cancelled = false
     async function load() {
       try {
-        const response = await fetch('/wedding-directory.html', { cache: 'no-store' })
+        const blog = pathname === '/blog' || pathname.startsWith('/blog/')
+        const response = await fetch(blog ? '/wedding-directory-idf.html' : '/wedding-directory.html', { cache: 'no-store' })
         if (response.status === 404) return
         if (!response.ok) throw new Error(`Annuaire inaccessible (HTTP ${response.status}).`)
         const html = await response.text()
-        if (!html.includes('class="wedding-directory"')) {
+        if (html !== '' && !html.includes('class="wedding-directory"')) {
           throw new Error('Annuaire invalide. Publiez les pages mariage pour créer la zone de location.')
         }
         if (!cancelled) {

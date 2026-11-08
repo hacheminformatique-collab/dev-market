@@ -1,42 +1,29 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { getSettings, getLoginAttempts, saveLoginAttempts } from '../utils/storage'
+import { initStorage } from '../utils/storage'
+import { adminPaths, siteAdminRequest } from '../utils/siteAdministration'
 
 export default function AdminLogin() {
   const [pin, setPin] = useState('')
   const [error, setError] = useState('')
+  const [busy, setBusy] = useState(false)
   const navigate = useNavigate()
 
-  function isBlocked() {
-    const attempts = getLoginAttempts()
-    if (attempts.blockedUntil && Date.now() < attempts.blockedUntil) {
-      const mins = Math.ceil((attempts.blockedUntil - Date.now()) / 60000)
-      return `Trop de tentatives. Réessayez dans ${mins} minute(s).`
-    }
-    return null
-  }
-
-  function handleSubmit(e) {
+  async function handleSubmit(e) {
     e.preventDefault()
-    const blocked = isBlocked()
-    if (blocked) { setError(blocked); return }
-
-    const settings = getSettings()
-    if (pin === settings.pin) {
-      saveLoginAttempts({ count: 0, blockedUntil: null })
+    if (busy) return
+    setBusy(true)
+    setError('')
+    try {
+      await siteAdminRequest({ action: 'login', pin })
+      await initStorage({ names: ['settings'], reload: true, paced: false, persistDefaults: false })
       sessionStorage.setItem('adminAuth', '1')
-      navigate('/dashboard')
-    } else {
-      const attempts = getLoginAttempts()
-      const newCount = (attempts.count || 0) + 1
-      if (newCount >= 3) {
-        saveLoginAttempts({ count: 0, blockedUntil: Date.now() + 10 * 60 * 1000 })
-        setError('Trop de tentatives. Compte bloqué 10 minutes.')
-      } else {
-        saveLoginAttempts({ count: newCount, blockedUntil: null })
-        setError(`Code incorrect. ${3 - newCount} tentative(s) restante(s).`)
-      }
+      navigate(adminPaths().dashboard)
+    } catch (err) {
+      setError(err.message)
       setPin('')
+    } finally {
+      setBusy(false)
     }
   }
 
@@ -109,8 +96,8 @@ export default function AdminLogin() {
             </div>
           )}
 
-          <button type="submit" className="btn btn-primary w-100" style={{ justifyContent: 'center', padding: '13px', fontSize: '13px', marginTop: '4px' }}>
-            Se connecter
+          <button type="submit" disabled={busy} className="btn btn-primary w-100" style={{ justifyContent: 'center', padding: '13px', fontSize: '13px', marginTop: '4px' }}>
+            {busy ? 'Connexion…' : 'Se connecter'}
           </button>
         </form>
 

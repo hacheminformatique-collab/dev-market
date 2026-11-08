@@ -36,7 +36,7 @@ export function createSiteFetch({ transport, origin, now = Date.now, wait = (ms)
       else assertAvailable()
       options?.signal?.throwIfAborted()
       const response = await transport(input, options)
-      const quoteLimit = response.status === 429 && response.headers.get('X-RateLimit-Scope') === 'quote-followup'
+      const quoteLimit = response.status === 429 && ['quote-followup', 'admin-login'].includes(response.headers.get('X-RateLimit-Scope'))
       if ((response.status === 429 && !quoteLimit) || response.status === 509) {
         const retry = response.headers.get('retry-after')
         const seconds = Number(retry)
@@ -59,9 +59,24 @@ export function createSiteFetch({ transport, origin, now = Date.now, wait = (ms)
     const key = url.href
     const cacheable = method === 'GET' && url.pathname === '/api/storage.php' && !options?.signal && options?.cache !== 'no-store'
     if (method !== 'GET') {
-      revisions.set(key, (revisions.get(key) || 0) + 1)
-      cache.delete(key)
-      reads.delete(key)
+      const affected = [key]
+      if (url.pathname === '/api/city-page-storage.php') {
+        const pageKey = url.searchParams.get('key')
+        const storageUrl = new URL('/api/storage.php', origin)
+        const keys = [pageKey]
+        if (url.searchParams.get('action') === 'backup-pages') {
+          keys.push(pageKey?.replace(/^paradise_city_pages/, 'paradise_city_pages_backup'))
+        }
+        for (const storageKey of keys) {
+          storageUrl.searchParams.set('key', storageKey)
+          affected.push(storageUrl.href)
+        }
+      }
+      for (const affectedKey of affected) {
+        revisions.set(affectedKey, (revisions.get(affectedKey) || 0) + 1)
+        cache.delete(affectedKey)
+        reads.delete(affectedKey)
+      }
     }
     if (cacheable && cache.has(key) && cache.get(key).expires > now()) return Promise.resolve(cache.get(key).response.clone())
     if (cacheable && reads.has(key)) return reads.get(key).then((response) => response.clone())

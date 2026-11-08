@@ -1,5 +1,6 @@
 <?php
 require_once __DIR__ . '/site-guard.php';
+require_once __DIR__ . '/city-json-stream.php';
 siteMaintenanceGuard('city-page-storage');
 // Small, incremental requests; existing JSON page files remain compatible.
 ini_set('display_errors', '0');
@@ -20,30 +21,37 @@ function lockCityStorage(string $path) {
     return $lock;
 }
 
-function readCityStorage(string $path, bool $pages) {
+function readCityStorage(string $path, bool $pages): array {
     if (is_link($path)) failCityStorage(409, 'Fichier de stockage invalide.');
-    if (!file_exists($path)) return $pages ? new stdClass() : [];
-    $raw = file_get_contents($path);
-    if ($raw === false) failCityStorage(500, 'Lecture du stockage impossible. Vérifiez les droits de storage-data.');
-    $value = json_decode($raw);
-    // Older versions represented an empty page map as [].
-    if ($pages && $value === []) return new stdClass();
-    if (json_last_error() !== JSON_ERROR_NONE || ($pages ? !is_object($value) : !is_array($value))) {
-        failCityStorage(409, 'Le stockage existant est invalide. Aucun fichier ne sera remplacé.');
+    if (!file_exists($path)) return [null, []];
+    $stream = fopen($path, 'rb');
+    if (!$stream) throw new RuntimeException('Lecture du stockage impossible. Vérifiez les droits de storage-data.');
+    try {
+        return [$stream, cityJsonEntries($stream, $pages)];
+    } catch (Throwable $error) {
+        fclose($stream);
+        throw $error;
     }
-    return $value;
 }
 
-function writeCityStorage(string $path, $value): void {
+function writeCityStorage(string $path, callable $write): void {
     if (is_link($path)) failCityStorage(409, 'Fichier de stockage invalide.');
-    $json = json_encode($value, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
-    if ($json === false) failCityStorage(500, 'Encodage du stockage impossible.');
     $tmp = tempnam(dirname($path), '.city-pages-');
-    if ($tmp === false) failCityStorage(500, 'Fichier temporaire impossible. Vérifiez les droits et l’espace disque.');
-    $written = file_put_contents($tmp, $json, LOCK_EX);
-    if ($written !== strlen($json) || !chmod($tmp, 0644) || !rename($tmp, $path)) {
-        unlink($tmp);
-        failCityStorage(500, 'Écriture du stockage impossible. Vérifiez les droits et l’espace disque.');
+    if ($tmp === false) throw new RuntimeException('Fichier temporaire impossible. Vérifiez les droits et l’espace disque.');
+    $output = null;
+    try {
+        $output = fopen($tmp, 'wb');
+        if (!$output) throw new RuntimeException('Écriture du stockage impossible.');
+        $write($output);
+        if (!fflush($output)) throw new RuntimeException('Écriture du stockage impossible.');
+        fclose($output);
+        $output = null;
+        if (!chmod($tmp, 0644) || !rename($tmp, $path)) {
+            throw new RuntimeException('Écriture du stockage impossible. Vérifiez les droits et l’espace disque.');
+        }
+    } finally {
+        if (is_resource($output)) fclose($output);
+        if (is_file($tmp) && !unlink($tmp)) error_log('[CityPagesStorage] Nettoyage du fichier temporaire impossible.');
     }
 }
 
@@ -88,37 +96,81 @@ if (!is_dir($dataDir)) {
 }
 $path = $dataDir . '/' . $key . '.json';
 $lock = lockCityStorage($path);
-$pages = readCityStorage($path, true);
-if ($action === 'migrate-pages') {
-    $aliases = $input->aliases ?? null;
-    if (!is_object($aliases) || count(get_object_vars($aliases)) > 250) failCityStorage(400, 'Migration de villes invalide.');
-    foreach ($aliases as $old => $new) {
-        if (!is_string($new) || !preg_match('/^[a-z0-9]+(?:-[a-z0-9]+)*$/D', $old)
-            || !preg_match('/^' . preg_quote($old, '/') . '-[0-9]{5}$/D', $new)) {
-            failCityStorage(400, 'Identifiant ville-code postal invalide.');
+$source = null;
+$backupSource = null;
+$backupLock = null;
+$failure = null;
+try {
+    [$source, $pages] = readCityStorage($path, true);
+    if ($action === 'migrate-pages') {
+        $aliases = $input->aliases ?? null;
+        if (!is_object($aliases) || count(get_object_vars($aliases)) > 250) failCityStorage(400, 'Migration de villes invalide.');
+        foreach ($aliases as $old => $new) {
+            if (!is_string($new) || !preg_match('/^[a-z0-9]+(?:-[a-z0-9]+)*$/D', $old)
+                || !preg_match('/^' . preg_quote($old, '/') . '-[0-9]{5}$/D', $new)) {
+                failCityStorage(400, 'Identifiant ville-code postal invalide.');
+            }
+            if (isset($pages[$old]) && !$pages[$old]['null']) {
+                if (!isset($pages[$new]) || $pages[$new]['null']) $pages[$new] = $pages[$old];
+                unset($pages[$old]);
+            }
         }
-        if (isset($pages->{$old})) {
-            if (!isset($pages->{$new})) $pages->{$new} = $pages->{$old};
-            unset($pages->{$old});
+    } elseif ($action === 'save-page') {
+        $legacySlug = $input->legacySlug ?? null;
+        if ($legacySlug !== null && (!is_string($legacySlug)
+            || !preg_match('/^[a-z0-9]+(?:-[a-z0-9]+)*$/D', $legacySlug)
+            || !preg_match('/^' . preg_quote($legacySlug, '/') . '-[0-9]{5}$/D', $slug))) {
+            failCityStorage(400, 'Ancien identifiant de ville invalide.');
         }
+        if ($legacySlug !== null && $legacySlug !== $slug) unset($pages[$legacySlug]);
+        $pages[$slug] = ['json' => json_encode($page, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR)];
+    } elseif (count($pages) > 0) {
+        $suffix = substr($key, strlen('paradise_city_pages'));
+        $backupPath = $dataDir . '/paradise_city_pages_backup' . $suffix . '.json';
+        $backupLock = lockCityStorage($backupPath);
+        [$backupSource, $backups] = readCityStorage($backupPath, false);
+        writeCityStorage($backupPath, function ($output) use ($source, $backupSource, $backups): void {
+            cityJsonWrite($output, '[{"snapshot":');
+            // Copy the validated original collection, not a decoded/re-encoded snapshot.
+            $stat = fstat($source);
+            if ($stat === false) throw new RuntimeException('Lecture de la taille du stockage impossible.');
+            cityJsonCopy($source, $output, ['offset' => 0, 'length' => $stat['size']]);
+            cityJsonWrite($output, ',"backedUpAt":' . json_encode(gmdate('c')) . '}');
+            foreach (array_slice($backups, 0, 4) as $entry) {
+                cityJsonWrite($output, ',');
+                cityJsonCopy($backupSource, $output, $entry);
+            }
+            cityJsonWrite($output, ']');
+        });
     }
-    writeCityStorage($path, $pages);
-} elseif ($action === 'save-page') {
-    $legacySlug = $input->legacySlug ?? null;
-    if ($legacySlug !== null && (!is_string($legacySlug)
-        || !preg_match('/^[a-z0-9]+(?:-[a-z0-9]+)*$/D', $legacySlug)
-        || !preg_match('/^' . preg_quote($legacySlug, '/') . '-[0-9]{5}$/D', $slug))) {
-        failCityStorage(400, 'Ancien identifiant de ville invalide.');
+    if ($action !== 'backup-pages') {
+        writeCityStorage($path, function ($output) use ($source, $pages): void {
+            cityJsonWrite($output, '{');
+            $first = true;
+            foreach ($pages as $slug => $entry) {
+                cityJsonWrite($output, ($first ? '' : ',') . json_encode((string) $slug, JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR) . ':');
+                if (isset($entry['json'])) cityJsonWrite($output, $entry['json']);
+                else cityJsonCopy($source, $output, $entry);
+                $first = false;
+            }
+            cityJsonWrite($output, '}');
+        });
     }
-    if ($legacySlug !== null && $legacySlug !== $slug) unset($pages->{$legacySlug});
-    $pages->{$slug} = $page;
-    writeCityStorage($path, $pages);
-} elseif (count(get_object_vars($pages)) > 0) {
-    $suffix = substr($key, strlen('paradise_city_pages'));
-    $backupPath = $dataDir . '/paradise_city_pages_backup' . $suffix . '.json';
-    $backupLock = lockCityStorage($backupPath);
-    $backups = readCityStorage($backupPath, false);
-    array_unshift($backups, ['snapshot' => $pages, 'backedUpAt' => gmdate('c')]);
-    writeCityStorage($backupPath, array_slice($backups, 0, 5));
+} catch (JsonException | UnexpectedValueException $error) {
+    $failure = [409, 'Le stockage existant est invalide. Aucun fichier ne sera remplacé.'];
+} catch (LengthException $error) {
+    $failure = [413, $error->getMessage()];
+} catch (RuntimeException $error) {
+    $failure = [500, $error->getMessage()];
+} finally {
+    if (is_resource($source)) fclose($source);
+    if (is_resource($backupSource)) fclose($backupSource);
+    if (is_resource($backupLock)) {
+        flock($backupLock, LOCK_UN);
+        fclose($backupLock);
+    }
+    flock($lock, LOCK_UN);
+    fclose($lock);
 }
+if ($failure !== null) failCityStorage($failure[0], $failure[1]);
 echo json_encode(['ok' => true]);

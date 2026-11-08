@@ -1,5 +1,27 @@
 # React + Vite
 
+## Correctif mémoire PHP des pages villes
+
+Les écritures, migrations, sauvegardes et lectures des collections de pages
+villes fonctionnent désormais par blocs, sans décoder ni réencoder toutes
+les pages et les cinq snapshots en mémoire. Le format JSON existant et les
+clés de stockage ne changent pas. Les sauvegardes conservent les cinq versions
+les plus récentes ; les fichiers sont validés avant remplacement et écrits
+atomiquement sous les mêmes verrous.
+
+Ce correctif évite l'erreur `Allowed memory size of 268435456 bytes exhausted`
+dans `city-page-storage.php`. Il est vérifié avec 3640 pages et un fichier de
+cinq sauvegardes dépassant 256 Mo, sous `memory_limit=256M`, avec un pic PHP
+inférieur à 32 Mo pour les opérations testées. Il n'augmente pas la limite
+mémoire de l'hébergeur. Un champ individuel dépassant 16 Mo est refusé avec
+une erreur explicite, sans écraser le stockage.
+
+Déployer ensemble **`api/city-page-storage.php`**, **`api/storage.php`** et le
+nouveau helper **`api/city-json-stream.php`** (également présents dans `dist/`).
+Ne supprimer ni les collections `storage-data/paradise_city_pages*.json`,
+ni les HTML publiés. La copie des sauvegardes reste proportionnelle à leur
+taille sur disque ; ce changement ne crée aucun traitement en arrière-plan.
+
 ## Forfaits tout compris et suivi administratif
 
 **Formules** permet de créer un forfait à prix global ou de convertir une

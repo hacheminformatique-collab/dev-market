@@ -34,7 +34,7 @@ function SourceAccordion({ node, city, knownFaqs, businessName, index }) {
   )
 }
 
-export default function WeddingSourceSections({ layout, city, knownFaqs, businessName, afterIntro, gallery }) {
+export default function WeddingSourceSections({ layout, city, knownFaqs, businessName, afterIntro }) {
   let faqIndex = 0
   function renderNode(node, section, key) {
     if (typeof node === 'string') return injectWeddingSource(node, city)
@@ -67,10 +67,9 @@ export default function WeddingSourceSections({ layout, city, knownFaqs, busines
     if (node.tag === 'section' && section.id === 'intro') children.push(afterIntro)
     return createElement(node.tag, props, ...children)
   }
-  return layout.sections.map((section, index) => (
+  return layout.sections.map((section) => (
     <div key={section.id} className="wedding-source-section">
       {renderNode(section.tree, section, section.id)}
-      {index === 4 && gallery}
     </div>
   ))
 }

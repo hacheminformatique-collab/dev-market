@@ -176,12 +176,12 @@ export function makePageTypeStorage(typeId) {
   const kPages  = _keyPages(typeId)
   const kBackup = _keyBackup(typeId)
 
-  async function getConfig() {
+  async function getConfig({ requireServer = false } = {}) {
     // For non-mariage types, fall back to the global mariage config for
     // shared fields (businessName, token, social, maps key) when no
     // type-specific config exists yet.
-    const global = await _get(KEY_CONFIG)
-    const local  = await _get(kConfig)
+    const global = await _get(KEY_CONFIG, requireServer)
+    const local  = kConfig === KEY_CONFIG ? global : await _get(kConfig, requireServer)
     const base   = {
       ...DEFAULT_CONFIG,
       ...(global || {}),   // inherit shared settings
@@ -214,15 +214,16 @@ export function makePageTypeStorage(typeId) {
       const [canonical] = Object.keys(canonicalCityPages({ [slug]: page }))
       return canonical !== slug ? [[slug, canonical]] : []
     })
-    if (!moves.length) return
+    if (!moves.length) return canonicalCityPages(raw)
     await backupPages({ requireServer: true })
     for (let i = 0; i < moves.length; i += 250) {
       await pageOperation(kPages, 'migrate-pages', { aliases: Object.fromEntries(moves.slice(i, i + 250)) })
     }
+    return canonicalCityPages(raw)
   }
 
-  async function getGallery() {
-    return (await _get(KEY_GALLERY)) || []
+  async function getGallery({ requireServer = false } = {}) {
+    return (await _get(KEY_GALLERY, requireServer)) || []
   }
 
   async function saveGallery(photos) {

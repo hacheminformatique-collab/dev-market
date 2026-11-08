@@ -71,6 +71,36 @@ test('twenty exact source DOM layouts retain all cards, icons, headings, lists a
   }
 })
 
+test('all twenty source models place the photo and social section inside the introduction', () => {
+  const city = cities.getCityBySlug('meaux-77100')
+  const config = {
+    businessName: 'Le Paradise',
+    instagramUsername: 'leparadise77',
+    instagramPosts: ['https://www.instagram.com/reel/ABC123xyz/'],
+  }
+  for (const model of templates.WEDDING_SOURCE_MODELS) {
+    const page = templates.generateWeddingPage({ slug: city.slug, familyId: model.id, seed: 42, travel })
+    const snapshot = publication.makeCitySnapshot({
+      slug: city.slug,
+      pages: { [city.slug]: page },
+      config,
+      gallery: ['/media/test-gallery.jpg'],
+      allTypePages: { mariage: { [city.slug]: page } },
+      blogArticles: {},
+    })
+    const html = renderToStaticMarkup(createElement(MemoryRouter, null,
+      createElement(cityModule.CityPageContent, snapshot)))
+    const firstSection = html.indexOf('class="wedding-source-section"')
+    const nextSection = html.indexOf('class="wedding-source-section"', firstSection + 1)
+    const introduction = html.slice(firstSection, nextSection)
+    assert.ok(introduction.includes('id="intro"'), `${model.id}: introduction section`)
+    assert.ok(introduction.includes('id="galerie"'), `${model.id}: gallery must be inside the introduction`)
+    assert.ok(introduction.includes('/media/test-gallery.jpg'), `${model.id}: gallery photo`)
+    assert.ok(introduction.includes('instagram.com/reel/ABC123xyz/embed'), `${model.id}: Instagram embed`)
+    assert.ok(!introduction.includes('>Voir la publication</span>'), `${model.id}: no fake Instagram header`)
+  }
+})
+
 test('all twenty FAQs keep fourteen original questions in order and SSR includes every known answer', () => {
   const city = cities.getCityBySlug('meaux-77100')
   for (const model of templates.WEDDING_SOURCE_MODELS) {

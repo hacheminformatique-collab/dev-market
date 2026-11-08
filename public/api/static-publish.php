@@ -74,10 +74,33 @@ function readCityFile(string $path) {
     return $html;
 }
 
+function citySnapshotMatch(string $html) {
+    preg_match_all('~<script\b([^>]*)>(.*?)</script\s*>~is', $html, $scripts, PREG_SET_ORDER);
+    $found = [];
+    foreach ($scripts as $script) {
+        if (!preg_match('~\bid\s*=\s*(["\'])city-page-data\1~i', $script[1])) continue;
+        if (!preg_match('~\btype\s*=\s*(["\'])application/json\1~i', $script[1])) return false;
+        $found[] = [$script[0], $script[2]];
+    }
+    return count($found) === 1 ? $found[0] : false;
+}
+
+function citySnapshot(string $html) {
+    $match = citySnapshotMatch($html);
+    if ($match === false) return false;
+    $snapshot = json_decode($match[1]);
+    if (!is_object($snapshot) || !isset($snapshot->page, $snapshot->config)
+        || !is_object($snapshot->page) || !is_object($snapshot->config)) return false;
+    // Older documents omitted these optional public collections.
+    $snapshot->gallery = $snapshot->gallery ?? [];
+    $snapshot->blogArticles = $snapshot->blogArticles ?? [];
+    if (!is_array($snapshot->gallery) || !is_array($snapshot->blogArticles)) return false;
+    return $snapshot;
+}
+
 function snapshotFingerprint(string $html) {
-    if (!preg_match('~<script id="city-page-data" type="application/json">(.*?)</script>~s', $html, $matches)) return false;
-    $snapshot = json_decode($matches[1]);
-    if (!is_object($snapshot) || !isset($snapshot->page, $snapshot->config, $snapshot->gallery, $snapshot->blogArticles)) return false;
+    $snapshot = citySnapshot($html);
+    if ($snapshot === false) return false;
     $value = [
         'page' => $snapshot->page,
         'config' => $snapshot->config,
@@ -178,8 +201,7 @@ if (($data['action'] ?? '') === 'inspect') {
             if (isset($legacyPages[$slug])) {
                 $legacyHtml = readCityFile(cityFile($root, $legacyPages[$slug]));
                 if ($legacyHtml === false || snapshotFingerprint($legacyHtml) === false) failPublication(409, 'Ancienne page publiée absente ou invalide : ' . $slug);
-                preg_match('~<script id="city-page-data" type="application/json">(.*?)</script>~s', $legacyHtml, $matches);
-                $saved = json_decode($matches[1]);
+                $saved = citySnapshot($legacyHtml);
                 $result[$slug] = ['fileHash' => 'missing', 'fingerprint' => null, 'directoryHash' => null,
                     'legacySlug' => $legacyPages[$slug], 'legacyHash' => hash('sha256', $legacyHtml),
                     'businessName' => $saved->config->businessName ?? 'Le Paradise 77', 'generatedAt' => $saved->page->generatedAt ?? null];
@@ -190,8 +212,7 @@ if (($data['action'] ?? '') === 'inspect') {
         } else {
             $fingerprint = snapshotFingerprint($html);
             if ($fingerprint === false) failPublication(409, 'Une page existante ne contient pas de données de publication reconnues : ' . $slug . '. Aucun fichier ne sera remplacé.');
-            preg_match('~<script id="city-page-data" type="application/json">(.*?)</script>~s', $html, $snapshotMatch);
-            $savedSnapshot = json_decode($snapshotMatch[1] ?? '');
+            $savedSnapshot = citySnapshot($html);
             $result[$slug] = [
                 'fileHash' => hash('sha256', $html),
                 'fingerprint' => $fingerprint,
@@ -233,8 +254,9 @@ if (($data['action'] ?? '') === 'inspect') {
         $from = strpos($html, $start);
         $html = substr($html, 0, $from) . $block . substr($html, strpos($html, $end) + strlen($end));
     } elseif (strpos($html, $start) === false && strpos($html, $end) === false) {
-        $anchor = '<script id="city-page-data" type="application/json">';
-        if (substr_count($html, $anchor) !== 1) failPublication(409, 'Page incompatible avec l’annuaire HTML.');
+        $match = citySnapshotMatch($html);
+        $anchor = $match === false ? '' : $match[0];
+        if ($anchor === '' || substr_count($html, $anchor) !== 1) failPublication(409, 'Page incompatible avec l’annuaire HTML.');
         // Keep legacy React markup intact so its original bundle can still hydrate.
         $legacyStyle = '<style id="legacy-wedding-directory-style">' . $styles
             . (strpos($html, '<section class="wedding-directory"') !== false ? "\n#root .wedding-directory{display:none!important}" : '')
@@ -258,7 +280,8 @@ if (($data['action'] ?? '') === 'inspect') {
     if ($oldHtml === false) failPublication(409, 'Ancienne page introuvable.');
     $path = cityFile($root, $slug);
     if (readCityFile($path) !== false) failPublication(409, 'La nouvelle adresse existe déjà. Relancez la publication.');
-    preg_match('~<script id="city-page-data" type="application/json">(.*?)</script>~s', $oldHtml, $matches);
+    $matches = citySnapshotMatch($oldHtml);
+    if ($matches === false) failPublication(409, 'Données de l’ancienne page invalides.');
     $snapshot = json_decode($matches[1] ?? '', true);
     if (!is_array($snapshot) || ($snapshot['citySlug'] ?? '') !== $legacy) failPublication(409, 'Identité de l’ancienne page invalide.');
     $snapshot['citySlug'] = $slug;

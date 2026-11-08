@@ -226,6 +226,36 @@ test('HTML has content, self-canonical, SEO and quote links before JavaScript', 
   assert.throws(() => publication.renderCityDocument({ template: '<div id="root"></div>', snapshot, settings: fixture.settings, origin }), /modèle statique/)
 })
 
+test('city pages render responsive official Instagram and TikTok embeds', () => {
+  const snapshot = publication.makeCitySnapshot({
+    slug: 'meaux-77100',
+    ...fixture,
+    config: {
+      ...fixture.config,
+      instagramPosts: ['https://www.instagram.com/reel/ABC123xyz/'],
+      tiktokPosts: ['https://www.tiktok.com/@paradise/video/1234567890123456789'],
+    },
+  })
+  const html = publication.renderCityDocument({ template, snapshot, settings: fixture.settings, origin })
+  assert.match(html, /instagram\.com\/reel\/ABC123xyz\/embed/)
+  assert.match(html, /tiktok\.com\/embed\/1234567890123456789/)
+  assert.match(html, /border-radius:16px/)
+  assert.match(html, /referrerPolicy="strict-origin-when-cross-origin"/)
+  assert.match(html, /loading="lazy"/)
+  assert.match(html, /Ouvrir cette publication sur Instagram/)
+  const introduction = html.slice(html.indexOf('id="intro"'), html.indexOf('id="pourquoi"'))
+  assert.match(introduction, /id="galerie"/)
+
+  const invalidSnapshot = publication.makeCitySnapshot({
+    slug: 'meaux-77100',
+    ...fixture,
+    config: { ...fixture.config, instagramPosts: ['javascript:alert(1)'] },
+  })
+  const invalidHtml = publication.renderCityDocument({ template, snapshot: invalidSnapshot, settings: fixture.settings, origin })
+  assert.doesNotMatch(invalidHtml, /(?:src|href)="javascript:alert/)
+  assert.match(invalidHtml, /Lien Instagram invalide/)
+})
+
 test('PHP rejects unauthenticated writes, traversal and malformed HTML', async () => {
   const post = (body, adminPin = pin) => fetch(`${origin}/api/static-publish.php`, {
     method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Admin-Pin': adminPin }, body: JSON.stringify(body),
@@ -563,28 +593,27 @@ test('publication migrates legacy directories and writes updated city links into
     await writeFile(file, legacy)
     requests.length = 0
     const upgrade = await publication.publishWeddingPages(options)
-    assert.equal(upgrade.upgraded, 1)
-    assert.equal(upgrade.published, 0)
+    assert.equal(upgrade.upgraded, 0)
+    assert.equal(upgrade.published, 1)
     const migrated = await readFile(file, 'utf8')
     assert.match(migrated, /<!-- CITY_DIRECTORY_START -->/)
-    assert.match(migrated, /legacy-wedding-directory-style/)
+    assert.doesNotMatch(migrated, /legacy-wedding-directory-style/)
     assert.doesNotMatch(migrated, /shared-wedding-directory-v1\.js/)
-    assert.equal(requests.filter((request) => request.action === 'city-directory').length, 1)
-    assert.equal(requests.filter((request) => request.action === 'page').length, 0)
+    assert.equal(requests.filter((request) => request.action === 'city-directory').length, 0)
+    assert.equal(requests.filter((request) => request.action === 'page').length, 1)
 
     const withNewCity = { ...fixture.pages, 'bobigny-93000': { content: 'Nouvelle page Bobigny', generatedAt: '2026-02-01T12:00:00Z', travel } }
     requests.length = 0
     const addition = await publication.publishWeddingPages({ ...options, pages: withNewCity })
-    assert.deepEqual(addition, { total: 3, published: 1, unchanged: 0, upgraded: 2 })
+    assert.deepEqual(addition, { total: 3, published: 3, unchanged: 0, upgraded: 0 })
     const withDirectory = await readFile(file, 'utf8')
     const visibleDirectory = withDirectory.match(/<!-- CITY_DIRECTORY_START -->([\s\S]*?)<!-- CITY_DIRECTORY_END -->/)[1]
     assert.match(visibleDirectory, /href="\/locationsalledemariage\/bobigny-93000"/)
     assert.match(visibleDirectory, /Location salle de mariage près de Meaux/)
     assert.notEqual(withDirectory, migrated)
-    const updatedBlock = withDirectory.match(/<!-- CITY_DIRECTORY_START -->[\s\S]*?<!-- CITY_DIRECTORY_END -->/)[0]
-    const migratedBlock = migrated.match(/<!-- CITY_DIRECTORY_START -->[\s\S]*?<!-- CITY_DIRECTORY_END -->/)[0]
-    assert.equal(withDirectory.replace(updatedBlock, migratedBlock), migrated, 'Only the directory block may change')
-    assert.deepEqual(requests.filter((request) => request.action === 'page').map((request) => request.slug), ['bobigny-93000'])
+    assert.match(withDirectory, /Texte unique \$&amp; et &lt;script&gt;/)
+    assert.equal(requests.filter((request) => request.action === 'city-directory').length, 0, 'Each generated file already contains the final footer')
+    assert.deepEqual(requests.filter((request) => request.action === 'page').map((request) => request.slug).sort(), ['bobigny-93000', 'meaux-77100', 'nanteuil-les-meaux-77100'])
     assert.match(await (await fetch('/wedding-directory.html')).text(), /locationsalledemariage\/bobigny-93000/)
     assert.doesNotMatch(original, /href="\/locationsalledemariage\/bobigny-93000"/)
     assert.match(await (await fetch('/locationsalledemariage/meaux-77100')).text(), /<!-- CITY_DIRECTORY_START -->[\s\S]*href="\/locationsalledemariage\/bobigny-93000"/)
@@ -617,6 +646,56 @@ test('publication migrates legacy directories and writes updated city links into
     const conflict = await post({ action: 'page', slug: 'meaux-77100', html: updated, expectedHash: '0'.repeat(64) })
     assert.equal(conflict.status, 409)
     assert.equal(await readFile(file, 'utf8'), updated)
+
+    const compatibleLegacy = updated.replace('<script id="city-page-data" type="application/json">',
+      "<script type='application/json' data-publication='legacy' id = 'city-page-data'>")
+    await writeFile(file, compatibleLegacy)
+    const compatibleInspection = await post({ action: 'inspect', slugs: ['meaux-77100'], aliases: {} })
+    assert.equal(compatibleInspection.status, 200, 'Attribute order, quotes and spacing in old HTML must be recognized')
+    assert.equal(await readFile(file, 'utf8'), compatibleLegacy, 'Inspection never changes the file')
+    await publication.publishWeddingPages({ ...options, pages: { 'meaux-77100': fixture.pages['meaux-77100'] } })
+    assert.equal(await readFile(file, 'utf8'), updated, 'Unified publication upgrades the old markup')
+
+    requests.length = 0
+    globalThis.fetch = (url, fetchOptions) => {
+      if (url === '/static-city.html') {
+        return Promise.resolve(new Response(template.replace('</body>', '<!-- new-site-model --></body>'),
+          { headers: { 'Content-Type': 'text/html' } }))
+      }
+      if (url === '/api/static-publish.php') requests.push(JSON.parse(fetchOptions.body))
+      return nativeFetch(new URL(url, origin), fetchOptions)
+    }
+    const modelUpgrade = await publication.publishWeddingPages({
+      ...options, pages: { 'meaux-77100': fixture.pages['meaux-77100'] },
+    })
+    assert.equal(modelUpgrade.published, 1, 'Normal publication must apply changed template assets without a second button')
+    assert.match(await readFile(file, 'utf8'), /new-site-model/)
+    globalThis.fetch = (url, fetchOptions) => {
+      if (url === '/api/static-publish.php') requests.push(JSON.parse(fetchOptions.body))
+      return nativeFetch(new URL(url, origin), fetchOptions)
+    }
+    await publication.publishWeddingPages({ ...options, pages: { 'meaux-77100': fixture.pages['meaux-77100'] } })
+    assert.equal(await readFile(file, 'utf8'), updated)
+
+    const optionalLegacy = updated.replace(/(<script id="city-page-data" type="application\/json">)([\s\S]*?)(<\/script>)/,
+      (_match, open, json, close) => {
+        const snapshot = JSON.parse(json)
+        snapshot.gallery = null
+        delete snapshot.blogArticles
+        return `${open}${JSON.stringify(snapshot).replaceAll('<', '\\u003c')}${close}`
+      })
+    await writeFile(file, optionalLegacy)
+    assert.equal((await post({ action: 'inspect', slugs: ['meaux-77100'], aliases: {} })).status, 200,
+      'Null or omitted optional collections must not reject otherwise recognized publication data')
+    await writeFile(file, updated)
+
+    const corrupt = updated.replace(/(<script id="city-page-data" type="application\/json">)[\s\S]*?(<\/script>)/,
+      '$1{"broken":true}$2')
+    await writeFile(file, corrupt)
+    const rejected = await post({ action: 'inspect', slugs: ['meaux-77100'], aliases: {} })
+    assert.equal(rejected.status, 409, 'Truly unknown data must still stop publication')
+    assert.equal(await readFile(file, 'utf8'), corrupt)
+    await writeFile(file, updated)
   } finally {
     globalThis.fetch = nativeFetch
   }

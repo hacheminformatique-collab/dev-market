@@ -56,7 +56,7 @@ test('allows twenty complete six-stage flows per IP per hour, then releases the 
   }
 })
 
-test('notify HTTP sends one accepted step, deduplicates retry, and sends cumulative next section', async () => {
+test('notify HTTP records step one silently and sends one prospect alert after step two', async () => {
   const fixture = path.join(root, `tests/.quote-followup-http-${process.pid}`)
   const webroot = path.join(fixture, 'public')
   const api = path.join(webroot, 'api')
@@ -127,28 +127,11 @@ process.stdin.on('end', () => {
     const post = (payload) => fetch(endpoint, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) })
     const initial = basePayload()
     await writeFile(settingsFile, JSON.stringify({}))
-    const unavailable = await post(initial)
-    assert.equal(unavailable.status, 503)
-    assert.equal((await unavailable.json()).ok, false)
+    const recordedWithoutEmail = await post(initial)
+    assert.equal(recordedWithoutEmail.status, 200)
+    assert.deepEqual(await recordedWithoutEmail.json(), { ok: true, duplicate: false })
     assert.equal(await readFile(mailAttempts, 'utf8').catch(() => ''), '')
-    await writeFile(settingsFile, JSON.stringify(settings))
-
-    const failed = await post(initial)
-    assert.equal(failed.status, 503)
-    assert.deepEqual(await failed.json(), { ok: false, error: 'L’envoi du récapitulatif a échoué. Veuillez réessayer.' })
-    assert.equal(await readFile(mailCapture, 'utf8').catch(() => ''), '')
-    assert.equal((await readFile(mailAttempts, 'utf8')).trim().split('\n').length, 1)
-
-    await rm(failMarker)
-    const sent = await post(initial)
-    assert.deepEqual(await sent.json(), { ok: true, duplicate: false })
-    const retry = await post(initial)
-    assert.deepEqual(await retry.json(), { ok: true, duplicate: true })
-    let delivered = await readFile(mailCapture, 'utf8')
-    assert.equal(delivered.split('---MAIL---').length - 1, 1)
-    assert.match(delivered, /To: owner@example\.test/)
-    assert.match(delivered, /Coordonnées : Alice Martin/)
-    assert.match(delivered, /E-mail : alice@example\.fr/)
+    assert.equal((await readFile(path.join(storage, 'quote-followups', `flow-${initial.flowId}.json`), 'utf8')).length > 0, true)
 
     const nextSection = basePayload({
       stage: 2,
@@ -159,10 +142,36 @@ process.stdin.on('end', () => {
         nbEnfants: 20,
       },
     })
-    const nextSent = await post(nextSection)
-    assert.deepEqual(await nextSent.json(), { ok: true, duplicate: false })
+    const savedWithoutOwnerEmail = await post(nextSection)
+    assert.equal(savedWithoutOwnerEmail.status, 503)
+    const savedProspect = JSON.parse(await readFile(path.join(storage, 'quote-followups', `flow-${nextSection.flowId}.json`), 'utf8'))
+    assert.equal(savedProspect.stage, 2, 'The prospect is stored before attempting its email alert')
+    assert.equal(await readFile(mailAttempts, 'utf8').catch(() => ''), '')
+    await writeFile(settingsFile, JSON.stringify(settings))
+
+    const failed = await post(nextSection)
+    assert.equal(failed.status, 503)
+    assert.deepEqual(await failed.json(), { ok: false, error: 'L’envoi du récapitulatif a échoué. Veuillez réessayer.' })
+    assert.equal(await readFile(mailCapture, 'utf8').catch(() => ''), '')
+    assert.equal((await readFile(mailAttempts, 'utf8')).trim().split('\n').length, 1)
+
+    await rm(failMarker)
+    const sent = await post(nextSection)
+    assert.deepEqual(await sent.json(), { ok: true, duplicate: false })
+    const retry = await post(nextSection)
+    assert.deepEqual(await retry.json(), { ok: true, duplicate: true })
+    let delivered = await readFile(mailCapture, 'utf8')
+    assert.equal(delivered.split('---MAIL---').length - 1, 1)
+    assert.match(delivered, /To: owner@example\.test/)
+    assert.match(delivered, /Nouveau prospect enregistré/)
+    assert.match(delivered, /Subject:.*Nouveau prospect/)
+    assert.match(delivered, /Coordonnées : Alice Martin/)
+    assert.match(delivered, /E-mail : alice@example\.fr/)
+
+    const changedRetry = basePayload({ ...nextSection, summary: { ...nextSection.summary, commentaire: 'détail ajouté' } })
+    assert.deepEqual(await (await post(changedRetry)).json(), { ok: true, duplicate: true })
     delivered = await readFile(mailCapture, 'utf8')
-    assert.equal(delivered.split('---MAIL---').length - 1, 2)
+    assert.equal(delivered.split('---MAIL---').length - 1, 1, 'Step two sends only one email even if the prospect details change')
     assert.match(delivered, /Événement : Mariage/)
     assert.match(delivered, /Participants : 140 \(120 adultes, 20 enfants\)/)
     const prospectEndpoint = `http://127.0.0.1:${httpPort}/api/prospects.php`
@@ -182,6 +191,8 @@ process.stdin.on('end', () => {
     await writeFile(path.join(storage, 'paradise_clients.json'), '[]')
     const progressed = basePayload({ stage: 3, summary: { ...nextSection.summary, formule: 'Location sèche' } })
     assert.equal((await post(progressed)).status, 200)
+    delivered = await readFile(mailCapture, 'utf8')
+    assert.equal(delivered.split('---MAIL---').length - 1, 2, 'The existing follow-up for later stages remains enabled')
     assert.equal((await getProspects()).prospects.length, 0, 'Validating the formula removes the prospect')
     await post(nextSection)
     assert.equal((await getProspects()).prospects.length, 0, 'Back navigation cannot reclassify an advanced quote')
@@ -192,17 +203,22 @@ process.stdin.on('end', () => {
     const rejectedData = await post(basePayload({ summary: { email: 'invalid' } }))
     assert.equal(rejectedData.status, 400)
     assert.equal((await rejectedData.json()).ok, false)
-    assert.equal((await readFile(mailCapture, 'utf8')).split('---MAIL---').length - 1, 3)
+    assert.equal((await readFile(mailCapture, 'utf8')).split('---MAIL---').length - 1, 2)
 
     await writeFile(failMarker, 'fail')
     const newFlow = basePayload({ flowId: 'abcdef0123456789abcdef0123456789' })
-    const failedDelivery = await post(newFlow)
+    const newProspect = basePayload({
+      flowId: newFlow.flowId,
+      stage: 2,
+      summary: { typeEvenement: 'Mariage', dateEvenement: '2099-06-12', nbAdultes: 50, nbEnfants: 0 },
+    })
+    const failedDelivery = await post(newProspect)
     assert.equal(failedDelivery.status, 503)
     assert.equal((await failedDelivery.json()).ok, false)
     await rm(failMarker)
-    const retryAfterFailure = await post(newFlow)
+    const retryAfterFailure = await post(newProspect)
     assert.deepEqual(await retryAfterFailure.json(), { ok: true, duplicate: false })
-    assert.equal((await readFile(mailCapture, 'utf8')).split('---MAIL---').length - 1, 4)
+    assert.equal((await readFile(mailCapture, 'utf8')).split('---MAIL---').length - 1, 3)
   } finally {
     if (phpServer) {
       const exited = once(phpServer, 'exit')

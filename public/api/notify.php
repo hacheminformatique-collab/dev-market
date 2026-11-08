@@ -243,12 +243,6 @@ if ($notificationType === 'quote_followup') {
         echo json_encode(['ok' => false, 'error' => 'Les informations transmises sont incomplètes ou invalides.']);
         exit;
     }
-    if (!$ownerEmail) {
-        http_response_code(503);
-        echo json_encode(['ok' => false, 'error' => 'Le service de suivi est momentanément indisponible.']);
-        exit;
-    }
-
     $followupDir = $logDir . '/quote-followups';
     if (!is_dir($followupDir) && !@mkdir($followupDir, 0750, true) && !is_dir($followupDir)) {
         http_response_code(503);
@@ -257,6 +251,18 @@ if ($notificationType === 'quote_followup') {
     }
     $protectFile = $followupDir . '/.htaccess';
     if (!is_file($protectFile)) @file_put_contents($protectFile, "Require all denied\n", LOCK_EX);
+
+    if ($followup['stage'] === 1) {
+        $remoteAddress = isset($_SERVER['REMOTE_ADDR']) ? (string) $_SERVER['REMOTE_ADDR'] : 'unknown';
+        $rateFile = $followupDir . '/rate-' . hash('sha256', $remoteAddress) . '.json';
+        if (!quote_followup_rate_allowed($rateFile)) {
+            http_response_code(429);
+            header('X-RateLimit-Scope: quote-followup');
+            header('Retry-After: ' . quote_followup_retry_after($rateFile));
+            echo json_encode(['ok' => false, 'error' => 'Trop de demandes ont été envoyées. Veuillez réessayer plus tard.']);
+            exit;
+        }
+    }
 
     try {
         quote_followup_save_progress($followupDir, $followup);
@@ -267,8 +273,20 @@ if ($notificationType === 'quote_followup') {
         exit;
     }
 
+    if ($followup['stage'] === 2 && is_file(__DIR__ . '/admin-push-lib.php')) {
+        require_once __DIR__ . '/admin-push-lib.php';
+        adminPushDispatch('prospect', $followup['flowId']);
+    }
+
+    if ($followup['stage'] === 1) {
+        echo json_encode(['ok' => true, 'duplicate' => false]);
+        exit;
+    }
+
     $summaryJson = json_encode($followup['summary'], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
-    $dedupeKey = hash('sha256', $followup['flowId'] . ':' . $followup['stage'] . ':' . $summaryJson);
+    $dedupeKey = hash('sha256', $followup['flowId'] . ':' . (
+        $followup['stage'] === 2 ? 'prospect' : $followup['stage'] . ':' . $summaryJson
+    ));
     $recordFile = $followupDir . '/' . $dedupeKey . '.json';
     $recordHandle = @fopen($recordFile, 'c+');
     if (!$recordHandle || !flock($recordHandle, LOCK_EX)) {
@@ -286,7 +304,6 @@ if ($notificationType === 'quote_followup') {
         echo json_encode(['ok' => true, 'duplicate' => true]);
         exit;
     }
-
     $remoteAddress = isset($_SERVER['REMOTE_ADDR']) ? (string) $_SERVER['REMOTE_ADDR'] : 'unknown';
     $rateFile = $followupDir . '/rate-' . hash('sha256', $remoteAddress) . '.json';
     if (!quote_followup_rate_allowed($rateFile)) {
@@ -298,11 +315,18 @@ if ($notificationType === 'quote_followup') {
         echo json_encode(['ok' => false, 'error' => 'Trop de demandes ont été envoyées. Veuillez réessayer plus tard.']);
         exit;
     }
+    if (!$ownerEmail) {
+        flock($recordHandle, LOCK_UN);
+        fclose($recordHandle);
+        http_response_code(503);
+        echo json_encode(['ok' => false, 'error' => 'Le service de suivi est momentanément indisponible.']);
+        exit;
+    }
 
-    $stageNames = [1 => 'Coordonnées', 2 => 'Événement', 3 => 'Formule', 4 => 'Menu', 5 => 'Gâteau', 6 => 'Options'];
+    $stageNames = [2 => 'Prospect', 3 => 'Formule', 4 => 'Menu', 5 => 'Gâteau', 6 => 'Options'];
     $stageName = $stageNames[$followup['stage']];
     $summaryText = quote_followup_summary_text($followup['summary']);
-    $adminMessage = "Nouvelle demande de devis — étape validée : {$stageName}\n\n"
+    $adminMessage = ($followup['stage'] === 2 ? "Nouveau prospect enregistré\n\n" : "Nouvelle demande de devis — étape validée : {$stageName}\n\n")
         . $summaryText . "\n\nLe devis est incomplet ou en cours de préparation.";
     $record['sent'] = !empty($record['sent']);
     $record['updatedAt'] = time();
@@ -318,7 +342,8 @@ if ($notificationType === 'quote_followup') {
         $followupHeaders .= "Reply-To: {$followup['summary']['email']}\r\n";
         $mailResult = send_with_fallback(
             $ownerEmail,
-            'Suivi de demande de devis — ' . $stageName,
+            $followup['stage'] === 2 ? 'Nouveau prospect : ' . $followup['summary']['prenom'] . ' ' . $followup['summary']['nom']
+                : 'Suivi de demande de devis — ' . $stageName,
             $adminMessage,
             $followupHeaders,
             $smtpConfig,
@@ -455,6 +480,12 @@ if ($clientEmail) {
     );
     $clientSent = $clientResult['sent'];
     $clientVia = $clientResult['via'];
+}
+
+if (is_file(__DIR__ . '/admin-push-lib.php')) {
+    require_once __DIR__ . '/admin-push-lib.php';
+    if ($notificationType === 'devis_brouillon') adminPushDispatch('draft', $devisNumber);
+    if ($notificationType === 'devis_signe') adminPushDispatch('signed', $devisNumber);
 }
 
 echo json_encode([

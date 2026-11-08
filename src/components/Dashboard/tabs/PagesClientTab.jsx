@@ -286,7 +286,7 @@ export default function PagesClientTab({ pageType }) {
         setPages({ ...updated })
         done++
       }
-      setPublishMessage(`✅ Trajets mis à jour pour ${done} page(s). Cliquez sur « Publier les pages en HTML statique » pour actualiser les fichiers publiés.`)
+      setPublishMessage(`✅ Trajets mis à jour pour ${done} page(s). Cliquez sur « Publier / actualiser les pages » pour actualiser les fichiers publiés.`)
     } catch (error) {
       setGenError(`❌ Mise à jour du trajet impossible${current ? ` pour "${current}"` : ''} : ${error.message} Les pages déjà mises à jour restent conservées.`)
     } finally {
@@ -295,21 +295,19 @@ export default function PagesClientTab({ pageType }) {
     }
   }
 
-  async function handlePublish(updateTemplate = false) {
-    if (updateTemplate && !window.confirm('Mettre à jour le modèle HTML de toutes les pages enregistrées ? Leurs fichiers existants seront remplacés, même si leurs textes n’ont pas changé.')) return
+  async function handlePublish() {
     setPublishing(true)
     setPublishMessage('')
     setPublishError('')
     setPublishProgress({ done: 0, total: Object.keys(pages).length, current: 'Préparation des pages' })
     try {
-      for (const pt of PAGE_TYPES) await makePageTypeStorage(pt.id).migratePageKeys()
-      const [savedConfig, savedGallery, blogArticles, ...typePages] = await Promise.all([
-        storage.getConfig(),
-        storage.getGallery(),
-        getBlogArticles(),
-        ...PAGE_TYPES.map((pt) => makePageTypeStorage(pt.id).getPages()),
+      const allTypePages = {}
+      for (const pt of PAGE_TYPES) allTypePages[pt.id] = await makePageTypeStorage(pt.id).migratePageKeys()
+      const [savedConfig, savedGallery, blogArticles] = await Promise.all([
+        storage.getConfig({ requireServer: true }),
+        storage.getGallery({ requireServer: true }),
+        getBlogArticles({ requireServer: true }),
       ])
-      const allTypePages = Object.fromEntries(PAGE_TYPES.map((pt, i) => [pt.id, typePages[i]]))
       const { publishWeddingPages } = await import('../../../utils/staticCityPublication')
       const result = await publishWeddingPages({
         pages: allTypePages.mariage,
@@ -320,7 +318,6 @@ export default function PagesClientTab({ pageType }) {
         settings: getSettings(),
         origin: window.location.origin,
         onProgress: setPublishProgress,
-        updateTemplate,
       })
       setPages(allTypePages.mariage)
       setPublishMessage(`✅ ${result.published} page(s) publiée(s) ou actualisée(s), ${result.unchanged} inchangée(s), ${result.upgraded} avec annuaire HTML actualisé. Annuaire, sitemap et robots.txt actualisés.`)
@@ -365,7 +362,7 @@ export default function PagesClientTab({ pageType }) {
       await storage.savePages(snapshot)
       setPages(snapshot)
       setPublishError('')
-      setPublishMessage('ℹ️ Sauvegarde restaurée. Cliquez sur « Publier les pages en HTML statique » pour actualiser les fichiers publics et leur bandeau vidéo.')
+      setPublishMessage('ℹ️ Sauvegarde restaurée. Cliquez sur « Publier / actualiser les pages » pour actualiser les fichiers publics et leur bandeau vidéo.')
       const bkps = await storage.getBackups()
       setBackups(bkps || [])
     } finally {
@@ -650,16 +647,7 @@ export default function PagesClientTab({ pageType }) {
                     disabled={publishing || generating || saving || restoringIdx !== null}
                     onClick={() => handlePublish()}
                   >
-                    {publishing ? '⏳ Publication en cours…' : '📄 Publier les pages en HTML statique'}
-                  </button>
-                  <button
-                    type="button"
-                    className="btn btn-outline"
-                    disabled={publishing || generating || saving || restoringIdx !== null}
-                    onClick={() => handlePublish(true)}
-                    style={{ marginLeft: '8px' }}
-                  >
-                    Mettre à jour le modèle des pages
+                    {publishing ? '⏳ Publication en cours…' : '📄 Publier / actualiser les pages'}
                   </button>
                   <button
                     type="button"
@@ -671,12 +659,12 @@ export default function PagesClientTab({ pageType }) {
                     🚗 Mettre à jour les trajets
                   </button>
                   <p style={{ fontSize: '13px', color: 'var(--text-light)', marginTop: '12px', lineHeight: 1.6 }}>
-                    Publie les nouvelles pages et actualise celles dont le contenu, la galerie, la configuration ou les articles ont changé.
-                    Les autres fichiers sont modifiés uniquement si leur annuaire doit être actualisé.
+                    Applique le modèle actuel et publie les pages en une seule opération, sans régénérer les textes ni les avis.
+                    Les fichiers déjà à jour ne sont pas réécrits. Le pied de page inclut toutes les villes du lot dès la première publication.
                     L’annuaire des pages publiées est inscrit directement dans leur HTML, sans nécessiter JavaScript.
                     La publication crée aussi les 16 pages département et les actualise uniquement si leur HTML change.
                     Hors Île-de-France, l’annuaire des villes ne contient que les communes publiées du même département.
-                    Après une mise à jour du modèle du site, utilisez le second bouton si vous souhaitez l’appliquer aux pages enregistrées.
+                    Gardez cet onglet ouvert jusqu’à la fin : aucun traitement ne continue sur le serveur après sa fermeture.
                     Le bouton « Mettre à jour les trajets » calcule la distance et la durée routières réelles depuis Le Paradise pour les pages enregistrées avant ce calcul ; elles sont exigées pour publier.
                     Enregistrez la configuration et gardez cet onglet ouvert jusqu’à la fin.
                   </p>

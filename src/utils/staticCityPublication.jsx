@@ -31,16 +31,6 @@ async function hashText(text) {
   return Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, '0')).join('')
 }
 
-async function snapshotFingerprint(snapshot) {
-  const json = JSON.stringify({
-    page: snapshot.page,
-    config: snapshot.config,
-    gallery: snapshot.gallery,
-    blogArticles: snapshot.blogArticles,
-  })
-  return hashText(json)
-}
-
 function cityDirectory(slugs, slug, businessName) {
   const city = getCityBySlug(slug)
   return renderToStaticMarkup(<WeddingDirectory slugs={slugs} businessName={businessName} cityName={city.name} departmentCode={directoryDepartmentCode(city)} />)
@@ -218,7 +208,8 @@ export async function publishWeddingPages({ pages, config, gallery, allTypePages
       throw new Error(`Vérification du fichier de ${getCityBySlug(slug).name} invalide.`)
     }
     const snapshot = pages[slug] ? makeCitySnapshot({ slug, pages, config, gallery, allTypePages, blogArticles }) : null
-    if (!snapshot || (!updateTemplate && existing.fingerprint === await snapshotFingerprint(snapshot))) {
+    if (snapshot) snapshot.allTypePages.mariage = Object.fromEntries(allSlugs.map((citySlug) => [citySlug, true]))
+    if (!snapshot) {
       if (!snapshot && existing.fileHash === 'missing' && existing.legacySlug) {
         const result = await write({ action: 'city-migrate', slug, legacySlug: existing.legacySlug, expectedHash: existing.legacyHash })
         const check = await fetch(`${PAGE_TYPES_BY_ID.mariage.basePath}/${slug}`, { cache: 'no-store' })
@@ -239,8 +230,15 @@ export async function publishWeddingPages({ pages, config, gallery, allTypePages
       onProgress({ done: i + 1, total: allSlugs.length, current: '' })
       continue
     }
-    const initialSlugs = [...new Set([...inspection.publishedSlugs, slug])]
-    const html = renderCityDocument({ template, snapshot, settings, origin, directorySlugs: initialSlugs })
+    const html = renderCityDocument({ template, snapshot, settings, origin, directorySlugs: allSlugs })
+    const desiredHash = await hashText(html)
+    if (!updateTemplate && existing.fileHash === desiredHash) {
+      pageHashes[slug] = existing.fileHash
+      directoryHashes[slug] = existing.directoryHash
+      counts.unchanged++
+      onProgress({ done: i + 1, total: allSlugs.length, current: '' })
+      continue
+    }
     await write({ action: 'page', slug, html, expectedHash: existing.fileHash })
     const check = await fetch(`${snapshot.pageType.basePath}/${slug}`, { cache: 'no-store' })
     if (!check.ok || await check.text() !== html) {
@@ -248,8 +246,8 @@ export async function publishWeddingPages({ pages, config, gallery, allTypePages
     }
     counts.published++
     publishedNow.add(slug)
-    pageHashes[slug] = await hashText(html)
-    directoryHashes[slug] = await hashText(cityDirectory(initialSlugs, slug, snapshot.config.businessName || 'Le Paradise 77'))
+    pageHashes[slug] = desiredHash
+    directoryHashes[slug] = await hashText(cityDirectory(allSlugs, slug, snapshot.config.businessName || 'Le Paradise 77'))
     onProgress({ done: i + 1, total: allSlugs.length, current: '' })
   }
   for (let i = 0; i < allSlugs.length; i++) {

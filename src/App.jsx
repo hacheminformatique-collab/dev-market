@@ -8,6 +8,7 @@ import { PAGE_TYPES_BY_ID } from './data/pageTypes'
 import PublicWeddingDirectory from './components/PublicWeddingDirectory'
 import { storageProfile } from './utils/storageProfiles'
 import { adminPaths, siteAdminRequest } from './utils/siteAdministration'
+import PageAnalytics from './components/PageAnalytics'
 
 const AdminLogin = lazy(() => import('./components/AdminLogin'))
 const Dashboard = lazy(() => import('./components/Dashboard/Dashboard'))
@@ -92,6 +93,7 @@ function AppContent() {
 
   return (
     <>
+      <PageAnalytics enabled={!isAdmin} />
       <SeoManager settingsVersion={readyPath} />
       <PublicWeddingDirectory />
       <Suspense fallback={(

@@ -167,19 +167,84 @@ function GalleryGrid({ photos }) {
 
 // ── Instagram post embed ───────────────────────────────────────────────────────
 
-function InstagramEmbed({ url }) {
-  if (!url) return null
-  const embedUrl = url.replace(/\/$/, '') + '/embed'
+function instagramEmbedUrl(value) {
+  try {
+    const url = new URL(value)
+    if (!['instagram.com', 'www.instagram.com'].includes(url.hostname)) return ''
+    const match = url.pathname.match(/^\/(p|reel|tv)\/([A-Za-z0-9_-]+)(?:\/embed)?\/?$/)
+    return match ? {
+      embedUrl: `https://www.instagram.com/${match[1]}/${match[2]}/embed`,
+      postUrl: `https://www.instagram.com/${match[1]}/${match[2]}/`,
+    } : null
+  } catch {
+    return null
+  }
+}
+
+function SocialVideoCard({ platform, profileUrl, embedUrl, title, height = 580 }) {
   return (
-    <iframe
-      src={embedUrl}
-      title="Instagram post"
-      style={{ border: 'none', borderRadius: '12px', width: '328px', minHeight: '440px', maxWidth: '100%' }}
-      scrolling="no"
-      loading="lazy"
-      allowTransparency
-      allow="encrypted-media"
-    />
+    <article style={{
+      width: 'min(100%, 390px)',
+      overflow: 'hidden',
+      background: '#fff',
+      border: '1px solid #e8e4df',
+      borderRadius: '16px',
+      boxShadow: '0 12px 32px rgba(28,28,46,0.10)',
+    }}>
+      <a href={profileUrl} target="_blank" rel="noreferrer noopener"
+        style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '13px 15px', color: 'var(--dark)', textDecoration: 'none' }}>
+        <span aria-hidden="true" style={{
+          display: 'grid', placeItems: 'center', width: '34px', height: '34px', flexShrink: 0,
+          borderRadius: '50%', color: '#fff', fontSize: '19px', fontWeight: 700,
+          background: platform === 'Instagram'
+            ? 'linear-gradient(135deg, #7b39a8, #e1306c 58%, #f6a543)'
+            : '#111',
+        }}>{platform === 'Instagram' ? '◎' : '♪'}</span>
+        <span style={{ minWidth: 0 }}>
+          <strong style={{ display: 'block', fontSize: '14px' }}>{platform}</strong>
+          <span style={{ display: 'block', color: '#777', fontSize: '12px' }}>Voir la publication</span>
+        </span>
+        <span aria-hidden="true" style={{ marginLeft: 'auto', color: 'var(--gold)', fontSize: '20px' }}>↗</span>
+      </a>
+      <iframe
+        src={embedUrl}
+        title={title}
+        style={{ display: 'block', border: 0, width: '100%', height: `${height}px`, background: '#faf9f7' }}
+        scrolling="no"
+        loading="lazy"
+        referrerPolicy="strict-origin-when-cross-origin"
+        allowFullScreen
+        allow="encrypted-media; picture-in-picture; web-share"
+      />
+      <div style={{ padding: '10px 15px', color: '#777', fontSize: '12px' }}>
+        Contenu intégré fourni par {platform}
+      </div>
+    </article>
+  )
+}
+
+function InstagramEmbed({ url, username }) {
+  if (!url) return null
+  const embed = instagramEmbedUrl(url)
+  if (!embed) {
+    return <p role="note" style={{ color: '#777', maxWidth: '390px' }}>Lien Instagram invalide. Utilisez l’URL d’une publication, d’un Reel ou d’une vidéo publique.</p>
+  }
+  return (
+    <div style={{ width: 'min(100%, 400px)' }}>
+      <iframe
+        src={embed.embedUrl}
+        title={username ? `Publication Instagram de @${username}` : 'Publication Instagram'}
+        style={{ display: 'block', border: 0, width: '100%', height: '580px', maxWidth: '100%', background: '#fff' }}
+        scrolling="no"
+        loading="lazy"
+        referrerPolicy="strict-origin-when-cross-origin"
+        allow="encrypted-media; picture-in-picture; web-share"
+      />
+      <a href={embed.postUrl} target="_blank" rel="noreferrer noopener"
+        style={{ display: 'inline-block', marginTop: '8px', color: 'var(--gold)', fontWeight: 600, fontSize: '13px' }}>
+        Ouvrir cette publication sur Instagram
+      </a>
+    </div>
   )
 }
 
@@ -187,18 +252,17 @@ function InstagramEmbed({ url }) {
 
 function TikTokEmbed({ url }) {
   if (!url) return null
-  const match = url.match(/\/video\/(\d+)/)
-  if (!match) return null
+  let parsed
+  try { parsed = new URL(url) } catch { parsed = null }
+  const match = parsed && ['www.tiktok.com', 'tiktok.com'].includes(parsed.hostname)
+    ? parsed.pathname.match(/\/video\/(\d+)/)
+    : null
+  if (!match) {
+    return <p role="note" style={{ color: '#777', maxWidth: '390px' }}>Lien TikTok invalide. Utilisez l’URL complète d’une vidéo publique.</p>
+  }
   const videoId = match[1]
   return (
-    <iframe
-      src={`https://www.tiktok.com/embed/${videoId}`}
-      title="TikTok video"
-      style={{ border: 'none', borderRadius: '12px', width: '325px', height: '575px', maxWidth: '100%' }}
-      loading="lazy"
-      allowFullScreen
-      allow="encrypted-media"
-    />
+    <SocialVideoCard platform="TikTok" profileUrl={`https://www.tiktok.com${parsed.pathname}`} embedUrl={`https://www.tiktok.com/embed/${videoId}`} title="Vidéo TikTok intégrée" height={640} />
   )
 }
 
@@ -409,13 +473,14 @@ function SectionReviews({ page }) {
   )
 }
 
-function SectionIntro({ city, businessName, page }) {
+function SectionIntro({ city, businessName, page, gallery }) {
   return (
     <Section id="intro" title={page.template?.version === 2 ? undefined : `${businessName} — votre réception depuis ${city.name}`}>
       <div style={{ fontSize: '15px', color: 'var(--text)', lineHeight: 1.8 }}>
         {renderContent(withoutTestimonials(normalizeWeddingDisplayText(page.content, getCityBySlug(city.slug))))}
         <SectionReviews page={page} />
       </div>
+      {gallery}
     </Section>
   )
 }
@@ -676,11 +741,16 @@ function SectionCapacite({ city, businessName }) {
 // ── 6. Section Galerie ─────────────────────────────────────────────────────────
 
 function SectionGalerie({ gallery, instagramUsername, instagramPosts, tiktokUsername, tiktokPosts }) {
+  const hasContent = gallery?.length || instagramUsername || instagramPosts.length || tiktokUsername || tiktokPosts.length
+  if (!hasContent) return null
   return (
-    <Section id="galerie" title="📸 Galerie & Réseaux sociaux">
+    <div id="galerie" style={{ marginTop: '40px', paddingTop: '28px', borderTop: '1px solid var(--border)' }}>
+      <h3 style={{ fontFamily: 'var(--font-heading)', fontSize: '1.35rem', fontWeight: '700', color: 'var(--dark)', margin: '0 0 20px' }}>
+        📸 Photos & réseaux sociaux
+      </h3>
       {gallery && gallery.length > 0 && (
         <div style={{ marginBottom: '36px' }}>
-          <h3 style={{ fontFamily: 'var(--font-heading)', fontSize: '1.1rem', fontWeight: '700', color: 'var(--dark)', marginBottom: '16px' }}>Notre galerie photos</h3>
+          <h4 style={{ fontFamily: 'var(--font-heading)', fontSize: '1.1rem', fontWeight: '700', color: 'var(--dark)', marginBottom: '16px' }}>Notre galerie photos</h4>
           <GalleryGrid photos={gallery} />
         </div>
       )}
@@ -699,8 +769,8 @@ function SectionGalerie({ gallery, instagramUsername, instagramPosts, tiktokUser
             </p>
           )}
           {instagramPosts.length > 0 && (
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '16px' }}>
-              {instagramPosts.filter(Boolean).map((url, i) => <InstagramEmbed key={i} url={url} />)}
+            <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'flex-start', gap: '20px' }}>
+              {instagramPosts.filter(Boolean).map((url, i) => <InstagramEmbed key={i} url={url} username={instagramUsername} />)}
             </div>
           )}
         </div>
@@ -720,13 +790,13 @@ function SectionGalerie({ gallery, instagramUsername, instagramPosts, tiktokUser
             </p>
           )}
           {tiktokPosts.length > 0 && (
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '16px' }}>
+            <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'flex-start', gap: '20px' }}>
               {tiktokPosts.filter(Boolean).map((url, i) => <TikTokEmbed key={i} url={url} />)}
             </div>
           )}
         </div>
       )}
-    </Section>
+    </div>
   )
 }
 
@@ -1218,17 +1288,16 @@ export function CityPageContent({ citySlug, pageType, page, gallery, config, all
   const orderedSections = sourceLayout ? [
     <WeddingSourceSections key="source" layout={sourceLayout} city={sourceCity}
       knownFaqs={getWeddingFaqs({ city, businessName: 'Le Paradise' })} businessName="Le Paradise"
-      afterIntro={<SectionReviews key="reviews" page={page} />} gallery={liveGallery} />,
+      afterIntro={<><SectionReviews key="reviews" page={page} />{liveGallery}</>} />,
     <SectionBlogArticles key="blog-articles" articles={blogArticles} />,
   ] : [
-    <SectionIntro key="intro" city={city} businessName={businessName} page={page} />,
+    <SectionIntro key="intro" city={city} businessName={businessName} page={page} gallery={liveGallery} />,
     ...(page.template?.version === 2 ? [] : [
       <SectionWhyChoose key="why-choose" city={city} businessName={businessName} />,
       <SectionPrestations key="prestations" city={city} businessName={businessName} />,
       <SectionReservation key="reservation" city={city} businessName={businessName} />,
       <SectionCapacite key="capacite" city={city} businessName={businessName} />,
     ]),
-    liveGallery,
     ...(page.template?.version === 2 ? [] : [
       <SectionLieux key="lieux" city={city} businessName={businessName} />,
       <SectionConseils key="conseils" city={city} />,

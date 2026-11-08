@@ -79,7 +79,7 @@ Les anciennes sauvegardes restent importables : les clés sont normalisées
 sans modifier leurs textes. Une copie déjà enregistrée sous une clé postale
 est prioritaire sur la copie historique du même identifiant.
 
-Après déploiement complet de `dist/`, lancer **Publier les pages en HTML statique**.
+Après déploiement complet de `dist/`, lancer **Publier / actualiser les pages**.
 La génération et la publication sauvegardent les collections à migrer, puis renomment leurs clés
 côté serveur par lots de 250 correspondances, sans retransmettre les contenus.
 Les anciens HTML absents d'une sauvegarde restaurée sont copiés à leur nouvelle
@@ -102,10 +102,63 @@ plus avancée. Ces demandes peuvent être encore en cours, sans délai d'abandon
 supposé. Les anciens journaux ne permettent pas de reconstruire les coordonnées.
 `api/prospects.php` exige le PIN enregistré et ne met pas les résultats en cache ;
 les dossiers restent dans le stockage privé `storage-data/quote-followups/`.
+La validation de l'étape 1 enregistre le parcours sans envoyer d'e-mail.
+Après l'enregistrement de l'étape 2, un seul e-mail « Nouveau prospect » est
+envoyé par parcours, même si le navigateur réessaie ou si les coordonnées
+évoluent ; les notifications déjà prévues pour les étapes suivantes restent
+inchangées.
 
 Le formulaire intégré réinitialise sa couleur de texte pour éviter l'héritage
-blanc des sections villes, notamment pour DJ. Utiliser **Mettre à jour le modèle
-des pages** pour fournir ce nouveau code aux HTML sauvegardés avec d'anciens assets.
+blanc des sections villes, notamment pour DJ. Utiliser **Publier / actualiser
+les pages** pour fournir ce nouveau code aux HTML sauvegardés avec d'anciens assets.
+
+## Notifications push administrateur
+
+**Mes Infos > Notifications administrateur** permet d'activer les alertes sur
+chaque appareil : nouveaux prospects, devis non signés, devis signés et,
+facultativement, une visite par navigateur pseudonyme/jour. Les visites sont
+désactivées par défaut. Sur iPhone, utiliser iOS 16.4 minimum et HTTPS, ouvrir
+Mes Infos dans Safari après connexion, ajouter l'administration à l'écran
+d'accueil, puis ouvrir cette icône et toucher **Activer**. L'autorisation iOS
+est obligatoire. Les notifications peuvent arriver application fermée ; la
+génération et la publication, elles, nécessitent toujours un onglet ouvert et
+un écran actif. Aucun cron ni tâche de fond n'est installé.
+
+Déployer tout `dist/`, y compris `api/push-runtime/vendor/`, les manifestes,
+icônes, `admin-push-sw.js` et `.htaccess`. L'hébergement doit fournir PHP 8.2+
+avec curl, openssl et mbstring, et autoriser les connexions HTTPS sortantes.
+Composer n'est pas nécessaire sur l'hébergement. Préserver le dossier privé
+`storage-data/admin-push/` (clés VAPID et abonnements) entre déploiements :
+ses fichiers ne doivent jamais être accessibles publiquement. Dix appareils
+maximum peuvent s'abonner. Les préférences restent actives après déconnexion,
+mais ouvrir une notification exige toujours l'accès administrateur.
+
+Les alertes ne contiennent aucune identité client. Les échecs d'envoi sont
+journalisés sans bloquer le devis ; aucun renvoi automatique n'est effectué.
+La réception réelle sur iPhone doit être vérifiée après déploiement en créant
+un prospect avec l'application fermée. Les réglages Concentration, le réseau
+ou la révocation des permissions peuvent retarder ou empêcher les alertes.
+Voir `public/api/push-runtime/INSTALL.md` pour les prérequis et contrôles.
+
+## Mesure d'audience et intégrations sociales
+
+L'onglet **Statistiques**, sous **Mes Infos**, affiche les pages vues, une
+estimation des navigateurs uniques par jour, les moyennes des 7, 30 et 90
+derniers jours et les pages les plus consultées. Les mesures commencent après
+le déploiement de cette version ; aucun trafic antérieur ne peut être recréé.
+Un identifiant aléatoire du navigateur est renouvelé chaque jour ; le serveur
+ne conserve que son empreinte datée, les totaux de pages et aucune adresse IP.
+Les robots courants et les espaces client/staff ne sont pas comptés. Les
+statistiques sont conservées au maximum 400 jours et la mesure peut être
+désactivée dans **Politique de confidentialité**.
+
+Les URL de publications/Reels Instagram et de vidéos TikTok publiques sont
+affichées dans la présentation de la ville. Instagram utilise son embed officiel
+direct, sans fausse barre de profil ni de boutons d'interaction simulés ; les
+commandes J'aime/partage dépendent de ce que la plateforme expose dans son
+lecteur intégré. Pour mettre à jour le rendu HTML déjà publié, déployer `dist/`,
+puis choisir **Publier / actualiser les pages** dans l'onglet des pages
+mariage : cette action remplace les fichiers statiques après confirmation.
 
 ## Protection contre les rafales LWS
 
@@ -259,7 +312,7 @@ ceux du modèle demandé, indépendamment du nom configuré pour les autres cont
 Les noms de villes affichés et injectés dans les nouveaux textes sont également
 sans accents ni ponctuation. Les URL et adresses structurées restent inchangées ;
 les anciens textes sauvegardés sont conservés et normalisés à l'affichage.
-Déployer puis utiliser **Mettre à jour le modèle des pages** pour actualiser
+Déployer puis utiliser **Publier / actualiser les pages** pour actualiser
 les métadonnées des pages enregistrées dont le HTML utilise un ancien modèle.
 Après restauration, publier les pages dont les données ont changé.
 
@@ -354,7 +407,7 @@ d'échec, l'image reste visible et un message explicite est affiché.
 
 Déployer tout `dist/`, notamment `media/`. Les sauvegardes de contenus
 antérieures restent compatibles : elles utilisent le modèle actuel après
-restauration. Utiliser **Mettre à jour le modèle des pages** après le déploiement
+restauration. Utiliser **Publier / actualiser les pages** après le déploiement
 si les fichiers HTML existants ne contiennent pas encore le bandeau.
 Les anciens fichiers HTML ne sont pas modifiés automatiquement ; restaurer
 un ancien fichier HTML complet rétablira son ancien aspect.
@@ -365,14 +418,28 @@ L'administration ne propose plus que l'onglet **Pages salle de mariage**.
 Les contenus sauvegardés et les anciennes URL des autres types restent disponibles.
 
 Dans **Pages salle de mariage > Sélection villes**, le bouton
-**Publier les pages en HTML statique** crée les pages manquantes et actualise
-celles dont le contenu, la configuration, les photos ou les articles ont
-changé. Les fichiers dont le contenu et l'annuaire sont inchangés ne sont ni
-remplacés ni vérifiés chacun par une requête HTTP. L'ajout d'une ville modifie
-le bloc d'annuaire des pages déjà publiées. La première publication migre les
-anciens fichiers vers cet annuaire HTML.
+**Générer** conserve la génération et la sauvegarde des villes sélectionnées,
+sans publication automatique. **Publier / actualiser les pages** applique le
+modèle compilé actuel, les réglages SEO et la galerie, sans régénérer les textes
+ni les avis. Aucun second bouton de mise à jour du modèle n'est nécessaire.
+Le HTML cible est comparé à l'empreinte du fichier existant : les fichiers
+identiques ne sont ni réécrits ni vérifiés par une nouvelle requête HTTP.
+Chaque fichier nouvellement écrit contient dès le premier passage le pied de
+page complet du lot. L'annuaire général et le sitemap sont finalisés à la fin
+de la même opération ; aucune deuxième publication manuelle n'est nécessaire.
+Gardez le navigateur ouvert pour générer et publier : aucun cron ni traitement
+en arrière-plan n'est installé. Relancer après une interruption conserve les
+fichiers déjà écrits et ignore ceux qui sont maintenant identiques.
 Les pages déjà publiées absentes d'une sauvegarde restaurée restent dans le
 registre et l'annuaire tant que leur fichier existe.
+
+L'inspection reconnaît les anciennes balises JSON dont les attributs sont
+réordonnés ou utilisent des apostrophes, et les collections facultatives
+absentes. Un HTML sans données valides de publication reste bloqué pour ne
+pas écraser son contenu. Pour une erreur telle que `paris-1er-75001`, conserver
+le fichier et vérifier son bloc `city-page-data` ; ne pas supprimer le fichier
+pour contourner ce contrôle. Le correctif de compatibilité ne garantit pas
+la récupération d'un fichier réellement corrompu.
 
 La publication crée également **16 pages département**, pour les huit
 départements d'Île-de-France et l'Aisne (02), l'Eure (27), l'Eure-et-Loir (28),
@@ -419,7 +486,7 @@ les extraits d'avis Google conservés présentent le nom, la note, les étoiles
 jaunes et le texte dans une carte blanche. Ce ne sont pas des avis chargés
 en direct depuis Google.
 Pour appliquer ces changements visuels aux fichiers de villes existants,
-utiliser **Mettre à jour le modèle des pages** après le déploiement.
+utiliser **Publier / actualiser les pages** après le déploiement.
 
 Chaque ville possède un fichier physique
 `locationsalledemariage/<ville>.html`, servi à l'adresse existante
@@ -480,7 +547,7 @@ public OSRM exige une connexion Internet et peut être indisponible ou limiter
 les requêtes. Les tests automatisés simulent ses réponses.
 
 Pour les pages anciennes ou restaurées sans trajet enregistré, utiliser
-**Mettre à jour les trajets**, puis **Publier les pages en HTML statique**.
+**Mettre à jour les trajets**, puis **Publier / actualiser les pages**.
 La mise à jour sauvegarde les pages côté serveur, conserve leurs modèles et
 leurs textes personnalisés et ne calcule que les trajets manquants. La publication
 refuse les pages sans trajet : elle ne substitue pas une estimation géométrique.

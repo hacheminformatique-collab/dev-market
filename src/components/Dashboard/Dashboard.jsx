@@ -21,6 +21,7 @@ const ComptabiliteTab = lazy(() => import('./tabs/ComptabiliteTab'))
 const PagesClientTab = lazy(() => import('./tabs/PagesClientTab'))
 const BlogTab = lazy(() => import('./tabs/BlogTab'))
 const BackupTab = lazy(() => import('./tabs/BackupTab'))
+const StatisticsTab = lazy(() => import('./tabs/StatisticsTab'))
 
 const TABS = [
   { id: 'clients',    icon: '👥', label: 'Clients & Devis' },
@@ -38,6 +39,7 @@ const TABS = [
   { id: 'blog',       icon: '📝', label: 'Blog' },
   { id: 'backup',     icon: '💾', label: 'Back-up' },
   { id: 'infos',      icon: '⚙️', label: 'Mes Infos' },
+  { id: 'statistics', icon: '📈', label: 'Statistiques' },
   { id: 'motdepasse', icon: '🔑', label: 'Code PIN' },
 ]
 
@@ -98,6 +100,7 @@ export default function Dashboard() {
       case 'gateaux':     return <GateauTab key={refreshKey} />
       case 'prestations': return <PrestationTab key={refreshKey} />
       case 'infos':       return <MesInfosTab key={refreshKey} />
+      case 'statistics':  return <StatisticsTab key={refreshKey} />
       case 'motdepasse':  return <MotDePasseTab key={refreshKey} />
       case 'blog':        return <BlogTab key={refreshKey} />
       case 'backup':      return <BackupTab key={refreshKey} />

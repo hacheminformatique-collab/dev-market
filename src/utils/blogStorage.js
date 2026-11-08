@@ -32,14 +32,18 @@ const KEY_AUTOLOG  = 'paradise_blog_autolog'
 
 // ── Shared get/set (same pattern as cityPageStorage) ──────────────────────────
 
-async function _get(key) {
+async function _get(key, requireServer = false) {
   try {
-    const res = await fetch(`/api/storage.php?key=${encodeURIComponent(key)}`)
+    const res = await fetch(`/api/storage.php?key=${encodeURIComponent(key)}`, requireServer ? { cache: 'no-store', paced: true } : undefined)
     if (res.ok) {
       const data = await res.json()
+      if (requireServer) return data
       if (data !== null) return data
     }
-  } catch { /* fall through to localStorage */ }
+    if (requireServer) throw new Error(`Lecture du blog impossible (HTTP ${res.status}).`)
+  } catch (error) {
+    if (requireServer) throw error
+  }
   try {
     const raw = localStorage.getItem(key)
     return raw ? JSON.parse(raw) : null
@@ -83,8 +87,8 @@ export async function saveBlogConfig(config) {
 // ── Articles ──────────────────────────────────────────────────────────────────
 
 /** Returns { [slug]: Article } */
-export async function getBlogArticles() {
-  return (await _get(KEY_ARTICLES)) || {}
+export async function getBlogArticles({ requireServer = false } = {}) {
+  return (await _get(KEY_ARTICLES, requireServer)) || {}
 }
 
 export async function saveBlogArticles(articles) {

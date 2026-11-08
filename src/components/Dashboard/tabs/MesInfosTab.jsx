@@ -7,6 +7,7 @@ import { PAGE_TYPES } from '../../../data/pageTypes'
 import { getBlogArticles } from '../../../utils/blogStorage'
 import { getPublishedWeddingSlugs, getPublishedWeddingDepartments } from '../../../utils/weddingPublication'
 import SiteAccessControls from '../SiteAccessControls'
+import AdminPushControls from '../AdminPushControls'
 
 function resizeImageToDataUrl(file, maxW, maxH) {
   return new Promise((resolve, reject) => {
@@ -189,6 +190,7 @@ export default function MesInfosTab() {
   return (
     <div>
       <SiteAccessControls kind="maintenance" />
+      <AdminPushControls />
       {saveError && <p role="alert" style={{ color: '#c0392b' }}>{saveError}</p>}
       <h3 style={{ marginBottom: '20px', color: '#1a1a2e' }}>Informations générales</h3>
       <div className="card" style={{ maxWidth: '600px' }}>

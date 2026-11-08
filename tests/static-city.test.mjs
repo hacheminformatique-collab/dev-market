@@ -558,10 +558,20 @@ async function testDepartments() {
     requests.length = 0
     await publication.publishWeddingPages(options)
     assert.equal(requests.filter(({ action }) => ['department', 'page', 'city-directory'].includes(action)).length, 0, 'No unchanged HTML is rewritten')
+    assert.ok(requests.filter(({ action }) => action === 'inspect').every(({ inspectSlugs }) => Array.isArray(inspectSlugs) && inspectSlugs.length <= 25))
     const post = (body) => fetch('/api/static-publish.php', {
       method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Admin-Pin': pin }, body: JSON.stringify(body),
     })
     const inspection = await (await post({ action: 'inspect', slugs: Object.keys(pages), aliases: {} })).json()
+    const metadata = await (await post({ action: 'inspect', slugs: Object.keys(pages), aliases: {}, inspectSlugs: [] })).json()
+    assert.equal(Object.keys(metadata.pages).length, 0)
+    assert.equal(metadata.registryHash, inspection.registryHash)
+    assert.deepEqual(metadata.publishedSlugs, inspection.publishedSlugs)
+    const scoped = await (await post({ action: 'inspect', slugs: Object.keys(pages), aliases: {}, inspectSlugs: ['meaux-77100'] })).json()
+    assert.deepEqual(Object.keys(scoped.pages), ['meaux-77100'])
+    assert.deepEqual(scoped.pages['meaux-77100'], inspection.pages['meaux-77100'])
+    assert.equal((await post({ action: 'inspect', slugs: Object.keys(pages), aliases: {}, inspectSlugs: Array(26).fill('meaux-77100') })).status, 400)
+    assert.equal((await post({ action: 'inspect', slugs: Object.keys(pages), aliases: {}, inspectSlugs: ['ville-inconnue-75001'] })).status, 400)
     const html = await readFile(join(site, 'locationsalledemariage/departements/75.html'), 'utf8')
     assert.equal((await post({ action: 'department', code: '../75', html, expectedHash: 'missing' })).status, 400)
     assert.equal((await post({ action: 'department', code: '75', html, expectedHash: 'missing' })).status, 409)
@@ -571,6 +581,39 @@ async function testDepartments() {
     globalThis.fetch = nativeFetch
   }
 }
+
+test('publication inspects bounded batches before writing and explains empty PHP responses', async () => {
+  const nativeFetch = globalThis.fetch
+  const slugs = ALL_CITIES.slice(0, 60).map((city) => city.slug)
+  const pages = Object.fromEntries(slugs.map((slug) => [slug, { content: 'Page de test', generatedAt: '2026-01-01T00:00:00Z', travel }]))
+  const calls = []
+  let emptyResponse = false
+  globalThis.fetch = async (url, options) => {
+    if (url === '/static-city.html') return new Response(template)
+    if (url === '/') return new Response(shellTemplate)
+    if (url !== '/api/static-publish.php') throw new Error(`Unexpected fetch ${url}`)
+    const payload = JSON.parse(options.body)
+    calls.push(payload)
+    if (emptyResponse) return new Response('', { status: 500, headers: { 'Content-Type': 'application/json' } })
+    if (payload.action !== 'inspect') return new Response(JSON.stringify({ error: 'Stop after inspection' }), { status: 409 })
+    return new Response(JSON.stringify({
+      ok: true, pages: Object.fromEntries(payload.inspectSlugs.map((slug) => [slug, { fileHash: 'missing', fingerprint: null, directoryHash: null }])),
+      departments: {}, publishedSlugs: [], registryHash: 'missing',
+    }))
+  }
+  try {
+    await assert.rejects(publication.publishWeddingPages({ ...fixture, pages, origin, onProgress() {} }), /Stop after inspection/)
+    assert.deepEqual(calls.filter(({ action }) => action === 'inspect').map(({ inspectSlugs }) => inspectSlugs.length), [0, 25, 25, 10])
+    assert.deepEqual(calls.filter(({ action }) => action === 'inspect').flatMap(({ inspectSlugs }) => inspectSlugs), slugs)
+    assert.equal(calls[4].action, 'page')
+    calls.length = 0
+    emptyResponse = true
+    await assert.rejects(publication.publishWeddingPages({ ...fixture, pages, origin, onProgress() {} }), /réponse vide.*static-publish\.php.*inspect.*HTTP 500/)
+    assert.equal(calls.length, 1)
+  } finally {
+    globalThis.fetch = nativeFetch
+  }
+})
 
 test('publication migrates legacy directories and writes updated city links into HTML', async () => {
   const nativeFetch = globalThis.fetch

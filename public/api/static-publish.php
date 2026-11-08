@@ -98,8 +98,8 @@ function citySnapshot(string $html) {
     return $snapshot;
 }
 
-function snapshotFingerprint(string $html) {
-    $snapshot = citySnapshot($html);
+function snapshotFingerprint(string $html, $snapshot = null) {
+    $snapshot = $snapshot ?? citySnapshot($html);
     if ($snapshot === false) return false;
     $value = [
         'page' => $snapshot->page,
@@ -193,15 +193,23 @@ if (($data['action'] ?? '') === 'inspect') {
         }
     }
     $previous = array_values(array_unique(array_map(function ($slug) use ($aliases) { return $aliases[$slug] ?? $slug; }, $previous)));
+    $allSlugs = array_values(array_unique(array_merge($previous, $slugs)));
+    $inspectSlugs = $data['inspectSlugs'] ?? $allSlugs;
+    if (!is_array($inspectSlugs) || (array_key_exists('inspectSlugs', $data) && count($inspectSlugs) > 25)) {
+        failPublication(400, 'Lot de vérification invalide (maximum 25 pages).');
+    }
+    foreach ($inspectSlugs as $slug) {
+        if (!is_string($slug) || !in_array($slug, $allSlugs, true)) failPublication(400, 'Ville absente du lot de publication.');
+    }
     $result = [];
-    foreach (array_unique(array_merge($previous, $slugs)) as $slug) {
+    foreach (array_unique($inspectSlugs) as $slug) {
         if (!validCitySlug($slug)) failPublication(400, 'Identifiant de ville invalide.');
         $html = readCityFile(cityFile($root, $slug));
         if ($html === false) {
             if (isset($legacyPages[$slug])) {
                 $legacyHtml = readCityFile(cityFile($root, $legacyPages[$slug]));
-                if ($legacyHtml === false || snapshotFingerprint($legacyHtml) === false) failPublication(409, 'Ancienne page publiée absente ou invalide : ' . $slug);
-                $saved = citySnapshot($legacyHtml);
+                $saved = $legacyHtml === false ? false : citySnapshot($legacyHtml);
+                if ($saved === false || snapshotFingerprint($legacyHtml, $saved) === false) failPublication(409, 'Ancienne page publiée absente ou invalide : ' . $slug);
                 $result[$slug] = ['fileHash' => 'missing', 'fingerprint' => null, 'directoryHash' => null,
                     'legacySlug' => $legacyPages[$slug], 'legacyHash' => hash('sha256', $legacyHtml),
                     'businessName' => $saved->config->businessName ?? 'Le Paradise 77', 'generatedAt' => $saved->page->generatedAt ?? null];
@@ -210,9 +218,9 @@ if (($data['action'] ?? '') === 'inspect') {
             if (in_array($slug, $previous, true)) failPublication(409, 'Une page du registre est absente : ' . $slug . '. Vérifiez les fichiers publiés.');
             $result[$slug] = ['fileHash' => 'missing', 'fingerprint' => null, 'directoryHash' => null];
         } else {
-            $fingerprint = snapshotFingerprint($html);
-            if ($fingerprint === false) failPublication(409, 'Une page existante ne contient pas de données de publication reconnues : ' . $slug . '. Aucun fichier ne sera remplacé.');
             $savedSnapshot = citySnapshot($html);
+            $fingerprint = $savedSnapshot === false ? false : snapshotFingerprint($html, $savedSnapshot);
+            if ($fingerprint === false) failPublication(409, 'Une page existante ne contient pas de données de publication reconnues : ' . $slug . '. Aucun fichier ne sera remplacé.');
             $result[$slug] = [
                 'fileHash' => hash('sha256', $html),
                 'fingerprint' => $fingerprint,

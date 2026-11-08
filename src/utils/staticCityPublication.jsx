@@ -170,11 +170,12 @@ export async function publishWeddingPages({ pages, config, gallery, allTypePages
       headers: { 'Content-Type': 'application/json', 'X-Admin-Pin': settings.pin },
       body: JSON.stringify(payload),
     })
-    if (!res.headers.get('content-type')?.includes('application/json')) {
-      throw new Error(`API PHP de publication indisponible (HTTP ${res.status}). Vérifiez le déploiement et la limite post_max_size.`)
+    const text = await res.text()
+    let data
+    try { data = JSON.parse(text) } catch {
+      throw new Error(`Publication : réponse ${text.trim() ? 'invalide ou tronquée' : 'vide'} de api/static-publish.php, opération « ${payload.action} » (HTTP ${res.status}). Consultez les journaux PHP pour vérifier les limites mémoire et de durée d’exécution.`)
     }
-    const data = await res.json()
-    if (!res.ok || !data.ok) throw new Error(data.error || `Publication refusée (HTTP ${res.status}).`)
+    if (!res.ok || !data?.ok) throw new Error(data?.error || `Publication refusée (HTTP ${res.status}, opération « ${payload.action} »).`)
     return data
   }
 
@@ -187,7 +188,7 @@ export async function publishWeddingPages({ pages, config, gallery, allTypePages
   }
   // Validate all inputs before writing the first file.
   for (const slug of slugs) makeCitySnapshot({ slug, pages, config, gallery, allTypePages, blogArticles })
-  const inspection = await write({ action: 'inspect', slugs, aliases: legacyCityAliases })
+  const inspection = await write({ action: 'inspect', slugs, aliases: legacyCityAliases, inspectSlugs: [] })
   if (!inspection.pages || typeof inspection.pages !== 'object' || !Array.isArray(inspection.publishedSlugs)
     || typeof inspection.registryHash !== 'string'
     || (inspection.registryHash !== 'missing' && !/^[a-f0-9]{64}$/.test(inspection.registryHash))
@@ -195,6 +196,18 @@ export async function publishWeddingPages({ pages, config, gallery, allTypePages
     throw new Error('Vérification des fichiers publiés invalide.')
   }
   const allSlugs = [...new Set([...inspection.publishedSlugs, ...slugs])]
+  for (let offset = 0; offset < allSlugs.length; offset += 25) {
+    onProgress({ done: 0, total: allSlugs.length, current: `Vérification préalable : ${offset} / ${allSlugs.length}` })
+    const inspectSlugs = allSlugs.slice(offset, offset + 25)
+    const batch = await write({ action: 'inspect', slugs, aliases: legacyCityAliases, inspectSlugs })
+    if (batch.registryHash !== inspection.registryHash) {
+      throw new Error('Le registre des pages a changé pendant la vérification. Relancez la publication pour protéger les fichiers.')
+    }
+    for (const slug of inspectSlugs) {
+      if (!batch.pages?.[slug]) throw new Error(`Vérification du fichier de ${getCityBySlug(slug).name} absente de la réponse serveur.`)
+      inspection.pages[slug] = batch.pages[slug]
+    }
+  }
   const counts = { published: 0, unchanged: 0, upgraded: 0 }
   const pageHashes = {}
   const directoryHashes = {}

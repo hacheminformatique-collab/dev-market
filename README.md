@@ -1,5 +1,21 @@
 # React + Vite
 
+## Vérification de publication sous la limite PHP de 30 secondes
+
+La publication vérifie les HTML existants par lots de **25 pages maximum**
+au lieu de parcourir plusieurs milliers de fichiers dans une seule requête
+`static-publish.php`. Le registre et l'ensemble des fichiers sont vérifiés
+avant la première écriture ; les contrôles de hash, les migrations et le
+refus des fichiers corrompus restent actifs. La progression affiche le nombre
+de fichiers examinés pendant cette préparation. Un registre modifié entre
+deux lots interrompt la publication pour protéger les fichiers.
+
+Les réponses PHP vides ou tronquées affichent maintenant l'opération et le
+statut HTTP plutôt que `Unexpected end of JSON input`. Déployer ensemble
+`api/static-publish.php` et les nouveaux assets de `dist/`, puis recharger
+l'administration pour utiliser la vérification par lots. Le correctif
+n'augmente pas `max_execution_time` et ne crée pas de tâche en arrière-plan.
+
 ## Correctif mémoire PHP des pages villes
 
 Les écritures, migrations, sauvegardes et lectures des collections de pages

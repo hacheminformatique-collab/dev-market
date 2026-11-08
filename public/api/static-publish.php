@@ -194,6 +194,9 @@ if (($data['action'] ?? '') === 'inspect') {
     }
     $previous = array_values(array_unique(array_map(function ($slug) use ($aliases) { return $aliases[$slug] ?? $slug; }, $previous)));
     $allSlugs = array_values(array_unique(array_merge($previous, $slugs)));
+    if (!array_key_exists('inspectSlugs', $data) && count($allSlugs) > 25) {
+        failPublication(409, 'Votre administration utilise une ancienne version de publication. Déployez tout le dossier dist, y compris index.html et les assets, puis fermez et rechargez l’administration pour vérifier les pages par lots de 25.');
+    }
     $inspectSlugs = $data['inspectSlugs'] ?? $allSlugs;
     if (!is_array($inspectSlugs) || (array_key_exists('inspectSlugs', $data) && count($inspectSlugs) > 25)) {
         failPublication(400, 'Lot de vérification invalide (maximum 25 pages).');

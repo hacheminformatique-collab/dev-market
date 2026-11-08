@@ -585,6 +585,12 @@ async function testDepartments() {
 test('publication inspects bounded batches before writing and explains empty PHP responses', async () => {
   const nativeFetch = globalThis.fetch
   const slugs = ALL_CITIES.slice(0, 60).map((city) => city.slug)
+  const legacyResponse = await nativeFetch(`${origin}/api/static-publish.php`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Admin-Pin': pin },
+    body: JSON.stringify({ action: 'inspect', slugs, aliases: {} }),
+  })
+  assert.equal(legacyResponse.status, 409)
+  assert.match((await legacyResponse.json()).error, /ancienne version.*dist.*assets/)
   const pages = Object.fromEntries(slugs.map((slug) => [slug, { content: 'Page de test', generatedAt: '2026-01-01T00:00:00Z', travel }]))
   const calls = []
   let emptyResponse = false

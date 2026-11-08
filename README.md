@@ -15,6 +15,9 @@ statut HTTP plutôt que `Unexpected end of JSON input`. Déployer ensemble
 `api/static-publish.php` et les nouveaux assets de `dist/`, puis recharger
 l'administration pour utiliser la vérification par lots. Le correctif
 n'augmente pas `max_execution_time` et ne crée pas de tâche en arrière-plan.
+Le serveur refuse également les anciennes requêtes qui demandent de vérifier
+plus de 25 pages sans découpage : il indique de déployer `index.html` et les
+assets, puis de recharger l'administration, plutôt que dépasser les 30 secondes.
 
 ## Correctif mémoire PHP des pages villes
 
